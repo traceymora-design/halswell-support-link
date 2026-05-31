@@ -13,8 +13,6 @@ import {
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 // --- FIREBASE CONFIGURATION ---
-// Safely load the configuration. If we are running in the preview sandbox, we use the global __firebase_config parameter.
-// If we are running in production on Vercel, we fallback to the local hardcoded credentials.
 const getFirebaseConfig = () => {
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
@@ -27,7 +25,7 @@ const getFirebaseConfig = () => {
     }
   }
   
-  // YOUR FIREBASE WEB APP CONFIGURATION OBJECT FOR HALSWELL SCHOOL PRODUCTION SITE:
+  // YOUR LIVE FIREBASE WEB APP CONFIGURATION OBJECT:
   return {
     apiKey: "AIzaSyDnWi7OUCjyApvDC0nclGBKWJaaCc-Cr1s",
     authDomain: "support-link-app.firebaseapp.com",
@@ -41,8 +39,7 @@ const getFirebaseConfig = () => {
 
 const firebaseConfig = getFirebaseConfig();
 
-// If the API key is missing or is a placeholder, we define a dummy config to prevent the app from instantly crashing on boot,
-// allowing it to render the UI safely or let the user continue updating keys.
+// Fallback dummy config for preview window
 const safeFirebaseConfig = (firebaseConfig && firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("YOUR_"))
   ? firebaseConfig
   : {
@@ -58,7 +55,7 @@ const app = initializeApp(safeFirebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Use a clean static string fallback when appId contains unsafe folder-like segments (such as filenames or paths from the sandbox)
+// Use a clean static string fallback when appId contains folder segments
 const getCleanAppId = () => {
   const rawId = typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production";
   return rawId.split('/')[0];
@@ -213,9 +210,8 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Sync Live Data & Check Authorization -- GUARDED to run ONLY after auth is complete AND user is actively authenticated
+  // 2. Sync Live Data & Check Authorization -- GUARDED to run ONLY after auth is complete
   useEffect(() => {
-    // Only subscribe to snapshots once authentication is fully completed and dbUser state exists.
     if (!authCompleted || !dbUser) return;
 
     let usersLoaded = false;
@@ -226,8 +222,6 @@ export default function App() {
       if (usersLoaded && sessionsLoaded && absencesLoaded) setIsDbReady(true);
     };
 
-    // Firebase storage path requirements aligned with rule structure:
-    // /artifacts/{appId}/public/data/{collectionName}
     const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersRef, async (snapshot) => {
       const fetchedUsers = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
@@ -268,7 +262,6 @@ export default function App() {
         if (localMatched) {
           setCurrentUser(localMatched);
         } else if (fetchedUsers.length > 0) {
-          // Fallback to first user in preview environment if no SENCO role is defined yet
           setCurrentUser(fetchedUsers[0]);
         }
       }
@@ -295,7 +288,7 @@ export default function App() {
     return () => { unsubUsers(); unsubSessions(); unsubAbsences(); };
   }, [authCompleted, dbUser]);
 
-  // Database Write Methods - Guarded to prevent unauthenticated operations
+  // Database Write Methods
   const addUserToDb = async (userObj) => {
     if (!auth.currentUser) return;
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
@@ -338,7 +331,6 @@ export default function App() {
 
   const handleGoogleSignIn = async () => {
     if (!firebaseConfig || !firebaseConfig.apiKey) {
-      // If we are currently running in the sandbox and no credentials are pasted yet, let them log in instantly as an authorized mock SENCO to test.
       const mockSenco = {
         id: 'u-senco-sandbox',
         name: 'Sarah Admin (SENCO)',
@@ -376,9 +368,7 @@ export default function App() {
     }
   };
 
-  // If we are in sandboxed preview mode and permissions/initial state are setting up,
-  // we render the main shell immediately instead of hanging on the loader if Firestore permissions fail on start.
-  if (!isDbReady && (firebaseConfig && firebaseConfig.apiKey)) {
+  if (!isDbReady) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
         <Loader2 className="w-12 h-12 text-[#6157e8] animate-spin mb-4" />
@@ -388,13 +378,11 @@ export default function App() {
     );
   }
 
-  // Fallback database states if in local preview/sandboxed mode with missing permissions
   const safeUsers = users.length > 0 ? users : INITIAL_USERS;
   const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
   const safeAbsences = absences;
 
-  // Real Google Login Screen
-  if (!currentUser && (firebaseConfig && firebaseConfig.apiKey)) {
+  if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
         <div className="flex flex-col items-center max-w-md w-full">
@@ -440,8 +428,7 @@ export default function App() {
     );
   }
 
-  // Active user representation (fallback to default admin in preview sandbox)
-  const activeUser = currentUser || { id: 'u-admin-fallback', name: 'Sarah Admin (SENCO)', role: ROLES.SENCO, email: 'admin@school.edu' };
+  const activeUser = currentUser;
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans">
@@ -786,15 +773,13 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
       {/* Coverage Resolution Modal */}
       {resolvingAbsence && (
-        <CoverageResolver {
-          ...{
-            absence: resolvingAbsence,
-            users,
-            sessions,
-            onClose: () => setResolvingAbsence(null),
-            onResolve: (assignments) => handleApplyCoverage(assignments, resolvingAbsence)
-          }
-        } />
+        <CoverageResolver 
+          absence={resolvingAbsence} 
+          users={users}
+          sessions={sessions} 
+          onClose={() => setResolvingAbsence(null)}
+          onResolve={(assignments) => handleApplyCoverage(assignments, resolvingAbsence)}
+        />
       )}
 
       {/* Session Editor Modal */}
@@ -845,4 +830,327 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
                   Cancel
                 </button>
-                <button type="submit"
+                <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Staff Modal */}
+      {showManageStaff && (
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
+            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">Manage Staff</h3>
+            
+            <div className="flex-1 overflow-y-auto pr-2 mb-6 space-y-2 border-b border-slate-100 pb-4">
+              {users.map(u => (
+                <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <div>
+                    <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
+                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
+                  </div>
+                  {u.id !== currentUser.id && (
+                    <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title={`Delete ${u.name}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-bold text-[#1a1f36] text-sm">Add New Staff</h4>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
+                <input 
+                  type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none mb-3"
+                  placeholder="e.g. Val Murray"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Email Address</label>
+                <input 
+                  type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none mb-3"
+                  placeholder="e.g. val.murray@school.nz"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Role / Access Level</label>
+                <select 
+                  value={newStaffRole} 
+                  onChange={(e) => setNewStaffRole(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none"
+                >
+                  <option value={ROLES.TA}>Teacher Aide (TA)</option>
+                  <option value={ROLES.TEACHER}>Teacher</option>
+                  <option value={ROLES.SENCO}>SENCO (Admin)</option>
+                </select>
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
+                  Done
+                </button>
+                <button onClick={handleAddStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">
+                  Add Staff
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wipe Data Confirmation Modal */}
+      {showWipeConfirm && (
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 animate-fade-in border-2 border-red-100">
+            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h3 className="text-xl font-bold text-[#1a1f36] mb-2">Wipe Demo Data?</h3>
+            <p className="text-slate-500 text-sm mb-6">
+              This will permanently delete all mock Teacher Aides, Timetables, and Absences. It cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button onClick={() => setShowWipeConfirm(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
+                Cancel
+              </button>
+              <button onClick={handleWipeData} className="px-6 py-3 bg-red-600 text-white font-bold hover:bg-red-700 rounded-xl transition-colors shadow-md text-sm">
+                Yes, Wipe Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-[#1a1f36] flex items-center">
+              Master Timetable
+            </h2>
+            <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-1">Live Database Connected</p>
+          </div>
+          
+          <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
+            <button 
+              onClick={() => setShowWipeConfirm(true)}
+              className="flex items-center px-4 py-2.5 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 transition-colors"
+              title="Clear all demo data"
+            >
+              <RefreshCw className="w-4 h-4 mr-1.5" strokeWidth={3} /> Wipe Demo
+            </button>
+            <button 
+              onClick={() => setShowManageStaff(true)}
+              className="flex items-center px-4 py-2.5 bg-[#f0efff] text-[#6157e8] font-bold text-sm rounded-xl hover:bg-[#e0dfff] transition-colors"
+            >
+              <Users className="w-4 h-4 mr-1.5" strokeWidth={3} /> Manage Staff
+            </button>
+            <select 
+              value={selectedDay}
+              onChange={(e) => setSelectedDay(e.target.value)}
+              className="bg-slate-50 border border-slate-200 text-[#1a1f36] font-semibold rounded-xl focus:ring-[#6157e8] focus:border-[#6157e8] block px-4 py-2.5 outline-none flex-1 sm:flex-none"
+            >
+              {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="p-0">
+          <TimetableGrid 
+            sessions={sessions} 
+            day={selectedDay} 
+            users={users} 
+            isEditable={true}
+            onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} 
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- COVERAGE RESOLUTION LOGIC ---
+function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
+  const absentTa = users.find(u => u.id === absence.taId);
+  const daySessions = sessions.filter(s => s.day === absence.day);
+  const criticalSessionsToCover = daySessions.filter(s => s.taId === absence.taId && s.tier === TIERS.CRITICAL);
+  const [assignments, setAssignments] = useState({});
+
+  const getSuggestionsForSlot = (timeSlotId) => {
+    const enrichmentSessions = daySessions.filter(s => 
+      s.timeSlotId === timeSlotId && 
+      s.tier === TIERS.ENRICHMENT &&
+      s.taId !== absence.taId
+    );
+    return enrichmentSessions.map(s => ({
+      ta: users.find(u => u.id === s.taId),
+      currentTask: s.subject
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-[32px] shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh]">
+        <div className="p-8 border-b border-slate-100">
+          <h3 className="text-2xl font-bold text-[#1a1f36]">Resolve Absence</h3>
+          <p className="text-sm font-semibold text-slate-500 mt-1">{absentTa?.name} • {absence.day}</p>
+        </div>
+        
+        <div className="p-8 overflow-y-auto flex-1 bg-slate-50">
+          {criticalSessionsToCover.length === 0 ? (
+            <div className="text-center p-8">
+              <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+              <p className="text-slate-500 font-medium">No critical sessions to cover on this day.</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {criticalSessionsToCover.map(session => {
+                const suggestions = getSuggestionsForSlot(session.timeSlotId);
+                const slotObj = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+                return (
+                  <div key={session.id} className="bg-white border border-slate-200 rounded-[24px] p-6 shadow-sm">
+                    <div className="mb-4">
+                      <span className="inline-block px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-bold tracking-wider uppercase mb-2">Critical Need</span>
+                      <h4 className="font-bold text-lg text-[#1a1f36]">{slotObj?.start} - {slotObj?.end}</h4>
+                      <p className="text-slate-600 font-medium mt-1">{session.subject}</p>
+                    </div>
+                    
+                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                        Suggested Coverage (TAs on Enrichment)
+                      </p>
+                      {suggestions.length > 0 ? (
+                        <div className="space-y-2">
+                          {suggestions.map((sug, idx) => (
+                            <label key={idx} className={`flex items-center p-4 border-[1.5px] rounded-[16px] cursor-pointer transition-all ${assignments[session.id] === sug.ta.id ? 'bg-[#f0efff] border-[#6157e8]' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                              <input 
+                                type="radio" 
+                                name={`cover-${session.id}`} 
+                                value={sug.ta.id}
+                                checked={assignments[session.id] === sug.ta.id}
+                                onChange={() => setAssignments(prev => ({...prev, [session.id]: sug.ta.id}))}
+                                className="text-[#6157e8] w-4 h-4 mr-4 focus:ring-[#6157e8]"
+                              />
+                              <div>
+                                <span className="font-bold text-[#1a1f36] block">{sug.ta.name}</span>
+                                <span className="text-xs font-semibold text-slate-500">Pulling from: {sug.currentTask}</span>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-red-500 font-semibold bg-red-50 p-3 rounded-xl border border-red-100">No TAs on Enrichment during this slot. Manual intervention required.</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        
+        <div className="p-6 border-t border-slate-100 bg-white flex justify-end space-x-3 rounded-b-[32px]">
+          <button onClick={onClose} className="px-6 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors">
+            Cancel
+          </button>
+          <button 
+            onClick={() => onResolve(assignments)}
+            className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md"
+          >
+            Approve & Broadcast
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- TEACHER DASHBOARD ---
+function TeacherDashboard({ sessions, users }) {
+  const [selectedDay, setSelectedDay] = useState('Monday');
+
+  return (
+    <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
+      <div className="p-8 border-b border-slate-100 bg-white flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-[#1a1f36]">School Timetable</h2>
+          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-1">Teacher View</p>
+        </div>
+        <select 
+          value={selectedDay}
+          onChange={(e) => setSelectedDay(e.target.value)}
+          className="bg-slate-50 border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none focus:ring-[#6157e8]"
+        >
+          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </div>
+      <div className="p-0">
+        <TimetableGrid sessions={sessions} day={selectedDay} users={users} isEditable={false} />
+      </div>
+    </div>
+  );
+}
+
+// --- SHARED COMPONENTS ---
+function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
+  const tas = users.filter(u => u.role === ROLES.TA);
+  
+  return (
+    <div className="relative max-h-[75vh] overflow-auto">
+      <table className="w-full text-left border-collapse min-w-max">
+        <thead>
+          <tr>
+            <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
+            {tas.map(ta => (
+              <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-medium text-sm min-w-[150px] sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]">
+                {ta.name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {TIME_SLOTS.map(slot => (
+            <tr key={slot.id} className="hover:bg-slate-50/50 transition-colors">
+              <td className="p-4 font-medium text-slate-800 text-sm whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9] group-hover:bg-slate-50/50">
+                {slot.start} <span className="text-slate-400 text-xs ml-1 font-medium">{slot.end}</span>
+              </td>
+              {tas.map(ta => {
+                const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === ta.id);
+                const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
+                
+                return (
+                  <td 
+                    key={`${slot.id}-${ta.id}`} 
+                    className={`p-2 relative group ${isEditable ? 'cursor-pointer' : ''}`}
+                    onClick={() => isEditable && onCellClick(slot.id, ta.id, session)}
+                  >
+                    {isEditable && (
+                       <div className="absolute inset-2 bg-[#6157e8]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex justify-center items-center z-10 pointer-events-none">
+                          <Edit3 className="text-[#6157e8] w-5 h-5" />
+                       </div>
+                    )}
+                    {session ? (
+                      <div className={`border ${style.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
+                        <span className={`text-[9px] font-medium tracking-wider uppercase mb-1 ${style.text}`}>{session.tier}</span>
+                        <div className="font-medium text-slate-800 text-sm leading-tight">{session.subject}</div>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">
+                        Free
+                      </div>
+                    )}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
