@@ -12,20 +12,19 @@ import {
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
-// --- FIREBASE CONFIGURATION ---
+// --- FIREBASE INITIALIZATION ---
 const getFirebaseConfig = () => {
+  // If running inside the Gemini Canvas Sandbox, use the sandboxed environment configuration
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
       const parsed = JSON.parse(__firebase_config);
-      if (parsed && parsed.apiKey) {
-        return parsed;
-      }
+      if (parsed && parsed.apiKey) return parsed;
     } catch (e) {
       console.error("Failed to parse sandbox config", e);
     }
   }
   
-  // YOUR LIVE FIREBASE WEB APP CONFIGURATION OBJECT:
+  // YOUR LIVE HALSWELL SCHOOL FIREBASE WEB APP CONFIGURATION OBJECT:
   return {
     apiKey: "AIzaSyDnWi7OUCjyApvDC0nclGBKWJaaCc-Cr1s",
     authDomain: "support-link-app.firebaseapp.com",
@@ -38,20 +37,7 @@ const getFirebaseConfig = () => {
 };
 
 const firebaseConfig = getFirebaseConfig();
-
-// Fallback dummy config for preview window
-const safeFirebaseConfig = (firebaseConfig && firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("YOUR_"))
-  ? firebaseConfig
-  : {
-      apiKey: "dummy-api-key-for-sandbox-preview-only",
-      authDomain: "dummy-project.firebaseapp.com",
-      projectId: "dummy-project",
-      storageBucket: "dummy-project.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:dummy"
-    };
-
-const app = initializeApp(safeFirebaseConfig);
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -160,15 +146,13 @@ const TIER_STYLES = {
   [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' }
 };
 
-const Toast = ({ message, type = 'success' }) => {
-  return (
-    <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50
-      ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
-      {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
-      <p className="font-medium text-sm">{message}</p>
-    </div>
-  );
-};
+const Toast = ({ message, type = 'success' }) => (
+  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50
+    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
+    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
+    <p className="font-medium text-sm">{message}</p>
+  </div>
+);
 
 // --- MAIN APP COMPONENT ---
 export default function App() {
@@ -176,14 +160,13 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null); // The matching staff profile in your DB
   const [accessDenied, setAccessDenied] = useState(false);
   const [isDbReady, setIsDbReady] = useState(false);
-  const [authCompleted, setAuthCompleted] = useState(false);
 
   const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
-  // 1. Initialize Authentication FIRST and await completion before making Firestore calls
+  // 1. Initialize Authentication
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -194,15 +177,13 @@ export default function App() {
         }
       } catch (err) {
         console.error("Auth init failed:", err);
-      } finally {
-        setAuthCompleted(true);
       }
     };
     initAuth();
     
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setDbUser(firebaseUser);
-      if (!firebaseUser) {
+      if (!firebaseUser || !firebaseUser.email) {
         setCurrentUser(null);
         setAccessDenied(false);
       }
@@ -210,9 +191,9 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Sync Live Data & Check Authorization -- GUARDED to run ONLY after auth is complete
+  // 2. Sync Live Data & Check Authorization
   useEffect(() => {
-    if (!authCompleted || !dbUser) return;
+    if (!dbUser) return;
 
     let usersLoaded = false;
     let sessionsLoaded = false;
@@ -228,6 +209,7 @@ export default function App() {
       setUsers(fetchedUsers);
       if(!usersLoaded) { usersLoaded = true; checkReady(); }
 
+      // Authorization Logic (Happens automatically when someone logs in via Google)
       if (dbUser.email) {
         const matchedUser = fetchedUsers.find(u => u.email.toLowerCase() === dbUser.email.toLowerCase());
         
@@ -243,80 +225,46 @@ export default function App() {
             role: ROLES.SENCO,
             email: dbUser.email.toLowerCase()
           };
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSenco.id), newSenco);
+          await setDoc(doc(usersRef, newSenco.id), newSenco);
           
-          for (const u of INITIAL_USERS) {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', u.id), u);
-          }
-          for (const s of INITIAL_SESSIONS) {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s);
-          }
+          // Seed Karen and the Teacher so the SENCO isn't looking at a blank screen
+          INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
+          INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
         } 
         else {
+          // Database has users, but this person's email isn't one of them
           setCurrentUser(null);
           setAccessDenied(true);
         }
-      } else {
-        // Fallback for anonymous login in local sandboxed environment
-        const localMatched = fetchedUsers.find(u => u.role === ROLES.SENCO);
-        if (localMatched) {
-          setCurrentUser(localMatched);
-        } else if (fetchedUsers.length > 0) {
-          setCurrentUser(fetchedUsers[0]);
-        }
       }
-    }, (error) => {
-      console.warn("Users subscription paused or insufficient permissions. Retrying...");
-    });
+    }, console.error);
 
     const sessionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'sessions');
     const unsubSessions = onSnapshot(sessionsRef, (snapshot) => {
       setSessions(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
       if(!sessionsLoaded) { sessionsLoaded = true; checkReady(); }
-    }, (error) => {
-      console.warn("Sessions subscription paused or insufficient permissions. Retrying...");
-    });
+    }, console.error);
 
     const absencesRef = collection(db, 'artifacts', appId, 'public', 'data', 'absences');
     const unsubAbsences = onSnapshot(absencesRef, (snapshot) => {
       setAbsences(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
       if(!absencesLoaded) { absencesLoaded = true; checkReady(); }
-    }, (error) => {
-      console.warn("Absences subscription paused or insufficient permissions. Retrying...");
-    });
+    }, console.error);
 
     return () => { unsubUsers(); unsubSessions(); unsubAbsences(); };
-  }, [authCompleted, dbUser]);
+  }, [dbUser]);
 
   // Database Write Methods
-  const addUserToDb = async (userObj) => {
-    if (!auth.currentUser) return;
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
-  };
-  const deleteUserFromDb = async (userId) => {
-    if (!auth.currentUser) return;
-    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
-  };
-  const saveSessionToDb = async (sessionData) => {
-    if (!auth.currentUser) return;
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
-  };
-  const deleteSessionFromDb = async (sessionId) => {
-    if (!auth.currentUser) return;
-    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
-  };
-  const saveAbsenceToDb = async (absenceData) => {
-    if (!auth.currentUser) return;
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
-  };
+  const addUserToDb = async (userObj) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
+  const deleteUserFromDb = async (userId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
+  const saveSessionToDb = async (sessionData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
+  const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
+  const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
   
   const clearAllDataDb = async () => {
-    if (!auth.currentUser) return;
     const deletePromises = [];
     users.forEach(u => {
-      if (u.role !== ROLES.SENCO) {
-        deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', u.id)));
-      }
+      if (u.role !== ROLES.SENCO) deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', u.id)));
     });
     sessions.forEach(s => deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id))));
     absences.forEach(a => deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id))));
@@ -330,19 +278,6 @@ export default function App() {
   };
 
   const handleGoogleSignIn = async () => {
-    if (!firebaseConfig || !firebaseConfig.apiKey) {
-      const mockSenco = {
-        id: 'u-senco-sandbox',
-        name: 'Sarah Admin (SENCO)',
-        role: ROLES.SENCO,
-        email: 'senco@school.edu'
-      };
-      await addUserToDb(mockSenco);
-      setCurrentUser(mockSenco);
-      addToast("Signed in securely as SENCO (Preview Mode)", "info");
-      return;
-    }
-
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
@@ -358,14 +293,7 @@ export default function App() {
     await signOut(auth);
     setCurrentUser(null);
     setAccessDenied(false);
-    setAuthCompleted(false);
-    try {
-      await signInAnonymously(auth); 
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setAuthCompleted(true);
-    }
+    await signInAnonymously(auth); // Fallback for preview window DB connection
   };
 
   if (!isDbReady) {
@@ -373,15 +301,11 @@ export default function App() {
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
         <Loader2 className="w-12 h-12 text-[#6157e8] animate-spin mb-4" />
         <h2 className="text-[#1a1f36] font-bold text-lg">Syncing with Cloud...</h2>
-        <p className="text-xs text-slate-400 mt-2">Checking real-time database credentials</p>
       </div>
     );
   }
 
-  const safeUsers = users.length > 0 ? users : INITIAL_USERS;
-  const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
-  const safeAbsences = absences;
-
+  // Real Google Login Screen
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
@@ -428,8 +352,6 @@ export default function App() {
     );
   }
 
-  const activeUser = currentUser;
-
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans">
       <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 sticky top-0 bg-white/90 backdrop-blur-md z-40">
@@ -461,12 +383,12 @@ export default function App() {
       </header>
 
       <main className="flex-1 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-8">
-        {activeUser.role === ROLES.SENCO && (
+        {currentUser.role === ROLES.SENCO && (
           <SencoDashboard 
-            currentUser={activeUser}
-            users={safeUsers} 
-            sessions={safeSessions} 
-            absences={safeAbsences} 
+            currentUser={currentUser}
+            users={users} 
+            sessions={sessions} 
+            absences={absences} 
             addToast={addToast} 
             addUserToDb={addUserToDb}
             deleteUserFromDb={deleteUserFromDb}
@@ -476,14 +398,14 @@ export default function App() {
             clearAllDataDb={clearAllDataDb}
           />
         )}
-        {activeUser.role === ROLES.TEACHER && (
-          <TeacherDashboard sessions={safeSessions} users={safeUsers} />
+        {currentUser.role === ROLES.TEACHER && (
+          <TeacherDashboard sessions={sessions} users={users} />
         )}
-        {activeUser.role === ROLES.TA && (
+        {currentUser.role === ROLES.TA && (
           <TADashboard 
-            user={activeUser} 
-            sessions={safeSessions} 
-            absences={safeAbsences} 
+            user={currentUser} 
+            sessions={sessions} 
+            absences={absences} 
             addToast={addToast}
             saveAbsenceToDb={saveAbsenceToDb}
           />
