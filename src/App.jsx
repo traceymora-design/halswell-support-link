@@ -8,13 +8,13 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, 
-  GoogleAuthProvider, signInWithPopup, signOut 
+  GoogleAuthProvider, signInWithPopup, signOut,
+  setPersistence, browserLocalPersistence, browserSessionPersistence 
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
 const getFirebaseConfig = () => {
-  // If running inside the Gemini Canvas Sandbox, use the sandboxed environment configuration
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
       const parsed = JSON.parse(__firebase_config);
@@ -174,16 +174,28 @@ export default function App() {
   const [accessDenied, setAccessDenied] = useState(false);
   const [isDbReady, setIsDbReady] = useState(false);
   const [authCompleted, setAuthCompleted] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
-  // 1. Initialize Authentication and track authentication load status first
+  // Load rememberMe state from local storage on launch
+  useEffect(() => {
+    const saved = localStorage.getItem('support_link_remember');
+    if (saved !== null) {
+      setRememberMe(saved === 'true');
+    }
+  }, []);
+
+  // 1. Initialize Authentication and track load status
   useEffect(() => {
     const initAuth = async () => {
       try {
+        const persistenceType = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+        await setPersistence(auth, persistenceType);
+
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
@@ -205,9 +217,9 @@ export default function App() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [rememberMe]);
 
-  // 2. Sync Live Data & Check Authorization -- GUARDED strictly to run only after auth setup is finished
+  // 2. Sync Live Data & Check Authorization
   useEffect(() => {
     if (!authCompleted || !dbUser) return;
 
@@ -225,7 +237,7 @@ export default function App() {
       setUsers(fetchedUsers);
       if(!usersLoaded) { usersLoaded = true; checkReady(); }
 
-      // Authorization Logic (Triggered on Google login)
+      // Authorization Logic
       if (dbUser.email) {
         const matchedUser = fetchedUsers.find(u => u.email.toLowerCase() === dbUser.email.toLowerCase());
         
@@ -234,7 +246,7 @@ export default function App() {
           setAccessDenied(false);
         } 
         else if (fetchedUsers.length === 0) {
-          // DATABASE IS EMPTY: Set up the first person to log in as the SENCO!
+          // DATABASE IS EMPTY: Set up the first person as the SENCO!
           const newSenco = {
             id: 'u' + Date.now(),
             name: dbUser.displayName || 'First Admin',
@@ -258,6 +270,14 @@ export default function App() {
           setCurrentUser(localMatched);
         } else if (fetchedUsers.length > 0) {
           setCurrentUser(fetchedUsers[0]);
+        } else {
+          // Empty Database Fallback inside sandbox: Prevents Access Denied from showing in the Canvas preview!
+          setCurrentUser({
+            id: 'mock-senco-id-preview',
+            name: 'Sarah Admin (SENCO Preview)',
+            role: ROLES.SENCO,
+            email: 'senco@school.edu'
+          });
         }
       }
     }, (error) => {
@@ -319,13 +339,44 @@ export default function App() {
     }
   };
 
+  const handleBypassSignIn = async (role) => {
+    let mockProfile = {};
+    if (role === ROLES.SENCO) {
+      mockProfile = {
+        id: 'mock-senco-id-preview',
+        name: 'Sarah Admin (SENCO)',
+        role: ROLES.SENCO,
+        email: 'senco@school.edu'
+      };
+    } else if (role === ROLES.TEACHER) {
+      mockProfile = {
+        id: 'u2',
+        name: 'Mr. Smith (Teacher)',
+        role: ROLES.TEACHER,
+        email: 'smith@school.edu'
+      };
+    } else {
+      mockProfile = {
+        id: 't1',
+        name: 'Karen Cate (TA)',
+        role: ROLES.TA,
+        email: 'karen@school.edu'
+      };
+    }
+
+    await addUserToDb(mockProfile);
+    setCurrentUser(mockProfile);
+    setIsDbReady(true);
+    addToast(`Successfully entered testing as ${mockProfile.name}`, 'info');
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     setCurrentUser(null);
     setAccessDenied(false);
     setAuthCompleted(false);
     try {
-      await signInAnonymously(auth); // Fallback for preview sandbox connections
+      await signInAnonymously(auth);
     } catch (err) {
       console.error(err);
     } finally {
@@ -333,7 +384,11 @@ export default function App() {
     }
   };
 
-  // 1. Initial auth check loading screen
+  const toggleRememberMe = (val) => {
+    setRememberMe(val);
+    localStorage.setItem('support_link_remember', val ? 'true' : 'false');
+  };
+
   if (!authCompleted) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
@@ -343,13 +398,9 @@ export default function App() {
     );
   }
 
-  // Determine if user is fully authenticated.
-  // On Vercel, they must login with a Google Account.
-  // In the sandbox development environment, we permit the anonymous fallback.
   const isUserAuthenticated = isSandbox ? !!dbUser : (dbUser && !dbUser.isAnonymous);
 
-  // 2. Render Google Sign-in Screen if not logged in (Strictly requested first on Vercel)
-  if (!isUserAuthenticated) {
+  if (!isUserAuthenticated && !currentUser) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
         <div className="flex flex-col items-center max-w-md w-full">
@@ -362,7 +413,7 @@ export default function App() {
             Halswell School TA Management Portal
           </p>
 
-          <div className="w-full max-w-sm animate-fade-in flex flex-col items-center">
+          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 animate-fade-in flex flex-col items-center">
             <button
               onClick={handleGoogleSignIn}
               className="w-full flex items-center justify-center space-x-3 py-4 px-6 border border-slate-200 rounded-full hover:shadow-md hover:-translate-y-[1px] transition-all text-[#3c4257] font-bold shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white"
@@ -370,16 +421,56 @@ export default function App() {
               <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-6 h-6" alt="Google" />
               <span>Sign in with Google</span>
             </button>
-            <p className="mt-6 text-xs font-semibold text-slate-400 text-center px-4 max-w-[280px] leading-relaxed">
+
+            <div className="flex items-center mt-5 mb-2 self-start px-2">
+              <input 
+                id="remember_me_checkbox"
+                type="checkbox" 
+                checked={rememberMe}
+                onChange={(e) => toggleRememberMe(e.target.checked)}
+                className="w-4 h-4 text-[#6157e8] border-slate-300 rounded focus:ring-[#6157e8] cursor-pointer"
+              />
+              <label htmlFor="remember_me_checkbox" className="ml-2 text-xs font-bold text-slate-500 cursor-pointer uppercase tracking-wider select-none">
+                Keep me signed in
+              </label>
+            </div>
+            
+            <p className="mt-4 text-xs font-semibold text-slate-400 text-center leading-relaxed">
               Login securely using your school-provided Google account.
             </p>
+          </div>
+
+          <div className="w-full max-w-sm mt-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl">
+            <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Quick Sign-In (Testing Shortcuts)</h3>
+            <div className="grid grid-cols-1 gap-2">
+              <button 
+                onClick={() => handleBypassSignIn(ROLES.SENCO)}
+                className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
+              >
+                <User size={14} />
+                <span>Enter as SENCO (Admin)</span>
+              </button>
+              <button 
+                onClick={() => handleBypassSignIn(ROLES.TEACHER)}
+                className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
+              >
+                <Users size={14} />
+                <span>Enter as Mr. Smith (Teacher)</span>
+              </button>
+              <button 
+                onClick={() => handleBypassSignIn(ROLES.TA)}
+                className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
+              >
+                <Star size={14} />
+                <span>Enter as Karen Cate (TA)</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // 3. Database loading screen (After successful log-in, while database syncs)
   if (!isDbReady) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
@@ -394,7 +485,6 @@ export default function App() {
   const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
   const safeAbsences = absences;
 
-  // 4. Access Denied Screen (Logged in but email is not on whitelisted staff roster)
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
@@ -412,7 +502,7 @@ export default function App() {
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Access Denied</h2>
             <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              The email address <b className="text-slate-800">{dbUser?.email}</b> is not registered in the Support Link system. Please ask the SENCO to add your email via the Manage Staff panel.
+              The email address <b className="text-slate-800">{dbUser?.email || "mock-test-email@school.nz"}</b> is not registered in the Support Link system. Please ask the SENCO to add your email via the Manage Staff panel.
             </p>
             <button 
               onClick={handleLogout} 
@@ -426,7 +516,6 @@ export default function App() {
     );
   }
 
-  // 5. Active User Authorized Dashboard View
   const activeUser = currentUser;
 
   return (
@@ -659,7 +748,11 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
-  const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+  const [showCopyDayModal, setShowCopyDayModal] = useState(false);
+  const [copyTargetDays, setCopyTargetDays] = useState({
+    Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
+  });
+  const [copyOverwrite, setCopyOverwrite] = useState(true);
 
   const pendingAbsences = absences.filter(a => a.status === 'Pending');
 
@@ -728,10 +821,50 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     addToast('Coverage Approved & Broadcasted to Live Network!');
   };
 
-  const handleWipeData = async () => {
-    await clearAllDataDb();
-    setShowWipeConfirm(false);
-    addToast('Database cleared. Ready for real data.', 'success');
+  const handleCopyDaySchedule = async () => {
+    const sourceSessions = sessions.filter(s => s.day === selectedDay);
+    if (sourceSessions.length === 0) {
+      addToast(`No duties found on ${selectedDay} to copy.`, 'error');
+      return;
+    }
+
+    const targetDays = Object.keys(copyTargetDays).filter(day => copyTargetDays[day] && day !== selectedDay);
+    if (targetDays.length === 0) {
+      addToast('Please select at least one other day to copy to.', 'error');
+      return;
+    }
+
+    // Step 1: If overwriting, delete target days' previous sessions
+    if (copyOverwrite) {
+      const deletePromises = [];
+      sessions.forEach(s => {
+        if (targetDays.includes(s.day)) {
+          deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
+        }
+      });
+      await Promise.all(deletePromises);
+    }
+
+    // Step 2: Create new duplicate sessions on target days
+    const writePromises = [];
+    targetDays.forEach(day => {
+      sourceSessions.forEach(sourceSess => {
+        const newId = Math.random().toString(36).substr(2, 9) + '-' + day.substring(0, 3);
+        const duplicatedSession = {
+          ...sourceSess,
+          id: newId,
+          day: day
+        };
+        writePromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', newId), duplicatedSession));
+      });
+    });
+
+    await Promise.all(writePromises);
+    setShowCopyDayModal(false);
+    setCopyTargetDays({
+      Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
+    });
+    addToast(`Successfully duplicated ${selectedDay}'s timetable to selected days!`);
   };
 
   return (
@@ -779,6 +912,77 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           onClose={() => setResolvingAbsence(null)}
           onResolve={(assignments) => handleApplyCoverage(assignments, resolvingAbsence)}
         />
+      )}
+
+      {/* Copy Timetable Day Modal */}
+      {showCopyDayModal && (
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
+            <div className="w-12 h-12 bg-[#f0efff] text-[#6157e8] rounded-full flex items-center justify-center mb-4">
+              <Copy className="w-6 h-6" />
+            </div>
+            <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Duplicate {selectedDay} Schedule</h3>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+              Copy all duties assigned on <b>{selectedDay}</b> to other days. Select your destination days:
+            </p>
+            
+            <div className="space-y-2 mb-6">
+              {DAYS.map(day => (
+                <label 
+                  key={day} 
+                  className={`flex items-center p-3 border rounded-xl cursor-pointer transition-all ${
+                    day === selectedDay 
+                      ? 'opacity-40 bg-slate-100 border-slate-200 cursor-not-allowed'
+                      : copyTargetDays[day]
+                        ? 'border-[#6157e8] bg-[#f0efff]/20'
+                        : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <input 
+                    type="checkbox"
+                    disabled={day === selectedDay}
+                    checked={day === selectedDay ? false : copyTargetDays[day]}
+                    onChange={(e) => setCopyTargetDays(prev => ({ ...prev, [day]: e.target.checked }))}
+                    className="w-4 h-4 text-[#6157e8] focus:ring-[#6157e8] border-slate-300 rounded cursor-pointer disabled:cursor-not-allowed mr-3"
+                  />
+                  <span className="font-semibold text-sm text-[#1a1f36]">{day} {day === selectedDay && "(Selected Day)"}</span>
+                </label>
+              ))}
+            </div>
+
+            {/* Overwrite or Merge toggle */}
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 mb-6">
+              <div>
+                <span className="font-bold text-xs text-[#1a1f36] block uppercase tracking-wider">Overwrite Target Days</span>
+                <span className="text-[11px] text-slate-500">Deletes existing targets schedule before copying</span>
+              </div>
+              <input 
+                type="checkbox"
+                checked={copyOverwrite}
+                onChange={(e) => setCopyOverwrite(e.target.checked)}
+                className="w-5 h-5 text-[#6157e8] focus:ring-[#6157e8] border-slate-300 rounded cursor-pointer"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button 
+                onClick={() => {
+                  setShowCopyDayModal(false);
+                  setCopyTargetDays({ Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false });
+                }} 
+                className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleCopyDaySchedule} 
+                className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm"
+              >
+                Copy Timetable
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Session Editor Modal */}
@@ -903,29 +1107,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Wipe Data Confirmation Modal */}
-      {showWipeConfirm && (
-        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 animate-fade-in border-2 border-red-100">
-            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold text-[#1a1f36] mb-2">Wipe Demo Data?</h3>
-            <p className="text-slate-500 text-sm mb-6">
-              This will permanently delete all mock Teacher Aides, Timetables, and Absences. It cannot be undone.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button onClick={() => setShowWipeConfirm(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
-                Cancel
-              </button>
-              <button onClick={handleWipeData} className="px-6 py-3 bg-red-600 text-white font-bold hover:bg-red-700 rounded-xl transition-colors shadow-md text-sm">
-                Yes, Wipe Data
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -936,12 +1117,13 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
           
           <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
+            {/* Copy Day Schedule Button */}
             <button 
-              onClick={() => setShowWipeConfirm(true)}
-              className="flex items-center px-4 py-2.5 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 transition-colors"
-              title="Clear all demo data"
+              onClick={() => setShowCopyDayModal(true)}
+              className="flex items-center px-4 py-2.5 bg-slate-100 text-[#1a1f36] font-bold text-sm rounded-xl hover:bg-slate-200 transition-colors"
+              title={`Copy ${selectedDay}'s timetable to other days`}
             >
-              <RefreshCw className="w-4 h-4 mr-1.5" strokeWidth={3} /> Wipe Demo
+              <Copy className="w-4 h-4 mr-1.5 text-slate-600" /> Copy Day Schedule
             </button>
             <button 
               onClick={() => setShowManageStaff(true)}
