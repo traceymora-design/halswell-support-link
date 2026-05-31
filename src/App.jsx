@@ -48,6 +48,19 @@ const getCleanAppId = () => {
 };
 const appId = getCleanAppId();
 
+// Detect if we are running in the development sandbox/local-preview or live on Vercel
+const isSandboxEnv = () => {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return (
+    host === 'localhost' || 
+    host.includes('web-platform') || 
+    host.includes('sandbox') || 
+    !host.includes('vercel.app')
+  );
+};
+const isSandbox = isSandboxEnv();
+
 // --- MOCK DATA & CONSTANTS ---
 const ROLES = {
   SENCO: 'SENCO',
@@ -156,17 +169,18 @@ const Toast = ({ message, type = 'success' }) => (
 
 // --- MAIN APP COMPONENT ---
 export default function App() {
-  const [dbUser, setDbUser] = useState(null); // The Google Auth profile
-  const [currentUser, setCurrentUser] = useState(null); // The matching staff profile in your DB
+  const [dbUser, setDbUser] = useState(null); // The active Firebase Auth user profile
+  const [currentUser, setCurrentUser] = useState(null); // The matching school staff profile
   const [accessDenied, setAccessDenied] = useState(false);
   const [isDbReady, setIsDbReady] = useState(false);
+  const [authCompleted, setAuthCompleted] = useState(false);
 
   const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
-  // 1. Initialize Authentication
+  // 1. Initialize Authentication and track authentication load status first
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -177,13 +191,15 @@ export default function App() {
         }
       } catch (err) {
         console.error("Auth init failed:", err);
+      } finally {
+        setAuthCompleted(true);
       }
     };
     initAuth();
     
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setDbUser(firebaseUser);
-      if (!firebaseUser || !firebaseUser.email) {
+      if (!firebaseUser) {
         setCurrentUser(null);
         setAccessDenied(false);
       }
@@ -191,9 +207,9 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Sync Live Data & Check Authorization
+  // 2. Sync Live Data & Check Authorization -- GUARDED strictly to run only after auth setup is finished
   useEffect(() => {
-    if (!dbUser) return;
+    if (!authCompleted || !dbUser) return;
 
     let usersLoaded = false;
     let sessionsLoaded = false;
@@ -209,7 +225,7 @@ export default function App() {
       setUsers(fetchedUsers);
       if(!usersLoaded) { usersLoaded = true; checkReady(); }
 
-      // Authorization Logic (Happens automatically when someone logs in via Google)
+      // Authorization Logic (Triggered on Google login)
       if (dbUser.email) {
         const matchedUser = fetchedUsers.find(u => u.email.toLowerCase() === dbUser.email.toLowerCase());
         
@@ -218,7 +234,7 @@ export default function App() {
           setAccessDenied(false);
         } 
         else if (fetchedUsers.length === 0) {
-          // DATABASE IS EMPTY: Make the first person to log in the SENCO!
+          // DATABASE IS EMPTY: Set up the first person to log in as the SENCO!
           const newSenco = {
             id: 'u' + Date.now(),
             name: dbUser.displayName || 'First Admin',
@@ -227,32 +243,46 @@ export default function App() {
           };
           await setDoc(doc(usersRef, newSenco.id), newSenco);
           
-          // Seed Karen and the Teacher so the SENCO isn't looking at a blank screen
+          // Seed initial mock accounts so the dashboard is ready
           INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
           INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
         } 
         else {
-          // Database has users, but this person's email isn't one of them
           setCurrentUser(null);
           setAccessDenied(true);
         }
+      } else {
+        // Fallback for local sandboxed preview mode
+        const localMatched = fetchedUsers.find(u => u.role === ROLES.SENCO);
+        if (localMatched) {
+          setCurrentUser(localMatched);
+        } else if (fetchedUsers.length > 0) {
+          setCurrentUser(fetchedUsers[0]);
+        }
       }
-    }, console.error);
+    }, (error) => {
+      console.warn("Database listener restricted (Not signed in with a Google account yet).");
+      if(!usersLoaded) { usersLoaded = true; checkReady(); }
+    });
 
     const sessionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'sessions');
     const unsubSessions = onSnapshot(sessionsRef, (snapshot) => {
       setSessions(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
       if(!sessionsLoaded) { sessionsLoaded = true; checkReady(); }
-    }, console.error);
+    }, (error) => {
+      if(!sessionsLoaded) { sessionsLoaded = true; checkReady(); }
+    });
 
     const absencesRef = collection(db, 'artifacts', appId, 'public', 'data', 'absences');
     const unsubAbsences = onSnapshot(absencesRef, (snapshot) => {
       setAbsences(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
       if(!absencesLoaded) { absencesLoaded = true; checkReady(); }
-    }, console.error);
+    }, (error) => {
+      if(!absencesLoaded) { absencesLoaded = true; checkReady(); }
+    });
 
     return () => { unsubUsers(); unsubSessions(); unsubAbsences(); };
-  }, [dbUser]);
+  }, [authCompleted, dbUser]);
 
   // Database Write Methods
   const addUserToDb = async (userObj) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
@@ -293,19 +323,78 @@ export default function App() {
     await signOut(auth);
     setCurrentUser(null);
     setAccessDenied(false);
-    await signInAnonymously(auth); // Fallback for preview window DB connection
+    setAuthCompleted(false);
+    try {
+      await signInAnonymously(auth); // Fallback for preview sandbox connections
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAuthCompleted(true);
+    }
   };
 
+  // 1. Initial auth check loading screen
+  if (!authCompleted) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
+        <Loader2 className="w-12 h-12 text-[#6157e8] animate-spin mb-4" />
+        <h2 className="text-[#1a1f36] font-bold text-lg">Connecting Securely...</h2>
+      </div>
+    );
+  }
+
+  // Determine if user is fully authenticated.
+  // On Vercel, they must login with a Google Account.
+  // In the sandbox development environment, we permit the anonymous fallback.
+  const isUserAuthenticated = isSandbox ? !!dbUser : (dbUser && !dbUser.isAnonymous);
+
+  // 2. Render Google Sign-in Screen if not logged in (Strictly requested first on Vercel)
+  if (!isUserAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
+        <div className="flex flex-col items-center max-w-md w-full">
+          <div className="bg-[#6157e8] p-4 rounded-[20px] shadow-sm mb-6">
+            <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
+          </div>
+          
+          <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
+          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-12 uppercase text-center">
+            Halswell School TA Management Portal
+          </p>
+
+          <div className="w-full max-w-sm animate-fade-in flex flex-col items-center">
+            <button
+              onClick={handleGoogleSignIn}
+              className="w-full flex items-center justify-center space-x-3 py-4 px-6 border border-slate-200 rounded-full hover:shadow-md hover:-translate-y-[1px] transition-all text-[#3c4257] font-bold shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white"
+            >
+              <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-6 h-6" alt="Google" />
+              <span>Sign in with Google</span>
+            </button>
+            <p className="mt-6 text-xs font-semibold text-slate-400 text-center px-4 max-w-[280px] leading-relaxed">
+              Login securely using your school-provided Google account.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Database loading screen (After successful log-in, while database syncs)
   if (!isDbReady) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
         <Loader2 className="w-12 h-12 text-[#6157e8] animate-spin mb-4" />
         <h2 className="text-[#1a1f36] font-bold text-lg">Syncing with Cloud...</h2>
+        <p className="text-xs text-slate-400 mt-2">Retrieving Halswell School Live Data</p>
       </div>
     );
   }
 
-  // Real Google Login Screen
+  const safeUsers = users.length > 0 ? users : INITIAL_USERS;
+  const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
+  const safeAbsences = absences;
+
+  // 4. Access Denied Screen (Logged in but email is not on whitelisted staff roster)
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
@@ -319,38 +408,26 @@ export default function App() {
             Halswell School TA Management Portal
           </p>
 
-          {accessDenied ? (
-            <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-red-100 text-center animate-fade-in">
-              <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Access Denied</h2>
-              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                The email address <b className="text-slate-800">{dbUser?.email}</b> is not registered in the Support Link system. Please ask the SENCO to add your email via the Manage Staff panel.
-              </p>
-              <button 
-                onClick={handleLogout} 
-                className="w-full py-3 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm"
-              >
-                Sign out & try another account
-              </button>
-            </div>
-          ) : (
-            <div className="w-full max-w-sm animate-fade-in flex flex-col items-center">
-              <button
-                onClick={handleGoogleSignIn}
-                className="w-full flex items-center justify-center space-x-3 py-4 px-6 border border-slate-200 rounded-full hover:shadow-md hover:-translate-y-[1px] transition-all text-[#3c4257] font-bold shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white"
-              >
-                <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-6 h-6" alt="Google" />
-                <span>Sign in with Google</span>
-              </button>
-              <p className="mt-6 text-xs font-semibold text-slate-400 text-center px-4 max-w-[280px] leading-relaxed">
-                The first person to sign in will automatically become the Master Admin (SENCO).
-              </p>
-            </div>
-          )}
+          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-red-100 text-center animate-fade-in">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Access Denied</h2>
+            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+              The email address <b className="text-slate-800">{dbUser?.email}</b> is not registered in the Support Link system. Please ask the SENCO to add your email via the Manage Staff panel.
+            </p>
+            <button 
+              onClick={handleLogout} 
+              className="w-full py-3 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm"
+            >
+              Sign out & try another account
+            </button>
+          </div>
         </div>
       </div>
     );
   }
+
+  // 5. Active User Authorized Dashboard View
+  const activeUser = currentUser;
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans">
@@ -383,12 +460,12 @@ export default function App() {
       </header>
 
       <main className="flex-1 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-8">
-        {currentUser.role === ROLES.SENCO && (
+        {activeUser.role === ROLES.SENCO && (
           <SencoDashboard 
-            currentUser={currentUser}
-            users={users} 
-            sessions={sessions} 
-            absences={absences} 
+            currentUser={activeUser}
+            users={safeUsers} 
+            sessions={safeSessions} 
+            absences={safeAbsences} 
             addToast={addToast} 
             addUserToDb={addUserToDb}
             deleteUserFromDb={deleteUserFromDb}
@@ -398,14 +475,14 @@ export default function App() {
             clearAllDataDb={clearAllDataDb}
           />
         )}
-        {currentUser.role === ROLES.TEACHER && (
-          <TeacherDashboard sessions={sessions} users={users} />
+        {activeUser.role === ROLES.TEACHER && (
+          <TeacherDashboard sessions={safeSessions} users={safeUsers} />
         )}
-        {currentUser.role === ROLES.TA && (
+        {activeUser.role === ROLES.TA && (
           <TADashboard 
-            user={currentUser} 
-            sessions={sessions} 
-            absences={absences} 
+            user={activeUser} 
+            sessions={safeSessions} 
+            absences={safeAbsences} 
             addToast={addToast}
             saveAbsenceToDb={saveAbsenceToDb}
           />
