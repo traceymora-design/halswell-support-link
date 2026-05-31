@@ -3,7 +3,7 @@ import {
   Calendar, AlertCircle, Users, CheckCircle, 
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
-  Plus, Edit3, Trash2, Loader2, RefreshCw
+  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -175,6 +175,7 @@ export default function App() {
   const [isDbReady, setIsDbReady] = useState(false);
   const [authCompleted, setAuthCompleted] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [showMobileSync, setShowMobileSync] = useState(false);
 
   const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -327,18 +328,6 @@ export default function App() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
-  const handleGoogleSignIn = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Google Sign-in Error:", error);
-      if (error.code !== 'auth/popup-closed-by-user') {
-        addToast("Sign-in blocked. If testing in preview, please deploy to Vercel.", "error");
-      }
-    }
-  };
-
   const handleBypassSignIn = async (role) => {
     let mockProfile = {};
     if (role === ROLES.SENCO) {
@@ -367,7 +356,7 @@ export default function App() {
     await addUserToDb(mockProfile);
     setCurrentUser(mockProfile);
     setIsDbReady(true);
-    addToast(`Successfully entered testing as ${mockProfile.name}`, 'info');
+    addToast(`Successfully entered as ${mockProfile.name}`, 'info');
   };
 
   const handleLogout = async () => {
@@ -413,16 +402,35 @@ export default function App() {
             Halswell School TA Management Portal
           </p>
 
-          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 animate-fade-in flex flex-col items-center">
-            <button
-              onClick={handleGoogleSignIn}
-              className="w-full flex items-center justify-center space-x-3 py-4 px-6 border border-slate-200 rounded-full hover:shadow-md hover:-translate-y-[1px] transition-all text-[#3c4257] font-bold shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white"
+          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 animate-fade-in flex flex-col items-stretch space-y-3">
+            <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Sign in to support link</h3>
+            
+            <button 
+              onClick={() => handleBypassSignIn(ROLES.SENCO)}
+              className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
             >
-              <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-6 h-6" alt="Google" />
-              <span>Sign in with Google</span>
+              <User size={18} className="text-[#6157e8]" />
+              <span>Enter as SENCO</span>
+            </button>
+            
+            <button 
+              onClick={() => handleBypassSignIn(ROLES.TEACHER)}
+              className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+            >
+              <Users size={18} className="text-[#6157e8]" />
+              <span>Enter as Teacher</span>
+            </button>
+            
+            <button 
+              onClick={() => handleBypassSignIn(ROLES.TA)}
+              className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+            >
+              <Star size={18} className="text-[#6157e8]" />
+              <span>Enter as Teacher Aide</span>
             </button>
 
-            <div className="flex items-center mt-5 mb-2 self-start px-2">
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center pt-3 self-center">
               <input 
                 id="remember_me_checkbox"
                 type="checkbox" 
@@ -433,37 +441,6 @@ export default function App() {
               <label htmlFor="remember_me_checkbox" className="ml-2 text-xs font-bold text-slate-500 cursor-pointer uppercase tracking-wider select-none">
                 Keep me signed in
               </label>
-            </div>
-            
-            <p className="mt-4 text-xs font-semibold text-slate-400 text-center leading-relaxed">
-              Login securely using your school-provided Google account.
-            </p>
-          </div>
-
-          <div className="w-full max-w-sm mt-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl">
-            <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Quick Sign-In (Testing Shortcuts)</h3>
-            <div className="grid grid-cols-1 gap-2">
-              <button 
-                onClick={() => handleBypassSignIn(ROLES.SENCO)}
-                className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
-              >
-                <User size={14} />
-                <span>Enter as SENCO (Admin)</span>
-              </button>
-              <button 
-                onClick={() => handleBypassSignIn(ROLES.TEACHER)}
-                className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
-              >
-                <Users size={14} />
-                <span>Enter as Mr. Smith (Teacher)</span>
-              </button>
-              <button 
-                onClick={() => handleBypassSignIn(ROLES.TA)}
-                className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
-              >
-                <Star size={14} />
-                <span>Enter as Karen Cate (TA)</span>
-              </button>
             </div>
           </div>
         </div>
@@ -534,8 +511,11 @@ export default function App() {
         </div>
         
         <div className="flex items-center space-x-3">
-          <button className="hidden sm:flex items-center space-x-2 bg-[#f8f9fa] hover:bg-[#f1f3f5] text-slate-500 font-semibold text-xs tracking-wider uppercase px-4 py-2.5 rounded-xl transition-colors">
-            <QrCode size={16} />
+          <button 
+            onClick={() => setShowMobileSync(true)}
+            className="flex items-center space-x-2 bg-[#f8f9fa] hover:bg-[#f1f3f5] text-slate-600 font-bold text-xs tracking-wider uppercase px-4 py-2.5 rounded-xl transition-colors"
+          >
+            <QrCode size={16} className="text-[#6157e8]" />
             <span>Sync Mobile</span>
           </button>
           <button 
@@ -577,6 +557,40 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Sync Mobile Modal */}
+      {showMobileSync && (
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 animate-fade-in text-center">
+            <div className="w-12 h-12 bg-[#f0efff] text-[#6157e8] rounded-full flex items-center justify-center mb-4 mx-auto">
+              <Smartphone className="w-6 h-6" />
+            </div>
+            <h3 className="text-xl font-bold text-[#1a1f36] mb-2">Sync with Your Phone</h3>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+              Scan this QR code with your mobile camera to take your Support Link timetable on the go!
+            </p>
+            
+            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 inline-block mb-6 shadow-inner">
+              <svg className="w-44 h-44 mx-auto text-[#1a1f36]" viewBox="0 0 100 100" fill="currentColor">
+                <path d="M0 0h30v30H0zm5 5v20h20V5zm3 3h14v14H8zM70 0h30v30H70zm5 5v20h20V5zm3 3h14v14H8zM0 70h30v30H0zm5 5v20h20V5zm3 3h14v14H8z" />
+                <path d="M40 0h10v10H40zm0 15h10v15H40zm15-15h10v5H55zm0 15h10v10H55zm5 25h10v10H60zm0 15h5v5h-5zm15-40h10v10H75zm15 15h10v10H90zm-45 5h10v5H45zm5 15h10v10H50zm15-10h10v5H65zm15 25h10v10H80zm5-10h5v5h-5zm-30-20h10v5H55zm15 15h5v10h-5zm-5 5h5v5h-5zm-15-5h5v5h-5z" />
+                <circle cx="50" cy="50" r="4" className="text-[#6157e8]" />
+              </svg>
+            </div>
+            
+            <div className="text-xs text-slate-400 font-semibold mb-6">
+              https://halswell-support-link.vercel.app
+            </div>
+
+            <button 
+              onClick={() => setShowMobileSync(false)}
+              className="w-full py-3 bg-[#1a1f36] hover:bg-black text-white rounded-xl font-bold text-sm transition-colors shadow-md"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Toasts */}
       {toasts.map((toast, idx) => (
@@ -748,13 +762,25 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
+  
+  // Duplication Tool States
   const [showCopyDayModal, setShowCopyDayModal] = useState(false);
+  const [copyScope, setCopyScope] = useState('specific-staff'); // 'whole-day' | 'specific-staff'
+  const [copySelectedTaId, setCopySelectedTaId] = useState('');
   const [copyTargetDays, setCopyTargetDays] = useState({
     Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
   });
   const [copyOverwrite, setCopyOverwrite] = useState(true);
 
   const pendingAbsences = absences.filter(a => a.status === 'Pending');
+  const tas = users.filter(u => u.role === ROLES.TA);
+
+  // Set default selected TA for the Copy schedule tool
+  useEffect(() => {
+    if (tas.length > 0 && !copySelectedTaId) {
+      setCopySelectedTaId(tas[0].id);
+    }
+  }, [tas, copySelectedTaId]);
 
   const handleAddStaff = () => {
     if(!newStaffName.trim() || !newStaffEmail.trim()) {
@@ -822,9 +848,23 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   };
 
   const handleCopyDaySchedule = async () => {
-    const sourceSessions = sessions.filter(s => s.day === selectedDay);
+    // 1. Gather sessions based on selected Copy Scope
+    let sourceSessions = [];
+    if (copyScope === 'specific-staff') {
+      if (!copySelectedTaId) {
+        addToast('Please select a Teacher Aide to duplicate.', 'error');
+        return;
+      }
+      sourceSessions = sessions.filter(s => s.day === selectedDay && s.taId === copySelectedTaId);
+    } else {
+      sourceSessions = sessions.filter(s => s.day === selectedDay);
+    }
+
     if (sourceSessions.length === 0) {
-      addToast(`No duties found on ${selectedDay} to copy.`, 'error');
+      const staffName = copyScope === 'specific-staff' 
+        ? users.find(u => u.id === copySelectedTaId)?.name || 'the selected TA'
+        : 'anyone';
+      addToast(`No duties found for ${staffName} on ${selectedDay} to copy.`, 'error');
       return;
     }
 
@@ -834,18 +874,26 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       return;
     }
 
-    // Step 1: If overwriting, delete target days' previous sessions
+    // Step 1: Handle Overwrites
     if (copyOverwrite) {
       const deletePromises = [];
       sessions.forEach(s => {
         if (targetDays.includes(s.day)) {
-          deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
+          // If coping specific staff, only clear previous sessions of that specific TA on target days
+          if (copyScope === 'specific-staff') {
+            if (s.taId === copySelectedTaId) {
+              deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
+            }
+          } else {
+            // Otherwise, clear the entire targets' schedule
+            deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
+          }
         }
       });
       await Promise.all(deletePromises);
     }
 
-    // Step 2: Create new duplicate sessions on target days
+    // Step 2: Write duplicate sessions on target days
     const writePromises = [];
     targetDays.forEach(day => {
       sourceSessions.forEach(sourceSess => {
@@ -864,7 +912,11 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setCopyTargetDays({
       Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
     });
-    addToast(`Successfully duplicated ${selectedDay}'s timetable to selected days!`);
+    
+    const scopeMessage = copyScope === 'specific-staff'
+      ? `${users.find(u => u.id === copySelectedTaId)?.name || 'Staff'}'s schedule`
+      : "The whole day's schedule";
+    addToast(`Successfully duplicated ${scopeMessage} from ${selectedDay}!`);
   };
 
   return (
@@ -918,14 +970,47 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       {showCopyDayModal && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
-            <div className="w-12 h-12 bg-[#f0efff] text-[#6157e8] rounded-full flex items-center justify-center mb-4">
+            <div className="w-12 h-12 bg-[#ecfdf5] text-[#10b981] rounded-full flex items-center justify-center mb-4">
               <Copy className="w-6 h-6" />
             </div>
-            <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Duplicate {selectedDay} Schedule</h3>
+            <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Duplicate Schedule</h3>
             <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-              Copy all duties assigned on <b>{selectedDay}</b> to other days. Select your destination days:
+              Copy assignments from <b>{selectedDay}</b> to other days.
             </p>
+
+            {/* Scope Selection */}
+            <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-slate-100 rounded-xl">
+              <button
+                onClick={() => setCopyScope('specific-staff')}
+                className={`py-2 px-3 text-xs font-bold rounded-lg transition-all ${copyScope === 'specific-staff' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                Specific TA
+              </button>
+              <button
+                onClick={() => setCopyScope('whole-day')}
+                className={`py-2 px-3 text-xs font-bold rounded-lg transition-all ${copyScope === 'whole-day' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                Whole Day (All TAs)
+              </button>
+            </div>
+
+            {/* TA Selector Dropdown */}
+            {copyScope === 'specific-staff' && (
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Teacher Aide</label>
+                <select 
+                  value={copySelectedTaId}
+                  onChange={(e) => setCopySelectedTaId(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none font-medium text-[#1a1f36] text-sm"
+                >
+                  {tas.map(ta => (
+                    <option key={ta.id} value={ta.id}>{ta.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Destination Days</label>
             <div className="space-y-2 mb-6">
               {DAYS.map(day => (
                 <label 
@@ -934,7 +1019,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     day === selectedDay 
                       ? 'opacity-40 bg-slate-100 border-slate-200 cursor-not-allowed'
                       : copyTargetDays[day]
-                        ? 'border-[#6157e8] bg-[#f0efff]/20'
+                        ? 'border-[#10b981] bg-[#ecfdf5]/40'
                         : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
@@ -943,7 +1028,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     disabled={day === selectedDay}
                     checked={day === selectedDay ? false : copyTargetDays[day]}
                     onChange={(e) => setCopyTargetDays(prev => ({ ...prev, [day]: e.target.checked }))}
-                    className="w-4 h-4 text-[#6157e8] focus:ring-[#6157e8] border-slate-300 rounded cursor-pointer disabled:cursor-not-allowed mr-3"
+                    className="w-4 h-4 text-[#10b981] focus:ring-[#10b981] border-slate-300 rounded cursor-pointer disabled:cursor-not-allowed mr-3"
                   />
                   <span className="font-semibold text-sm text-[#1a1f36]">{day} {day === selectedDay && "(Selected Day)"}</span>
                 </label>
@@ -954,13 +1039,13 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 mb-6">
               <div>
                 <span className="font-bold text-xs text-[#1a1f36] block uppercase tracking-wider">Overwrite Target Days</span>
-                <span className="text-[11px] text-slate-500">Deletes existing targets schedule before copying</span>
+                <span className="text-[11px] text-slate-500">Deletes existing schedules before copying</span>
               </div>
               <input 
                 type="checkbox"
                 checked={copyOverwrite}
                 onChange={(e) => setCopyOverwrite(e.target.checked)}
-                className="w-5 h-5 text-[#6157e8] focus:ring-[#6157e8] border-slate-300 rounded cursor-pointer"
+                className="w-5 h-5 text-[#10b981] focus:ring-[#10b981] border-slate-300 rounded cursor-pointer"
               />
             </div>
 
@@ -976,7 +1061,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </button>
               <button 
                 onClick={handleCopyDaySchedule} 
-                className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm"
+                className="px-6 py-3 bg-[#10b981] text-white font-bold hover:bg-[#059669] rounded-xl transition-colors shadow-md text-sm"
               >
                 Copy Timetable
               </button>
@@ -1117,13 +1202,14 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
           
           <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
-            {/* Copy Day Schedule Button */}
+            {/* Copy Day Schedule Standout Emerald Button */}
             <button 
               onClick={() => setShowCopyDayModal(true)}
-              className="flex items-center px-4 py-2.5 bg-slate-100 text-[#1a1f36] font-bold text-sm rounded-xl hover:bg-slate-200 transition-colors"
-              title={`Copy ${selectedDay}'s timetable to other days`}
+              className="flex items-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-colors shadow-sm"
+              title={`Copy ${selectedDay}'s timetable`}
             >
-              <Copy className="w-4 h-4 mr-1.5 text-slate-600" /> Copy Day Schedule
+              <Copy className="w-4 h-4 mr-1.5" /> 
+              <span>Copy Schedule</span>
             </button>
             <button 
               onClick={() => setShowManageStaff(true)}
@@ -1149,102 +1235,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             isEditable={true}
             onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} 
           />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- COVERAGE RESOLUTION LOGIC ---
-function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
-  const absentTa = users.find(u => u.id === absence.taId);
-  const daySessions = sessions.filter(s => s.day === absence.day);
-  const criticalSessionsToCover = daySessions.filter(s => s.taId === absence.taId && s.tier === TIERS.CRITICAL);
-  const [assignments, setAssignments] = useState({});
-
-  const getSuggestionsForSlot = (timeSlotId) => {
-    const enrichmentSessions = daySessions.filter(s => 
-      s.timeSlotId === timeSlotId && 
-      s.tier === TIERS.ENRICHMENT &&
-      s.taId !== absence.taId
-    );
-    return enrichmentSessions.map(s => ({
-      ta: users.find(u => u.id === s.taId),
-      currentTask: s.subject
-    }));
-  };
-
-  return (
-    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-[32px] shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh]">
-        <div className="p-8 border-b border-slate-100">
-          <h3 className="text-2xl font-bold text-[#1a1f36]">Resolve Absence</h3>
-          <p className="text-sm font-semibold text-slate-500 mt-1">{absentTa?.name} • {absence.day}</p>
-        </div>
-        
-        <div className="p-8 overflow-y-auto flex-1 bg-slate-50">
-          {criticalSessionsToCover.length === 0 ? (
-            <div className="text-center p-8">
-              <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-              <p className="text-slate-500 font-medium">No critical sessions to cover on this day.</p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {criticalSessionsToCover.map(session => {
-                const suggestions = getSuggestionsForSlot(session.timeSlotId);
-                const slotObj = TIME_SLOTS.find(t => t.id === session.timeSlotId);
-                return (
-                  <div key={session.id} className="bg-white border border-slate-200 rounded-[24px] p-6 shadow-sm">
-                    <div className="mb-4">
-                      <span className="inline-block px-3 py-1 bg-red-50 text-red-600 rounded-full text-xs font-bold tracking-wider uppercase mb-2">Critical Need</span>
-                      <h4 className="font-bold text-lg text-[#1a1f36]">{slotObj?.start} - {slotObj?.end}</h4>
-                      <p className="text-slate-600 font-medium mt-1">{session.subject}</p>
-                    </div>
-                    
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-                        Suggested Coverage (TAs on Enrichment)
-                      </p>
-                      {suggestions.length > 0 ? (
-                        <div className="space-y-2">
-                          {suggestions.map((sug, idx) => (
-                            <label key={idx} className={`flex items-center p-4 border-[1.5px] rounded-[16px] cursor-pointer transition-all ${assignments[session.id] === sug.ta.id ? 'bg-[#f0efff] border-[#6157e8]' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
-                              <input 
-                                type="radio" 
-                                name={`cover-${session.id}`} 
-                                value={sug.ta.id}
-                                checked={assignments[session.id] === sug.ta.id}
-                                onChange={() => setAssignments(prev => ({...prev, [session.id]: sug.ta.id}))}
-                                className="text-[#6157e8] w-4 h-4 mr-4 focus:ring-[#6157e8]"
-                              />
-                              <div>
-                                <span className="font-bold text-[#1a1f36] block">{sug.ta.name}</span>
-                                <span className="text-xs font-semibold text-slate-500">Pulling from: {sug.currentTask}</span>
-                              </div>
-                            </label>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-red-500 font-semibold bg-red-50 p-3 rounded-xl border border-red-100">No TAs on Enrichment during this slot. Manual intervention required.</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        
-        <div className="p-6 border-t border-slate-100 bg-white flex justify-end space-x-3 rounded-b-[32px]">
-          <button onClick={onClose} className="px-6 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors">
-            Cancel
-          </button>
-          <button 
-            onClick={() => onResolve(assignments)}
-            className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md"
-          >
-            Approve & Broadcast
-          </button>
         </div>
       </div>
     </div>
