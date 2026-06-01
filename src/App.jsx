@@ -406,6 +406,17 @@ function App() {
   const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
   const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
 
+  // RESTORED: clearAllDataDb declaration
+  const clearAllDataDb = async () => {
+    const deletePromises = [];
+    users.forEach(u => {
+      if (u.role !== ROLES.SENCO) deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', u.id)));
+    });
+    sessions.forEach(s => deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id))));
+    absences.forEach(a => deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id))));
+    await Promise.all(deletePromises);
+  };
+
   const addToast = (message, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
