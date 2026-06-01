@@ -24,7 +24,7 @@ const getFirebaseConfig = () => {
     }
   }
   
-  // YOUR LIVE HALSWELL SCHOOL FIREBASE WEB APP CONFIGURATION OBJECT:
+  // LIVE HALSWELL SCHOOL FIREBASE WEB APP CONFIGURATION OBJECT:
   return {
     apiKey: "AIzaSyDnWi7OUCjyApvDC0nclGBKWJaaCc-Cr1s",
     authDomain: "support-link-app.firebaseapp.com",
@@ -41,14 +41,12 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Use a clean static string fallback when appId contains folder segments
 const getCleanAppId = () => {
   const rawId = typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production";
   return rawId.split('/')[0];
 };
 const appId = getCleanAppId();
 
-// Detect if we are running in the development sandbox/local-preview or live on Vercel
 const isSandboxEnv = () => {
   if (typeof window === 'undefined') return false;
   const host = window.location.hostname;
@@ -94,7 +92,6 @@ const TIME_SLOTS = [
   { id: 't13', start: '2:30', end: '3:00' }
 ];
 
-// Seed data generated for testing
 const INITIAL_USERS = [
   { id: 'u2', name: 'Mr. Smith', role: ROLES.TEACHER, email: 'smith@school.edu' },
   { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu' }
@@ -103,7 +100,6 @@ const INITIAL_USERS = [
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
-// Generate Karen's Mon-Thu Schedule
 ['Monday', 'Tuesday', 'Wednesday', 'Thursday'].forEach(day => {
   const daySessions = [
     { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee' },
@@ -128,7 +124,6 @@ let sessionIdCounter = 1;
   });
 });
 
-// Generate Karen's Friday Schedule
 const fridaySessions = [
   { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee' },
   { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee' },
@@ -169,8 +164,8 @@ const Toast = ({ message, type = 'success' }) => (
 
 // --- MAIN APP COMPONENT ---
 export default function App() {
-  const [dbUser, setDbUser] = useState(null); // The active Firebase Auth user profile
-  const [currentUser, setCurrentUser] = useState(null); // The matching school staff profile
+  const [dbUser, setDbUser] = useState(null); 
+  const [currentUser, setCurrentUser] = useState(null); 
   const [accessDenied, setAccessDenied] = useState(false);
   const [isDbReady, setIsDbReady] = useState(false);
   const [authCompleted, setAuthCompleted] = useState(false);
@@ -182,7 +177,6 @@ export default function App() {
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
-  // Load rememberMe state from local storage on launch
   useEffect(() => {
     const saved = localStorage.getItem('support_link_remember');
     if (saved !== null) {
@@ -190,7 +184,6 @@ export default function App() {
     }
   }, []);
 
-  // 1. Initialize Authentication and track load status
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -220,7 +213,6 @@ export default function App() {
     return () => unsubscribe();
   }, [rememberMe]);
 
-  // 2. Sync Live Data & Check Authorization
   useEffect(() => {
     if (!authCompleted || !dbUser) return;
 
@@ -238,8 +230,7 @@ export default function App() {
       setUsers(fetchedUsers);
       if(!usersLoaded) { usersLoaded = true; checkReady(); }
 
-      // Authorization Logic
-      if (dbUser.email) {
+      if (dbUser && !dbUser.isAnonymous && dbUser.email) {
         const matchedUser = fetchedUsers.find(u => u.email.toLowerCase() === dbUser.email.toLowerCase());
         
         if (matchedUser) {
@@ -247,7 +238,6 @@ export default function App() {
           setAccessDenied(false);
         } 
         else if (fetchedUsers.length === 0) {
-          // DATABASE IS EMPTY: Set up the first person as the SENCO!
           const newSenco = {
             id: 'u' + Date.now(),
             name: dbUser.displayName || 'First Admin',
@@ -256,7 +246,6 @@ export default function App() {
           };
           await setDoc(doc(usersRef, newSenco.id), newSenco);
           
-          // Seed initial mock accounts so the dashboard is ready
           INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
           INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
         } 
@@ -265,24 +254,26 @@ export default function App() {
           setAccessDenied(true);
         }
       } else {
-        // Fallback for local sandboxed preview mode
-        const localMatched = fetchedUsers.find(u => u.role === ROLES.SENCO);
-        if (localMatched) {
-          setCurrentUser(localMatched);
-        } else if (fetchedUsers.length > 0) {
-          setCurrentUser(fetchedUsers[0]);
+        if (isSandbox) {
+          const localMatched = fetchedUsers.find(u => u.role === ROLES.SENCO);
+          if (localMatched) {
+            setCurrentUser(localMatched);
+          } else if (fetchedUsers.length > 0) {
+            setCurrentUser(fetchedUsers[0]);
+          } else {
+            setCurrentUser({
+              id: 'mock-senco-id-preview',
+              name: 'Sarah Admin (SENCO Preview)',
+              role: ROLES.SENCO,
+              email: 'senco@school.edu'
+            });
+          }
         } else {
-          // Empty Database Fallback inside sandbox: Prevents Access Denied from showing in the Canvas preview!
-          setCurrentUser({
-            id: 'mock-senco-id-preview',
-            name: 'Sarah Admin (SENCO Preview)',
-            role: ROLES.SENCO,
-            email: 'senco@school.edu'
-          });
+          setCurrentUser(null);
         }
       }
     }, (error) => {
-      console.warn("Database listener restricted (Not signed in with a Google account yet).");
+      console.warn("Database listener restricted.");
       if(!usersLoaded) { usersLoaded = true; checkReady(); }
     });
 
@@ -305,7 +296,6 @@ export default function App() {
     return () => { unsubUsers(); unsubSessions(); unsubAbsences(); };
   }, [authCompleted, dbUser]);
 
-  // Database Write Methods
   const addUserToDb = async (userObj) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
   const deleteUserFromDb = async (userId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
   const saveSessionToDb = async (sessionData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
@@ -326,6 +316,18 @@ export default function App() {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
+
+  const handleGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Google Sign-in Error:", error);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        addToast("Sign-in blocked. If testing in preview, please deploy to Vercel.", "error");
+      }
+    }
   };
 
   const handleBypassSignIn = async (role) => {
@@ -402,35 +404,18 @@ export default function App() {
             Halswell School TA Management Portal
           </p>
 
-          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 animate-fade-in flex flex-col items-stretch space-y-3">
-            <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Sign in to support link</h3>
+          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 animate-fade-in flex flex-col items-stretch space-y-4">
+            <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Sign in with Google</h3>
             
-            <button 
-              onClick={() => handleBypassSignIn(ROLES.SENCO)}
-              className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+            <button
+              onClick={handleGoogleSignIn}
+              className="w-full flex items-center justify-center space-x-3 py-4 px-6 border border-slate-200 rounded-full hover:shadow-md hover:-translate-y-[1px] transition-all text-[#3c4257] font-bold shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white"
             >
-              <User size={18} className="text-[#6157e8]" />
-              <span>Enter as SENCO</span>
-            </button>
-            
-            <button 
-              onClick={() => handleBypassSignIn(ROLES.TEACHER)}
-              className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
-            >
-              <Users size={18} className="text-[#6157e8]" />
-              <span>Enter as Teacher</span>
-            </button>
-            
-            <button 
-              onClick={() => handleBypassSignIn(ROLES.TA)}
-              className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
-            >
-              <Star size={18} className="text-[#6157e8]" />
-              <span>Enter as Teacher Aide</span>
+              <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-6 h-6" alt="Google" />
+              <span>Sign in with Google</span>
             </button>
 
-            {/* Remember Me Checkbox */}
-            <div className="flex items-center pt-3 self-center">
+            <div className="flex items-center pt-2 self-center">
               <input 
                 id="remember_me_checkbox"
                 type="checkbox" 
@@ -443,6 +428,35 @@ export default function App() {
               </label>
             </div>
           </div>
+
+          {isSandbox && (
+            <div className="w-full max-w-sm mt-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl">
+              <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Quick Sign-In (Testing Shortcuts)</h3>
+              <div className="grid grid-cols-1 gap-2">
+                <button 
+                  onClick={() => handleBypassSignIn(ROLES.SENCO)}
+                  className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
+                >
+                  <User size={14} />
+                  <span>Enter as SENCO (Admin)</span>
+                </button>
+                <button 
+                  onClick={() => handleBypassSignIn(ROLES.TEACHER)}
+                  className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
+                >
+                  <Users size={14} />
+                  <span>Enter as Mr. Smith (Teacher)</span>
+                </button>
+                <button 
+                  onClick={() => handleBypassSignIn(ROLES.TA)}
+                  className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
+                >
+                  <Star size={14} />
+                  <span>Enter as Karen Cate (TA)</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -479,7 +493,7 @@ export default function App() {
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Access Denied</h2>
             <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              The email address <b className="text-slate-800">{dbUser?.email || "mock-test-email@school.nz"}</b> is not registered in the Support Link system. Please ask the SENCO to add your email via the Manage Staff panel.
+              The email address <b className="text-slate-800">{dbUser?.email || "mock-test-email@school.nz"}</b> is not registered. Please ask the SENCO to add your email via the Manage Staff panel.
             </p>
             <button 
               onClick={handleLogout} 
@@ -558,7 +572,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Sync Mobile Modal */}
       {showMobileSync && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 animate-fade-in text-center">
@@ -570,12 +583,12 @@ export default function App() {
               Scan this QR code with your mobile camera to take your Support Link timetable on the go!
             </p>
             
-            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 inline-block mb-6 shadow-inner">
-              <svg className="w-44 h-44 mx-auto text-[#1a1f36]" viewBox="0 0 100 100" fill="currentColor">
-                <path d="M0 0h30v30H0zm5 5v20h20V5zm3 3h14v14H8zM70 0h30v30H70zm5 5v20h20V5zm3 3h14v14H8zM0 70h30v30H0zm5 5v20h20V5zm3 3h14v14H8z" />
-                <path d="M40 0h10v10H40zm0 15h10v15H40zm15-15h10v5H55zm0 15h10v10H55zm5 25h10v10H60zm0 15h5v5h-5zm15-40h10v10H75zm15 15h10v10H90zm-45 5h10v5H45zm5 15h10v10H50zm15-10h10v5H65zm15 25h10v10H80zm5-10h5v5h-5zm-30-20h10v5H55zm15 15h5v10h-5zm-5 5h5v5h-5zm-15-5h5v5h-5z" />
-                <circle cx="50" cy="50" r="4" className="text-[#6157e8]" />
-              </svg>
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 inline-block mb-6 shadow-md">
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : 'https://halswell-support-link.vercel.app')}`} 
+                alt="Live QR Code" 
+                className="w-44 h-44 mx-auto block"
+              />
             </div>
             
             <div className="text-xs text-slate-400 font-semibold mb-6">
@@ -592,7 +605,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Toasts */}
       {toasts.map((toast, idx) => (
         <div key={toast.id} style={{ bottom: `${1 + idx * 4.5}rem` }} className="fixed right-4 z-50">
           <Toast message={toast.message} type={toast.type} />
@@ -672,7 +684,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb }) {
             <AlertCircle className="w-5 h-5 mr-2 text-red-500" />
             Report Absence for {selectedDay}
           </h3>
-          <p className="text-sm text-slate-600 mb-4">Please provide a reason so the SENCO can arrange appropriate coverage.</p>
+          <p className="text-sm text-slate-600 mb-4">Please provide a reason so the SENCO can arrange coverage.</p>
           <div className="flex flex-col space-y-4">
             <textarea
               value={absenceReason}
@@ -763,9 +775,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
   
-  // Duplication Tool States
   const [showCopyDayModal, setShowCopyDayModal] = useState(false);
-  const [copyScope, setCopyScope] = useState('specific-staff'); // 'whole-day' | 'specific-staff'
+  const [copyScope, setCopyScope] = useState('specific-staff'); 
   const [copySelectedTaId, setCopySelectedTaId] = useState('');
   const [copyTargetDays, setCopyTargetDays] = useState({
     Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
@@ -775,7 +786,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const pendingAbsences = absences.filter(a => a.status === 'Pending');
   const tas = users.filter(u => u.role === ROLES.TA);
 
-  // Set default selected TA for the Copy schedule tool
   useEffect(() => {
     if (tas.length > 0 && !copySelectedTaId) {
       setCopySelectedTaId(tas[0].id);
@@ -844,84 +854,83 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
     saveAbsenceToDb({ ...resolvingAbsence, status: 'Resolved' });
     setResolvingAbsence(null);
-    addToast('Coverage Approved & Broadcasted to Live Network!');
+    addToast('Coverage Approved!');
   };
 
   const handleCopyDaySchedule = async () => {
-    // 1. Gather sessions based on selected Copy Scope
-    let sourceSessions = [];
-    if (copyScope === 'specific-staff') {
-      if (!copySelectedTaId) {
-        addToast('Please select a Teacher Aide to duplicate.', 'error');
+    try {
+      let sourceSessions = [];
+      if (copyScope === 'specific-staff') {
+        if (!copySelectedTaId) {
+          addToast('Please select a Teacher Aide to duplicate.', 'error');
+          return;
+        }
+        sourceSessions = sessions.filter(s => s.day === selectedDay && s.taId === copySelectedTaId);
+      } else {
+        sourceSessions = sessions.filter(s => s.day === selectedDay);
+      }
+
+      if (sourceSessions.length === 0) {
+        const staffName = copyScope === 'specific-staff' 
+          ? (users.find(u => u.id === copySelectedTaId)?.name || 'the selected TA')
+          : 'anyone';
+        addToast(`No duties found for ${staffName} on ${selectedDay} to copy.`, 'error');
         return;
       }
-      sourceSessions = sessions.filter(s => s.day === selectedDay && s.taId === copySelectedTaId);
-    } else {
-      sourceSessions = sessions.filter(s => s.day === selectedDay);
-    }
 
-    if (sourceSessions.length === 0) {
-      const staffName = copyScope === 'specific-staff' 
-        ? users.find(u => u.id === copySelectedTaId)?.name || 'the selected TA'
-        : 'anyone';
-      addToast(`No duties found for ${staffName} on ${selectedDay} to copy.`, 'error');
-      return;
-    }
+      const targetDays = Object.keys(copyTargetDays).filter(day => copyTargetDays[day] && day !== selectedDay);
+      if (targetDays.length === 0) {
+        addToast('Please select at least one other day to copy to.', 'error');
+        return;
+      }
 
-    const targetDays = Object.keys(copyTargetDays).filter(day => copyTargetDays[day] && day !== selectedDay);
-    if (targetDays.length === 0) {
-      addToast('Please select at least one other day to copy to.', 'error');
-      return;
-    }
-
-    // Step 1: Handle Overwrites
-    if (copyOverwrite) {
-      const deletePromises = [];
-      sessions.forEach(s => {
-        if (targetDays.includes(s.day)) {
-          // If coping specific staff, only clear previous sessions of that specific TA on target days
-          if (copyScope === 'specific-staff') {
-            if (s.taId === copySelectedTaId) {
+      if (copyOverwrite) {
+        const deletePromises = [];
+        sessions.forEach(s => {
+          if (targetDays.includes(s.day)) {
+            if (copyScope === 'specific-staff') {
+              if (s.taId === copySelectedTaId) {
+                deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
+              }
+            } else {
               deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
             }
-          } else {
-            // Otherwise, clear the entire targets' schedule
-            deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
           }
-        }
+        });
+        await Promise.all(deletePromises);
+      }
+
+      const writePromises = [];
+      targetDays.forEach(day => {
+        sourceSessions.forEach(sourceSess => {
+          const newId = Math.random().toString(36).substr(2, 9) + '-' + day.substring(0, 3);
+          const duplicatedSession = {
+            ...sourceSess,
+            id: newId,
+            day: day
+          };
+          writePromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', newId), duplicatedSession));
+        });
       });
-      await Promise.all(deletePromises);
+
+      await Promise.all(writePromises);
+      setShowCopyDayModal(false);
+      setCopyTargetDays({
+        Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
+      });
+      
+      const scopeMessage = copyScope === 'specific-staff'
+        ? `${users.find(u => u.id === copySelectedTaId)?.name || 'Staff'}'s schedule`
+        : "The whole day's schedule";
+      addToast(`Successfully duplicated ${scopeMessage} from ${selectedDay}!`, "success");
+    } catch (error) {
+      console.error("Duplicate timetable failed:", error);
+      addToast(`Duplicate failed.`, "error");
     }
-
-    // Step 2: Write duplicate sessions on target days
-    const writePromises = [];
-    targetDays.forEach(day => {
-      sourceSessions.forEach(sourceSess => {
-        const newId = Math.random().toString(36).substr(2, 9) + '-' + day.substring(0, 3);
-        const duplicatedSession = {
-          ...sourceSess,
-          id: newId,
-          day: day
-        };
-        writePromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', newId), duplicatedSession));
-      });
-    });
-
-    await Promise.all(writePromises);
-    setShowCopyDayModal(false);
-    setCopyTargetDays({
-      Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
-    });
-    
-    const scopeMessage = copyScope === 'specific-staff'
-      ? `${users.find(u => u.id === copySelectedTaId)?.name || 'Staff'}'s schedule`
-      : "The whole day's schedule";
-    addToast(`Successfully duplicated ${scopeMessage} from ${selectedDay}!`);
   };
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Alerts Section */}
       {pendingAbsences.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-[24px] p-6 shadow-sm">
           <div className="flex items-center text-red-800 mb-4">
@@ -955,7 +964,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Coverage Resolution Modal */}
       {resolvingAbsence && (
         <CoverageResolver 
           absence={resolvingAbsence} 
@@ -966,7 +974,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         />
       )}
 
-      {/* Copy Timetable Day Modal */}
       {showCopyDayModal && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
@@ -978,7 +985,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               Copy assignments from <b>{selectedDay}</b> to other days.
             </p>
 
-            {/* Scope Selection */}
             <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-slate-100 rounded-xl">
               <button
                 onClick={() => setCopyScope('specific-staff')}
@@ -994,14 +1000,13 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </button>
             </div>
 
-            {/* TA Selector Dropdown */}
             {copyScope === 'specific-staff' && (
               <div className="mb-4">
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Teacher Aide</label>
                 <select 
                   value={copySelectedTaId}
                   onChange={(e) => setCopySelectedTaId(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none font-medium text-[#1a1f36] text-sm"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none font-medium text-[#1a1f36] text-sm bg-slate-50"
                 >
                   {tas.map(ta => (
                     <option key={ta.id} value={ta.id}>{ta.name}</option>
@@ -1030,12 +1035,11 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     onChange={(e) => setCopyTargetDays(prev => ({ ...prev, [day]: e.target.checked }))}
                     className="w-4 h-4 text-[#10b981] focus:ring-[#10b981] border-slate-300 rounded cursor-pointer disabled:cursor-not-allowed mr-3"
                   />
-                  <span className="font-semibold text-sm text-[#1a1f36]">{day} {day === selectedDay && "(Selected Day)"}</span>
+                  <span className="font-semibold text-sm text-[#1a1f36]">{day} {day === selectedDay && "(Selected)"}</span>
                 </label>
               ))}
             </div>
 
-            {/* Overwrite or Merge toggle */}
             <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 mb-6">
               <div>
                 <span className="font-bold text-xs text-[#1a1f36] block uppercase tracking-wider">Overwrite Target Days</span>
@@ -1070,7 +1074,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Session Editor Modal */}
       {editingCell && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in">
@@ -1127,7 +1130,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Manage Staff Modal */}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
@@ -1141,7 +1143,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
                   </div>
                   {u.id !== currentUser.id && (
-                    <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title={`Delete ${u.name}`}>
+                    <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -1202,11 +1204,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
           
           <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
-            {/* Copy Day Schedule Standout Emerald Button */}
             <button 
               onClick={() => setShowCopyDayModal(true)}
-              className="flex items-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-colors shadow-sm"
-              title={`Copy ${selectedDay}'s timetable`}
+              className="flex items-center px-4 py-2.5 bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] font-medium text-sm rounded-xl transition-colors shadow-sm border border-[#a7f3d0]"
             >
               <Copy className="w-4 h-4 mr-1.5" /> 
               <span>Copy Schedule</span>
@@ -1287,7 +1287,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
         <tbody className="divide-y divide-slate-100">
           {TIME_SLOTS.map(slot => (
             <tr key={slot.id} className="hover:bg-slate-50/50 transition-colors">
-              <td className="p-4 font-medium text-slate-800 text-sm whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9] group-hover:bg-slate-50/50">
+              <td className="p-4 font-medium text-slate-800 text-sm whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
                 {slot.start} <span className="text-slate-400 text-xs ml-1 font-medium">{slot.end}</span>
               </td>
               {tas.map(ta => {
@@ -1322,6 +1322,74 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// --- ABSENCE RESOLVER COMPONENT ---
+function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
+  const absentTa = users.find(u => u.id === absence.taId);
+  const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
+  const otherTas = users.filter(u => u.role === ROLES.TA && u.id !== absence.taId);
+  
+  const [assignments, setAssignments] = useState({});
+
+  useEffect(() => {
+    const initial = {};
+    absentSessions.forEach(s => {
+      initial[s.id] = '';
+    });
+    setAssignments(initial);
+  }, [sessions, absence]);
+
+  return (
+    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-[32px] shadow-2xl max-w-lg w-full p-8 animate-fade-in max-h-[85vh] flex flex-col">
+        <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Coverage: {absentTa?.name}</h3>
+        <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
+        
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
+          {absentSessions.map(session => {
+            const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+            return (
+              <div key={session.id} className="border border-slate-100 bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    <span>{slot?.start} - {slot?.end}</span>
+                    <span className="mx-2">•</span>
+                    <span>{session.tier}</span>
+                  </div>
+                  <div className="font-bold text-[#1a1f36] text-sm">{session.subject}</div>
+                </div>
+                <select
+                  value={assignments[session.id] || ''}
+                  onChange={(e) => setAssignments(prev => ({ ...prev, [session.id]: e.target.value }))}
+                  className="w-full sm:w-44 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-medium focus:ring-[#6157e8] outline-none"
+                >
+                  <option value="">Leave Uncovered</option>
+                  {otherTas.map(ta => {
+                    const isBusy = sessions.some(s => s.day === absence.day && s.timeSlotId === session.timeSlotId && s.taId === ta.id);
+                    return (
+                      <option key={ta.id} value={ta.id}>
+                        {ta.name} {isBusy ? '(Has Duty)' : '(Available)'}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-end space-x-3 border-t border-slate-100 pt-4">
+          <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">
+            Cancel
+          </button>
+          <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">
+            Approve Coverage
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
