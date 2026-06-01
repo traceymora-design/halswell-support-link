@@ -374,15 +374,61 @@ export default function App() {
   };
 
   const handleBypassSencoLogin = async () => {
-    const sencoProfile = users.find(u => u.role === ROLES.SENCO) || {
-      id: 'mock-senco-id-production',
-      name: 'Sarah Admin (SENCO)',
-      role: ROLES.SENCO,
-      email: 'senco@school.nz'
-    };
+    const existingSenco = users.find(u => u.role === ROLES.SENCO);
+    
+    if (isSandbox) {
+      // In sandbox preview, immediately bypass to show admin dashboard
+      const sencoProfile = existingSenco || {
+        id: 'mock-senco-id-preview',
+        name: 'Sarah Admin (SENCO Preview)',
+        role: ROLES.SENCO,
+        email: 'senco@school.edu'
+      };
+      if (!existingSenco) {
+        await addUserToDb(sencoProfile);
+      }
+      handleSimpleSignIn(sencoProfile);
+      return;
+    }
 
-    await addUserToDb(sencoProfile);
-    handleGoogleVerification(sencoProfile);
+    // Live Website Google Auth with Auto-Register Support
+    setVerifyingGoogle(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const email = result.user?.email?.toLowerCase();
+      const displayName = result.user?.displayName || 'School Admin';
+      
+      if (!email) {
+        throw new Error("No secure email received from Google account.");
+      }
+
+      if (existingSenco) {
+        // If a SENCO exists, check if email matches
+        if (email === existingSenco.email.toLowerCase()) {
+          handleSimpleSignIn(existingSenco);
+        } else {
+          await signOut(auth);
+          addToast("Verification failed: This Google email is not the registered SENCO.", "error");
+        }
+      } else {
+        // First-Time Setup: Register this first-time Google user as the Master SENCO Admin!
+        const newSenco = {
+          id: 'u' + Date.now(),
+          name: displayName,
+          role: ROLES.SENCO,
+          email: email
+        };
+        await addUserToDb(newSenco);
+        handleSimpleSignIn(newSenco);
+        addToast("Master SENCO profile successfully initialized with your Google Account!", "success");
+      }
+    } catch (e) {
+      console.error(e);
+      addToast(e.message || "Google Sign-In failed.", "error");
+    } finally {
+      setVerifyingGoogle(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -704,7 +750,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb }) {
 
     setShowAbsenceForm(false);
     setAbsenceReason('');
-    addToast(`Absence for ${selectedDay} reported to SENCO.`, 'success');
+    addToast(`Absence for {selectedDay} reported to SENCO.`, 'success');
   };
 
   return (
@@ -1184,7 +1230,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <Trash2 className="w-4 h-4 mr-2" /> Remove
                   </button>
                 )}
-                <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
+                <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">
                   Cancel
                 </button>
                 <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">
@@ -1416,7 +1462,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                   >
                     {isEditable && (
                        <div className="absolute inset-2 bg-[#6157e8]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex justify-center items-center z-10 pointer-events-none">
-                          <Edit3 className="text-[#6157e8] w-5 h-5" />
+                          <Edit3 className="text-[#6157e8].w-5.h-5" />
                        </div>
                     )}
                     {session ? (
