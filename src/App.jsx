@@ -96,12 +96,15 @@ const TIME_SLOTS = [
 const INITIAL_USERS = [
   { id: 'u2', name: 'Mr. Smith', role: ROLES.TEACHER, email: 'smith@school.edu' },
   { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu' },
-  { id: 'tl1', name: 'Mrs. Davis', role: ROLES.TEAM_LEADER, email: 'davis@school.edu' }
+  { id: 'tl1', name: 'Mrs. Davis', role: ROLES.TEAM_LEADER, email: 'davis@school.edu' },
+  { id: 't_val', name: 'Val Murray', role: ROLES.TA, email: 'val.murray@school.nz' },
+  { id: 't_ruby', name: 'Ruby', role: ROLES.TA, email: 'ruby@school.nz' }
 ];
 
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
+// 1. Seed Karen's Monday-Thursday Schedule
 ['Monday', 'Tuesday', 'Wednesday', 'Thursday'].forEach(day => {
   const daySessions = [
     { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
@@ -126,6 +129,7 @@ let sessionIdCounter = 1;
   });
 });
 
+// Seed Karen's Friday Schedule
 const fridaySessions = [
   { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
   { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
@@ -140,10 +144,78 @@ const fridaySessions = [
   { timeSlotId: 't12', tier: TIERS.ENRICHMENT, subject: 'Harry' },
   { timeSlotId: 't13', tier: TIERS.ENRICHMENT, subject: 'Harry' }
 ];
-
 fridaySessions.forEach(s => {
   INITIAL_SESSIONS.push({
     id: `s${sessionIdCounter++}`, day: 'Friday', taId: 't1', teacherId: s.teacherId !== undefined ? s.teacherId : 'u2', ...s
+  });
+});
+
+// 2. Seed Val Murray's Timetable (Monday-Friday) from Val.png
+DAYS.forEach(day => {
+  // Constant slots (Morning HW blocks, tea, and afternoon ESOL)
+  const valDaySessions = [
+    { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
+    { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
+    { timeSlotId: 't3', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
+    { timeSlotId: 't4', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
+    { timeSlotId: 't5', tier: TIERS.MORNING_TEA, subject: 'Morning tea' },
+    { timeSlotId: 't6', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
+    { timeSlotId: 't7', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
+    { timeSlotId: 't12', tier: TIERS.ENRICHMENT, subject: 'Enrichment - ESOL' },
+    { timeSlotId: 't13', tier: TIERS.ENRICHMENT, subject: 'Enrichment - ESOL' }
+  ];
+
+  // Lunchtime Slot Evaluation (12:00 - 12:30)
+  if (day === 'Thursday') {
+    valDaySessions.push({ timeSlotId: 't8', tier: TIERS.LUNCH, subject: 'Unpaid break' });
+  } else {
+    valDaySessions.push({ timeSlotId: 't8', tier: TIERS.CRITICAL, subject: 'Monitor S.C' });
+  }
+
+  // Early Afternoon Slot Evaluation (12:30 - 1:30)
+  if (day === 'Wednesday') {
+    valDaySessions.push({ timeSlotId: 't9', tier: TIERS.ENRICHMENT, subject: 'Enrichment ESOL' });
+    valDaySessions.push({ timeSlotId: 't10', tier: TIERS.ENRICHMENT, subject: 'Enrichment ESOL' });
+  } else if (day !== 'Friday') {
+    valDaySessions.push({ timeSlotId: 't9', tier: TIERS.HIGH_NEEDS, subject: '*E.S - Individual Support' });
+    valDaySessions.push({ timeSlotId: 't10', tier: TIERS.HIGH_NEEDS, subject: '*E.S - Individual Support' });
+  }
+
+  // Late Afternoon Slot Evaluation (1:30 - 2:00)
+  if (day === 'Thursday') {
+    valDaySessions.push({ timeSlotId: 't11', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' });
+  } else {
+    valDaySessions.push({ timeSlotId: 't11', tier: TIERS.LUNCH, subject: 'Unpaid break' });
+  }
+
+  valDaySessions.forEach(s => {
+    INITIAL_SESSIONS.push({
+      id: `s${sessionIdCounter++}`, day, taId: 't_val', teacherId: null, teamLeaderId: null, ...s
+    });
+  });
+});
+
+// 3. Seed Ruby's Timetable (Monday-Friday) from Ruby.png
+DAYS.forEach(day => {
+  const rubyDaySessions = [
+    { timeSlotId: 't1', tier: TIERS.ENRICHMENT, subject: 'Ōrongonmai Enrichment' },
+    { timeSlotId: 't2', tier: TIERS.ENRICHMENT, subject: 'Ōrongonmai Enrichment' },
+    { timeSlotId: 't3', tier: TIERS.ENRICHMENT, subject: 'Ōrongonmai Enrichment' },
+    { timeSlotId: 't4', tier: TIERS.HIGH_NEEDS, subject: '*T.B Individual Support' },
+    { timeSlotId: 't5', tier: TIERS.MORNING_TEA, subject: 'Morning Tea' },
+    { timeSlotId: 't6', tier: TIERS.ENRICHMENT, subject: 'Ōtāwhito Enrichment' },
+    { timeSlotId: 't7', tier: TIERS.ENRICHMENT, subject: 'Ōtāwhito Enrichment' },
+    { timeSlotId: 't8', tier: TIERS.LUNCH, subject: 'Lunch' },
+    { timeSlotId: 't9', tier: TIERS.HIGH_NEEDS, subject: '*J.M Individual Support' },
+    { timeSlotId: 't10', tier: TIERS.HIGH_NEEDS, subject: '*J.M Individual Support' },
+    { timeSlotId: 't11', tier: TIERS.HIGH_NEEDS, subject: '*J.M Individual Support' },
+    { timeSlotId: 't12', tier: TIERS.HIGH_NEEDS, subject: '*J.M Individual Support (finishes at 2:45)' }
+  ];
+
+  rubyDaySessions.forEach(s => {
+    INITIAL_SESSIONS.push({
+      id: `s${sessionIdCounter++}`, day, taId: 't_ruby', teacherId: null, teamLeaderId: null, ...s
+    });
   });
 });
 
