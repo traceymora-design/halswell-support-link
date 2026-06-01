@@ -8,10 +8,10 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, 
-  GoogleAuthProvider, signInWithPopup, signOut,
+  GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
   setPersistence, browserLocalPersistence, browserSessionPersistence 
 } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs } from 'firebase/firestore';
 
 // --- FIREBASE INITIALIZATION ---
 const getFirebaseConfig = () => {
@@ -259,6 +259,32 @@ export default function App() {
         const persistenceType = rememberMe ? browserLocalPersistence : browserSessionPersistence;
         await setPersistence(auth, persistenceType);
 
+        // Standardize handling of redirect result logins (greatly prevents standalone blank-screen bugs)
+        const redirectResult = await getRedirectResult(auth);
+        if (redirectResult && redirectResult.user) {
+          const email = redirectResult.user.email?.toLowerCase();
+          if (email) {
+            // Fetch users snapshots directly to see if profile needs matching
+            const usersSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users'));
+            const fetchedUsersList = usersSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+            const matchedUser = fetchedUsersList.find(u => u.email.toLowerCase() === email);
+            
+            if (matchedUser) {
+              handleSimpleSignIn(matchedUser);
+            } else if (fetchedUsersList.length === 0) {
+              // Auto initialize empty database with the redirect result user
+              const newSencoProfile = {
+                id: 'u' + Date.now(),
+                name: redirectResult.user.displayName || 'School Admin',
+                role: ROLES.SENCO,
+                email: email
+              };
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSencoProfile.id), newSencoProfile);
+              handleSimpleSignIn(newSencoProfile);
+            }
+          }
+        }
+
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
@@ -366,8 +392,13 @@ export default function App() {
         addToast("Verification failed: Authenticated Google email does not match selected profile.", "error");
       }
     } catch (e) {
-      console.error(e);
-      addToast("Secure verification blocked or failed.", "error");
+      console.error("Popup failed, trying redirect fallback:", e);
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+        // Fallback transparently to Google redirect authentication inside standalone/iOS frames
+        await signInWithRedirect(auth, provider);
+      } else {
+        addToast("Secure verification blocked or failed.", "error");
+      }
     } finally {
       setVerifyingGoogle(false);
     }
@@ -377,7 +408,6 @@ export default function App() {
     const existingSenco = users.find(u => u.role === ROLES.SENCO);
     
     if (isSandbox) {
-      // In sandbox preview, immediately bypass to show admin dashboard
       const sencoProfile = existingSenco || {
         id: 'mock-senco-id-preview',
         name: 'Sarah Admin (SENCO Preview)',
@@ -404,7 +434,6 @@ export default function App() {
       }
 
       if (existingSenco) {
-        // If a SENCO exists, check if email matches
         if (email === existingSenco.email.toLowerCase()) {
           handleSimpleSignIn(existingSenco);
         } else {
@@ -412,21 +441,23 @@ export default function App() {
           addToast("Verification failed: This Google email is not the registered SENCO.", "error");
         }
       } else {
-        // First-Time Setup: Register this first-time Google user as the Master SENCO Admin!
         const newSenco = {
           id: 'u' + Date.now(),
           name: displayName,
           role: ROLES.SENCO,
           email: email
         };
-        // FIXED REF ERROR: Using direct path mapping instead of undefined usersRef variable
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSenco.id), newSenco);
         handleSimpleSignIn(newSenco);
         addToast("Master SENCO profile successfully initialized with your Google Account!", "success");
       }
     } catch (e) {
-      console.error(e);
-      addToast(e.message || "Google Sign-In failed.", "error");
+      console.error("Popup failed, trying redirect fallback:", e);
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+        await signInWithRedirect(auth, provider);
+      } else {
+        addToast(e.message || "Google Sign-In failed.", "error");
+      }
     } finally {
       setVerifyingGoogle(false);
     }
@@ -1524,7 +1555,8 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
     <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
       <div className="bg-white rounded-[32px] shadow-2xl max-w-lg w-full p-8 animate-fade-in max-h-[85vh] flex flex-col">
         <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Coverage: {absentTa?.name}</h3>
-        <g className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</g>
+        {/* Changed SVG group tag to semantic paragraph element to prevent rendering engine block */}
+        <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
         
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
           {absentSessions.map(session => {
