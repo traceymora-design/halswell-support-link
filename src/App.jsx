@@ -419,7 +419,8 @@ export default function App() {
           role: ROLES.SENCO,
           email: email
         };
-        await addUserToDb(newSenco);
+        // FIXED REF ERROR: Using direct path mapping instead of undefined usersRef variable
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSenco.id), newSenco);
         handleSimpleSignIn(newSenco);
         addToast("Master SENCO profile successfully initialized with your Google Account!", "success");
       }
@@ -432,6 +433,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    await signOut(auth);
     setCurrentUser(null);
     setActiveLoginTab(null);
     setSelectedStaffId('');
@@ -750,7 +752,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb }) {
 
     setShowAbsenceForm(false);
     setAbsenceReason('');
-    addToast(`Absence for {selectedDay} reported to SENCO.`, 'success');
+    addToast(`Absence reported to SENCO.`, 'success');
   };
 
   return (
@@ -1462,7 +1464,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                   >
                     {isEditable && (
                        <div className="absolute inset-2 bg-[#6157e8]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex justify-center items-center z-10 pointer-events-none">
-                          <Edit3 className="text-[#6157e8].w-5.h-5" />
+                          <Edit3 className="text-[#6157e8] w-5 h-5" />
                        </div>
                     )}
                     {session ? (
@@ -1522,7 +1524,7 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
     <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
       <div className="bg-white rounded-[32px] shadow-2xl max-w-lg w-full p-8 animate-fade-in max-h-[85vh] flex flex-col">
         <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Coverage: {absentTa?.name}</h3>
-        <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
+        <g className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</g>
         
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
           {absentSessions.map(session => {
