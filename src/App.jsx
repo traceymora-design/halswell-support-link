@@ -164,8 +164,55 @@ const Toast = ({ message, type = 'success' }) => (
   </div>
 );
 
+// --- SECURE ERROR BOUNDARY (CRASH PROTECTOR) ---
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, errorInfo: "" };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorInfo: error.message };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Support Link Crash caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-6 font-sans">
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-red-100 max-w-md w-full text-center">
+            <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Something went wrong</h2>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+              We caught a small visual layout error. Press the button below to cleanly refresh the app.
+            </p>
+            <div className="bg-red-50 text-red-700 text-xs font-mono p-3 rounded-xl mb-6 text-left overflow-auto max-h-32">
+              {this.state.errorInfo}
+            </div>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm transition-colors shadow-md"
+            >
+              Reload Support Link
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // --- MAIN APP COMPONENT ---
-export default function App() {
+export default function SafeApp() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
+
+function App() {
   const [dbUser, setDbUser] = useState(null); 
   const [currentUser, setCurrentUser] = useState(null); 
   const [accessDenied, setAccessDenied] = useState(false);
@@ -704,7 +751,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Sync Mobile Modal */}
       {showMobileSync && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 animate-fade-in text-center">
@@ -738,7 +784,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Toasts */}
       {toasts.map((toast, idx) => (
         <div key={toast.id} style={{ bottom: `${1 + idx * 4.5}rem` }} className="fixed right-4 z-50">
           <Toast message={toast.message} type={toast.type} />
