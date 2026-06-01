@@ -3,7 +3,7 @@ import {
   Calendar, AlertCircle, Users, CheckCircle, 
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
-  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck
+  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Download
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -104,7 +104,7 @@ const INITIAL_USERS = [
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
-// 1. Seed Karen's Monday-Thursday Schedule
+// Seed Karen's Monday-Thursday Schedule
 ['Monday', 'Tuesday', 'Wednesday', 'Thursday'].forEach(day => {
   const daySessions = [
     { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
@@ -150,9 +150,8 @@ fridaySessions.forEach(s => {
   });
 });
 
-// 2. Seed Val Murray's Timetable (Monday-Friday) from Val.png
+// Seed Val Murray's Timetable (Monday-Friday) from Val.png
 DAYS.forEach(day => {
-  // Constant slots (Morning HW blocks, tea, and afternoon ESOL)
   const valDaySessions = [
     { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
     { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
@@ -165,14 +164,12 @@ DAYS.forEach(day => {
     { timeSlotId: 't13', tier: TIERS.ENRICHMENT, subject: 'Enrichment - ESOL' }
   ];
 
-  // Lunchtime Slot Evaluation (12:00 - 12:30)
   if (day === 'Thursday') {
     valDaySessions.push({ timeSlotId: 't8', tier: TIERS.LUNCH, subject: 'Unpaid break' });
   } else {
     valDaySessions.push({ timeSlotId: 't8', tier: TIERS.CRITICAL, subject: 'Monitor S.C' });
   }
 
-  // Early Afternoon Slot Evaluation (12:30 - 1:30)
   if (day === 'Wednesday') {
     valDaySessions.push({ timeSlotId: 't9', tier: TIERS.ENRICHMENT, subject: 'Enrichment ESOL' });
     valDaySessions.push({ timeSlotId: 't10', tier: TIERS.ENRICHMENT, subject: 'Enrichment ESOL' });
@@ -181,7 +178,6 @@ DAYS.forEach(day => {
     valDaySessions.push({ timeSlotId: 't10', tier: TIERS.HIGH_NEEDS, subject: '*E.S - Individual Support' });
   }
 
-  // Late Afternoon Slot Evaluation (1:30 - 2:00)
   if (day === 'Thursday') {
     valDaySessions.push({ timeSlotId: 't11', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' });
   } else {
@@ -195,7 +191,7 @@ DAYS.forEach(day => {
   });
 });
 
-// 3. Seed Ruby's Timetable (Monday-Friday) from Ruby.png
+// Seed Ruby's Timetable (Monday-Friday) from Ruby.png
 DAYS.forEach(day => {
   const rubyDaySessions = [
     { timeSlotId: 't1', tier: TIERS.ENRICHMENT, subject: 'Ōrongonmai Enrichment' },
@@ -218,23 +214,6 @@ DAYS.forEach(day => {
     });
   });
 });
-
-// --- UI COMPONENTS ---
-const TIER_STYLES = {
-  [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-white', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
-  [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-white', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
-  [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-white', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
-  [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' }
-};
-
-const Toast = ({ message, type = 'success' }) => (
-  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50
-    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
-    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
-    <p className="font-medium text-sm">{message}</p>
-  </div>
-);
 
 // --- SECURE ERROR BOUNDARY (CRASH PROTECTOR) ---
 class ErrorBoundary extends React.Component {
@@ -1049,11 +1028,44 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const pendingAbsences = absences.filter(a => a.status === 'Pending');
   const tas = users.filter(u => u.role === ROLES.TA);
 
+  // Auto-scans if Val or Ruby are missing on the live db list
+  const isValMissing = !users.some(u => u.id === 't_val');
+  const isRubyMissing = !users.some(u => u.id === 't_ruby');
+  const showImportBanner = isValMissing || isRubyMissing;
+
   useEffect(() => {
     if (tas.length > 0 && !copySelectedTaId) {
       setCopySelectedTaId(tas[0].id);
     }
   }, [tas, copySelectedTaId]);
+
+  const handleImportValRuby = async () => {
+    try {
+      // 1. Write Val Murray
+      if (isValMissing) {
+        const valProfile = INITIAL_USERS.find(u => u.id === 't_val');
+        await addUserToDb(valProfile);
+      }
+      // 2. Write Ruby
+      if (isRubyMissing) {
+        const rubyProfile = INITIAL_USERS.find(u => u.id === 't_ruby');
+        await addUserToDb(rubyProfile);
+      }
+      
+      // 3. Sync Timetable Sessions
+      const writePromises = [];
+      INITIAL_SESSIONS.forEach(s => {
+        if (s.taId === 't_val' || s.taId === 't_ruby') {
+          writePromises.push(saveSessionToDb(s));
+        }
+      });
+      await Promise.all(writePromises);
+      addToast("Successfully imported Val Murray and Ruby timetables to your live database!", "success");
+    } catch (e) {
+      console.error(e);
+      addToast("Failed to write to live database.", "error");
+    }
+  };
 
   const handleAddStaff = () => {
     if(!newStaffName.trim() || !newStaffEmail.trim()) {
@@ -1194,6 +1206,29 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Import Val & Ruby Schedules Banner */}
+      {showImportBanner && (
+        <div className="bg-[#f5f3ff] border border-[#ddd6fe] rounded-[24px] p-6 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-fade-in">
+          <div>
+            <h3 className="font-bold text-[#1a1f36] text-lg flex items-center">
+              <Star className="w-5 h-5 mr-2 text-[#6157e8]" />
+              New Staff Timetables Available (Val Murray & Ruby)
+            </h3>
+            <p className="text-sm text-slate-500 mt-1 leading-relaxed">
+              We detected that Val Murray and Ruby are not yet added to your live cloud database list. Click the button to import their profiles and timetables now.
+            </p>
+          </div>
+          <button
+            onClick={handleImportValRuby}
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm transition-colors shadow-sm whitespace-nowrap"
+          >
+            <Download size={16} />
+            <span>Import Timetables</span>
+          </button>
+        </div>
+      )}
+
+      {/* Alerts Section */}
       {pendingAbsences.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-[24px] p-6 shadow-sm">
           <div className="flex items-center text-red-800 mb-4">
@@ -1269,7 +1304,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 <select 
                   value={copySelectedTaId}
                   onChange={(e) => setCopySelectedTaId(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none font-medium text-[#1a1f36] text-sm bg-slate-50"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none font-medium text-[#1a1f36] text-sm"
                 >
                   {tas.map(ta => (
                     <option key={ta.id} value={ta.id}>{ta.name}</option>
@@ -1298,7 +1333,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     onChange={(e) => setCopyTargetDays(prev => ({ ...prev, [day]: e.target.checked }))}
                     className="w-4 h-4 text-[#10b981] focus:ring-[#10b981] border-slate-300 rounded cursor-pointer disabled:cursor-not-allowed mr-3"
                   />
-                  <span className="font-semibold text-sm text-[#1a1f36]">{day} {day === selectedDay && "(Selected)"}</span>
+                  <span className="font-semibold text-sm text-[#1a1f36]">{day} {day === selectedDay && "(Selected Day)"}</span>
                 </label>
               ))}
             </div>
@@ -1322,7 +1357,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   setShowCopyDayModal(false);
                   setCopyTargetDays({ Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false });
                 }} 
-                className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors"
+                className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm"
               >
                 Cancel
               </button>
@@ -1337,6 +1372,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
+      {/* Session Editor Modal */}
       {editingCell && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in">
@@ -1391,7 +1427,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <Trash2 className="w-4 h-4 mr-2" /> Remove
                   </button>
                 )}
-                <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">
+                <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
                   Cancel
                 </button>
                 <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">
@@ -1403,6 +1439,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
+      {/* Manage Staff Modal */}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
@@ -1416,7 +1453,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
                   </div>
                   {u.id !== currentUser.id && (
-                    <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors">
+                    <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title={`Delete ${u.name}`}>
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -1456,7 +1493,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 </select>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
-                <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">
+                <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
                   Done
                 </button>
                 <button onClick={handleAddStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">
