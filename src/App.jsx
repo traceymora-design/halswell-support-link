@@ -3,7 +3,7 @@ import {
   Calendar, AlertCircle, Users, CheckCircle, 
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
-  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight
+  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -62,6 +62,7 @@ const isSandbox = isSandboxEnv();
 // --- MOCK DATA & CONSTANTS ---
 const ROLES = {
   SENCO: 'SENCO',
+  TEAM_LEADER: 'Team Leader',
   TEACHER: 'TEACHER',
   TA: 'TA'
 };
@@ -94,7 +95,8 @@ const TIME_SLOTS = [
 
 const INITIAL_USERS = [
   { id: 'u2', name: 'Mr. Smith', role: ROLES.TEACHER, email: 'smith@school.edu' },
-  { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu' }
+  { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu' },
+  { id: 'tl1', name: 'Mrs. Davis', role: ROLES.TEAM_LEADER, email: 'davis@school.edu' }
 ];
 
 let INITIAL_SESSIONS = [];
@@ -102,10 +104,10 @@ let sessionIdCounter = 1;
 
 ['Monday', 'Tuesday', 'Wednesday', 'Thursday'].forEach(day => {
   const daySessions = [
-    { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee' },
-    { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee' },
+    { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
+    { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
     { timeSlotId: 't3', tier: TIERS.MORNING_TEA, subject: 'Morning Tea', teacherId: null },
-    { timeSlotId: 't4', tier: TIERS.ENRICHMENT, subject: 'Casey' },
+    { timeSlotId: 't4', tier: TIERS.ENRICHMENT, subject: 'Casey', teamLeaderId: 'tl1' },
     { timeSlotId: 't5', tier: TIERS.CRITICAL, subject: 'Jess' },
     { timeSlotId: 't6', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito - Sam C/Check Karlee' },
     { timeSlotId: 't7', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito - Sam C/Check Karlee' },
@@ -125,8 +127,8 @@ let sessionIdCounter = 1;
 });
 
 const fridaySessions = [
-  { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee' },
-  { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee' },
+  { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
+  { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
   { timeSlotId: 't3', tier: TIERS.MORNING_TEA, subject: 'Morning Tea', teacherId: null },
   { timeSlotId: 't4', tier: TIERS.ENRICHMENT, subject: 'Casey' },
   { timeSlotId: 't5', tier: TIERS.CRITICAL, subject: 'Jess' },
@@ -172,6 +174,11 @@ export default function App() {
   const [rememberMe, setRememberMe] = useState(true);
   const [showMobileSync, setShowMobileSync] = useState(false);
 
+  // Simple Entrance Flow States
+  const [activeLoginTab, setActiveLoginTab] = useState(null); // 'SENCO' | 'TEAM_LEADER' | 'TEACHER' | 'TA'
+  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [verifyingGoogle, setVerifyingGoogle] = useState(false);
+
   const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [absences, setAbsences] = useState([]);
@@ -179,12 +186,10 @@ export default function App() {
 
   // Dynamic Touch/Homescreen Icon Injection Effect
   useEffect(() => {
-    // Vector replica of the high-resolution custom heart-handshake logo
     const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><rect width="180" height="180" rx="46" fill="#6157e8"/><g transform="translate(40, 40) scale(4.16)"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08v0c.8.8 2.1 1 2.96.47l2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m12 5 2.96 2.96a2.17 2.17 0 0 1 0 3.08v0c-.8.8-2.1 1-2.96.47l-2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.43 13.43a2.17 2.17 0 0 1-3.06 0L9 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.57 13.43a2.17 2.17 0 0 0 3.06 0L15 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
     const svgBase64 = btoa(svgString);
     const iconUrl = `data:image/svg+xml;base64,${svgBase64}`;
 
-    // Inject apple-touch-icon
     let appleTouchLink = document.querySelector("link[rel='apple-touch-icon']");
     if (!appleTouchLink) {
       appleTouchLink = document.createElement('link');
@@ -193,7 +198,6 @@ export default function App() {
     }
     appleTouchLink.href = iconUrl;
 
-    // Inject favicon icon
     let favIconLink = document.querySelector("link[rel='icon']");
     if (!favIconLink) {
       favIconLink = document.createElement('link');
@@ -202,10 +206,8 @@ export default function App() {
     }
     favIconLink.href = iconUrl;
 
-    // Set Document Title
     document.title = "Support Link";
 
-    // Inject manifest dynamically to satisfy PWA touch requirements
     const manifestObj = {
       short_name: "Support Link",
       name: "Support Link - Halswell Hub",
@@ -238,8 +240,19 @@ export default function App() {
     if (saved !== null) {
       setRememberMe(saved === 'true');
     }
+    
+    const savedStaffProfile = localStorage.getItem('support_link_active_profile');
+    if (savedStaffProfile && saved !== 'false') {
+      try {
+        const profile = JSON.parse(savedStaffProfile);
+        setCurrentUser(profile);
+      } catch (e) {
+        console.error("Failed to restore saved profile", e);
+      }
+    }
   }, []);
 
+  // 1. Initialize Authentication and track load status
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -261,14 +274,11 @@ export default function App() {
     
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setDbUser(firebaseUser);
-      if (!firebaseUser) {
-        setCurrentUser(null);
-        setAccessDenied(false);
-      }
     });
     return () => unsubscribe();
   }, [rememberMe]);
 
+  // 2. Sync Live Data & Check Authorization
   useEffect(() => {
     if (!authCompleted || !dbUser) return;
 
@@ -284,52 +294,16 @@ export default function App() {
     const unsubUsers = onSnapshot(usersRef, async (snapshot) => {
       const fetchedUsers = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
       setUsers(fetchedUsers);
-      if(!usersLoaded) { usersLoaded = true; checkReady(); }
-
-      if (dbUser && !dbUser.isAnonymous && dbUser.email) {
-        const matchedUser = fetchedUsers.find(u => u.email.toLowerCase() === dbUser.email.toLowerCase());
-        
-        if (matchedUser) {
-          setCurrentUser(matchedUser);
-          setAccessDenied(false);
-        } 
-        else if (fetchedUsers.length === 0) {
-          const newSenco = {
-            id: 'u' + Date.now(),
-            name: dbUser.displayName || 'First Admin',
-            role: ROLES.SENCO,
-            email: dbUser.email.toLowerCase()
-          };
-          await setDoc(doc(usersRef, newSenco.id), newSenco);
-          
-          INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
-          INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
-        } 
-        else {
-          setCurrentUser(null);
-          setAccessDenied(true);
-        }
-      } else {
-        if (isSandbox) {
-          const localMatched = fetchedUsers.find(u => u.role === ROLES.SENCO);
-          if (localMatched) {
-            setCurrentUser(localMatched);
-          } else if (fetchedUsers.length > 0) {
-            setCurrentUser(fetchedUsers[0]);
-          } else {
-            setCurrentUser({
-              id: 'mock-senco-id-preview',
-              name: 'Sarah Admin (SENCO Preview)',
-              role: ROLES.SENCO,
-              email: 'senco@school.edu'
-            });
-          }
-        } else {
-          setCurrentUser(null);
-        }
+      
+      // Seed initial dummy users if database is fresh and completely empty
+      if (fetchedUsers.length === 0) {
+        INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
+        INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
       }
+      
+      if(!usersLoaded) { usersLoaded = true; checkReady(); }
     }, (error) => {
-      console.warn("Database listener restricted.");
+      console.warn("Database listener warning:", error);
       if(!usersLoaded) { usersLoaded = true; checkReady(); }
     });
 
@@ -352,21 +326,12 @@ export default function App() {
     return () => { unsubUsers(); unsubSessions(); unsubAbsences(); };
   }, [authCompleted, dbUser]);
 
+  // Database Write Methods
   const addUserToDb = async (userObj) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
   const deleteUserFromDb = async (userId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
   const saveSessionToDb = async (sessionData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
   const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
   const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
-  
-  const clearAllDataDb = async () => {
-    const deletePromises = [];
-    users.forEach(u => {
-      if (u.role !== ROLES.SENCO) deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', u.id)));
-    });
-    sessions.forEach(s => deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id))));
-    absences.forEach(a => deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id))));
-    await Promise.all(deletePromises);
-  };
 
   const addToast = (message, type = 'success') => {
     const id = Date.now();
@@ -374,61 +339,58 @@ export default function App() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleSimpleSignIn = (staffObj) => {
+    setCurrentUser(staffObj);
+    if (rememberMe) {
+      localStorage.setItem('support_link_active_profile', JSON.stringify(staffObj));
+    }
+    addToast(`Signed in as ${staffObj.name}`, 'success');
+  };
+
+  const handleGoogleVerification = async (expectedProfile) => {
+    if (isSandbox) {
+      // Sandbox bypass directly signs you in without popup blocker interruption
+      handleSimpleSignIn(expectedProfile);
+      return;
+    }
+
+    setVerifyingGoogle(true);
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Google Sign-in Error:", error);
-      if (error.code !== 'auth/popup-closed-by-user') {
-        addToast("Sign-in blocked. If testing in preview, please deploy to Vercel.", "error");
+      const result = await signInWithPopup(auth, provider);
+      const email = result.user?.email?.toLowerCase();
+      if (email && email === expectedProfile.email.toLowerCase()) {
+        handleSimpleSignIn(expectedProfile);
+      } else {
+        await signOut(auth);
+        addToast("Verification failed: Authenticated Google email does not match selected profile.", "error");
       }
+    } catch (e) {
+      console.error(e);
+      addToast("Secure verification blocked or failed.", "error");
+    } finally {
+      setVerifyingGoogle(false);
     }
   };
 
-  const handleBypassSignIn = async (role) => {
-    let mockProfile = {};
-    if (role === ROLES.SENCO) {
-      mockProfile = {
-        id: 'mock-senco-id-preview',
-        name: 'Sarah Admin (SENCO)',
-        role: ROLES.SENCO,
-        email: 'senco@school.edu'
-      };
-    } else if (role === ROLES.TEACHER) {
-      mockProfile = {
-        id: 'u2',
-        name: 'Mr. Smith (Teacher)',
-        role: ROLES.TEACHER,
-        email: 'smith@school.edu'
-      };
-    } else {
-      mockProfile = {
-        id: 't1',
-        name: 'Karen Cate (TA)',
-        role: ROLES.TA,
-        email: 'karen@school.edu'
-      };
-    }
+  const handleBypassSencoLogin = async () => {
+    const sencoProfile = users.find(u => u.role === ROLES.SENCO) || {
+      id: 'mock-senco-id-production',
+      name: 'Sarah Admin (SENCO)',
+      role: ROLES.SENCO,
+      email: 'senco@school.nz'
+    };
 
-    await addUserToDb(mockProfile);
-    setCurrentUser(mockProfile);
-    setIsDbReady(true);
-    addToast(`Successfully entered as ${mockProfile.name}`, 'info');
+    await addUserToDb(sencoProfile);
+    handleGoogleVerification(sencoProfile);
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
     setCurrentUser(null);
-    setAccessDenied(false);
-    setAuthCompleted(false);
-    try {
-      await signInAnonymously(auth);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setAuthCompleted(true);
-    }
+    setActiveLoginTab(null);
+    setSelectedStaffId('');
+    localStorage.removeItem('support_link_active_profile');
+    addToast("Logged out of session.", "info");
   };
 
   const toggleRememberMe = (val) => {
@@ -445,9 +407,15 @@ export default function App() {
     );
   }
 
-  const isUserAuthenticated = isSandbox ? !!dbUser : (dbUser && !dbUser.isAnonymous);
+  // Render Login Panel
+  if (!currentUser) {
+    const listOptions = users.filter(u => {
+      if (activeLoginTab === 'TEACHER') return u.role === ROLES.TEACHER;
+      if (activeLoginTab === 'TA') return u.role === ROLES.TA;
+      if (activeLoginTab === 'TEAM_LEADER') return u.role === ROLES.TEAM_LEADER;
+      return false;
+    });
 
-  if (!isUserAuthenticated && !currentUser) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
         <div className="flex flex-col items-center max-w-md w-full">
@@ -456,23 +424,108 @@ export default function App() {
           </div>
           
           <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
-          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-12 uppercase text-center">
+          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-8 uppercase text-center">
             Halswell School TA Management Portal
           </p>
 
           <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 animate-fade-in flex flex-col items-stretch space-y-4">
-            <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Sign in with Google</h3>
-            
-            <button
-              onClick={handleGoogleSignIn}
-              className="w-full flex items-center justify-center space-x-3 py-4 px-6 border border-slate-200 rounded-full hover:shadow-md hover:-translate-y-[1px] transition-all text-[#3c4257] font-bold shadow-[0_2px_10px_rgba(0,0,0,0.04)] bg-white"
-            >
-              <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-6 h-6" alt="Google" />
-              <span>Sign in with Google</span>
-            </button>
+            {activeLoginTab === null ? (
+              <>
+                <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Select Your Role</h3>
+                
+                <button 
+                  onClick={handleBypassSencoLogin}
+                  className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+                >
+                  <User size={18} className="text-[#6157e8]" />
+                  <span>Enter as SENCO</span>
+                </button>
+
+                <button 
+                  onClick={() => { setActiveLoginTab('TEAM_LEADER'); setSelectedStaffId(users.filter(u => u.role === ROLES.TEAM_LEADER)[0]?.id || ''); }}
+                  className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+                >
+                  <Users size={18} className="text-[#6157e8]" />
+                  <span>Enter as Team Leader</span>
+                </button>
+                
+                <button 
+                  onClick={() => { setActiveLoginTab('TEACHER'); setSelectedStaffId(users.filter(u => u.role === ROLES.TEACHER)[0]?.id || ''); }}
+                  className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+                >
+                  <Users size={18} className="text-[#6157e8]" />
+                  <span>Enter as Teacher</span>
+                </button>
+                
+                <button 
+                  onClick={() => { setActiveLoginTab('TA'); setSelectedStaffId(users.filter(u => u.role === ROLES.TA)[0]?.id || ''); }}
+                  className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+                >
+                  <Star size={18} className="text-[#6157e8]" />
+                  <span>Enter as Teacher Aide</span>
+                </button>
+              </>
+            ) : (
+              <div className="space-y-4 animate-fade-in">
+                <button 
+                  onClick={() => setActiveLoginTab(null)}
+                  className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-wider"
+                >
+                  <ChevronLeft size={16} className="mr-1" /> Back
+                </button>
+
+                <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
+                  Choose Your Name
+                </h3>
+
+                {listOptions.length > 0 ? (
+                  <div className="space-y-4">
+                    <select
+                      value={selectedStaffId}
+                      onChange={(e) => setSelectedStaffId(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-4 py-3.5 focus:ring-[#6157e8] outline-none font-bold text-[#1a1f36] text-sm bg-slate-50"
+                    >
+                      <option value="" disabled>-- Select Name --</option>
+                      {listOptions.map(staff => (
+                        <option key={staff.id} value={staff.id}>{staff.name}</option>
+                      ))}
+                    </select>
+
+                    <button
+                      onClick={() => {
+                        const matched = users.find(u => u.id === selectedStaffId);
+                        if (matched) {
+                          handleGoogleVerification(matched);
+                        } else {
+                          addToast("Please select a profile to continue.", "error");
+                        }
+                      }}
+                      disabled={verifyingGoogle}
+                      className="w-full py-3.5 bg-[#6157e8] text-white font-bold rounded-xl hover:bg-[#5249d6] transition-colors shadow-md text-sm flex items-center justify-center space-x-2"
+                    >
+                      {verifyingGoogle ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <>
+                          <ShieldCheck size={18} />
+                          <span>Verify & Sign In</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center p-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50">
+                    <AlertCircle className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                    <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                      No staff members are registered under this role yet. Please ask your SENCO to add your name in "Manage Staff".
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Remember Me Checkbox */}
-            <div className="flex items-center pt-2 self-center">
+            <div className="flex items-center pt-3 self-center">
               <input 
                 id="remember_me_checkbox"
                 type="checkbox" 
@@ -485,41 +538,12 @@ export default function App() {
               </label>
             </div>
           </div>
-
-          {/* Quick Access Testing Shortcuts are ONLY displayed in safe Preview/Sandbox environments, securing live production */}
-          {isSandbox && (
-            <div className="w-full max-w-sm mt-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl">
-              <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Quick Sign-In (Testing Shortcuts)</h3>
-              <div className="grid grid-cols-1 gap-2">
-                <button 
-                  onClick={() => handleBypassSignIn(ROLES.SENCO)}
-                  className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
-                >
-                  <User size={14} />
-                  <span>Enter as SENCO (Admin)</span>
-                </button>
-                <button 
-                  onClick={() => handleBypassSignIn(ROLES.TEACHER)}
-                  className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
-                >
-                  <Users size={14} />
-                  <span>Enter as Mr. Smith (Teacher)</span>
-                </button>
-                <button 
-                  onClick={() => handleBypassSignIn(ROLES.TA)}
-                  className="w-full py-2.5 px-4 bg-white border border-slate-200 text-[#1a1f36] text-xs font-bold rounded-lg hover:border-[#6157e8] hover:text-[#6157e8] transition-all flex items-center justify-center space-x-2 shadow-sm"
-                >
-                  <Star size={14} />
-                  <span>Enter as Karen Cate (TA)</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );
   }
 
+  // Database loading state (Syncing live cloud records)
   if (!isDbReady) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
@@ -533,38 +557,6 @@ export default function App() {
   const safeUsers = users.length > 0 ? users : INITIAL_USERS;
   const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
   const safeAbsences = absences;
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
-        <div className="flex flex-col items-center max-w-md w-full">
-          <div className="bg-[#6157e8] p-4 rounded-[20px] shadow-sm mb-6">
-            <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
-          </div>
-          
-          <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
-          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-12 uppercase text-center">
-            Halswell School TA Management Portal
-          </p>
-
-          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-red-100 text-center animate-fade-in">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Access Denied</h2>
-            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              The email address <b className="text-slate-800">{dbUser?.email || "mock-test-email@school.nz"}</b> is not registered. Please ask the SENCO to add your email via the Manage Staff panel.
-            </p>
-            <button 
-              onClick={handleLogout} 
-              className="w-full py-3 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm"
-            >
-              Sign out & try another account
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const activeUser = currentUser;
 
   return (
@@ -616,8 +608,11 @@ export default function App() {
             clearAllDataDb={clearAllDataDb}
           />
         )}
+        {activeUser.role === ROLES.TEAM_LEADER && (
+          <TeamLeaderDashboard user={activeUser} sessions={safeSessions} users={safeUsers} />
+        )}
         {activeUser.role === ROLES.TEACHER && (
-          <TeacherDashboard sessions={safeSessions} users={safeUsers} />
+          <TeacherDashboard user={activeUser} sessions={safeSessions} users={safeUsers} />
         )}
         {activeUser.role === ROLES.TA && (
           <TADashboard 
@@ -630,6 +625,7 @@ export default function App() {
         )}
       </main>
 
+      {/* Sync Mobile Modal */}
       {showMobileSync && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 animate-fade-in text-center">
@@ -663,6 +659,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Toasts */}
       {toasts.map((toast, idx) => (
         <div key={toast.id} style={{ bottom: `${1 + idx * 4.5}rem` }} className="fixed right-4 z-50">
           <Toast message={toast.message} type={toast.type} />
@@ -1145,7 +1142,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               handleSaveSession({
                 subject: formData.get('subject'),
                 tier: formData.get('tier'),
-                teacherId: formData.get('teacherId') || null
+                teacherId: formData.get('teacherId') || null,
+                teamLeaderId: formData.get('teamLeaderId') || null
               });
             }} className="space-y-4">
               <div>
@@ -1168,6 +1166,15 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   <option value="">None / Self-Directed</option>
                   {users.filter(u => u.role === ROLES.TEACHER).map(t => (
                     <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Team Leader</label>
+                <select name="teamLeaderId" defaultValue={editingCell.session?.teamLeaderId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                  <option value="">None / No Team Leader</option>
+                  {users.filter(u => u.role === ROLES.TEAM_LEADER).map(tl => (
+                    <option key={tl.id} value={tl.id}>{tl.name}</option>
                   ))}
                 </select>
               </div>
@@ -1237,6 +1244,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 >
                   <option value={ROLES.TA}>Teacher Aide (TA)</option>
                   <option value={ROLES.TEACHER}>Teacher</option>
+                  <option value={ROLES.TEAM_LEADER}>Team Leader</option>
                   <option value={ROLES.SENCO}>SENCO (Admin)</option>
                 </select>
               </div>
@@ -1273,7 +1281,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             </button>
             <button 
               onClick={() => setShowManageStaff(true)}
-              className="flex items-center px-4 py-2.5 bg-[#f0efff] text-[#6157e8] font-medium text-sm rounded-xl hover:bg-[#e0dfff] transition-colors"
+              className="flex items-center px-4 py-2.5 bg-[#f0efff] text-[#6157e8] font-medium text-sm rounded-xl hover:bg-[#e0dfff] transition-colors border border-slate-100"
             >
               <Users className="w-4 h-4 mr-1.5" strokeWidth={3} /> Manage Staff
             </button>
@@ -1301,33 +1309,79 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   );
 }
 
-// --- TEACHER DASHBOARD ---
-function TeacherDashboard({ sessions, users }) {
+// --- TEAM LEADER DASHBOARD ---
+function TeamLeaderDashboard({ user, sessions, users }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
 
+  // Filter sessions where this Team Leader is explicitly assigned
+  const teamSessions = sessions.filter(s => s.day === selectedDay && s.teamLeaderId === user.id);
+
   return (
-    <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
-      <div className="p-8 border-b border-slate-100 bg-white flex justify-between items-center">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
         <div>
-          <h2 className="text-2xl font-bold text-[#1a1f36]">School Timetable</h2>
-          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-1">Teacher View</p>
+          <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
+          <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Team Leader View</p>
         </div>
         <select 
           value={selectedDay}
           onChange={(e) => setSelectedDay(e.target.value)}
-          className="bg-slate-50 border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none focus:ring-[#6157e8]"
+          className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none focus:ring-[#6157e8]"
         >
           {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
       </div>
-      <div className="p-0">
-        <TimetableGrid sessions={sessions} day={selectedDay} users={users} isEditable={false} />
+
+      <div className="bg-white rounded-[28px] border border-slate-200 overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+          <h3 className="font-bold text-slate-800 text-md">Your Assigned Team Schedules</h3>
+          <p className="text-xs text-slate-400 mt-1">Showing only duties where you are designated as Supporting Team Leader</p>
+        </div>
+        <div className="p-0">
+          <TimetableGrid sessions={teamSessions} day={selectedDay} users={users} isEditable={false} />
+        </div>
       </div>
     </div>
   );
 }
 
-// --- SHARED COMPONENTS ---
+// --- TEACHER DASHBOARD ---
+function TeacherDashboard({ user, sessions, users }) {
+  const [selectedDay, setSelectedDay] = useState('Monday');
+
+  // Teachers only see timetables where they are assigned as the teacher
+  const teacherSessions = sessions.filter(s => s.day === selectedDay && s.teacherId === user.id);
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
+        <div>
+          <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
+          <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Teacher View</p>
+        </div>
+        <select 
+          value={selectedDay}
+          onChange={(e) => setSelectedDay(e.target.value)}
+          className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none focus:ring-[#6157e8]"
+        >
+          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </div>
+
+      <div className="bg-white rounded-[28px] border border-slate-200 overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+          <h3 className="font-bold text-slate-800 text-md">Your Supporting TAs</h3>
+          <p className="text-xs text-slate-400 mt-1">Showing only duties where you are designated as Supporting Teacher</p>
+        </div>
+        <div className="p-0">
+          <TimetableGrid sessions={teacherSessions} day={selectedDay} users={users} isEditable={false} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- SHARED TIMETABLE GRID COMPONENT ---
 function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
   const tas = users.filter(u => u.role === ROLES.TA);
   
@@ -1369,6 +1423,22 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                       <div className={`border ${style.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
                         <span className={`text-[9px] font-medium tracking-wider uppercase mb-1 ${style.text}`}>{session.tier}</span>
                         <div className="font-medium text-slate-800 text-sm leading-tight">{session.subject}</div>
+                        
+                        {/* Display assigned staff on the cell */}
+                        {(session.teacherId || session.teamLeaderId) && (
+                          <div className="mt-2 pt-1 border-t border-slate-100 flex flex-wrap gap-1 text-[9px] text-slate-400 font-semibold">
+                            {session.teacherId && (
+                              <span className="bg-slate-100 px-1 py-0.5 rounded text-slate-600">
+                                T: {users.find(u => u.id === session.teacherId)?.name}
+                              </span>
+                            )}
+                            {session.teamLeaderId && (
+                              <span className="bg-purple-50 px-1 py-0.5 rounded text-purple-600">
+                                L: {users.find(u => u.id === session.teamLeaderId)?.name}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">
