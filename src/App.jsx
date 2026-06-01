@@ -3,7 +3,7 @@ import {
   Calendar, AlertCircle, Users, CheckCircle, 
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
-  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone
+  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -176,6 +176,62 @@ export default function App() {
   const [sessions, setSessions] = useState([]);
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
+
+  // Dynamic Touch/Homescreen Icon Injection Effect
+  useEffect(() => {
+    // Vector replica of the high-resolution custom heart-handshake logo
+    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><rect width="180" height="180" rx="46" fill="#6157e8"/><g transform="translate(40, 40) scale(4.16)"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08v0c.8.8 2.1 1 2.96.47l2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m12 5 2.96 2.96a2.17 2.17 0 0 1 0 3.08v0c-.8.8-2.1 1-2.96.47l-2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.43 13.43a2.17 2.17 0 0 1-3.06 0L9 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.57 13.43a2.17 2.17 0 0 0 3.06 0L15 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+    const svgBase64 = btoa(svgString);
+    const iconUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+    // Inject apple-touch-icon
+    let appleTouchLink = document.querySelector("link[rel='apple-touch-icon']");
+    if (!appleTouchLink) {
+      appleTouchLink = document.createElement('link');
+      appleTouchLink.rel = 'apple-touch-icon';
+      document.head.appendChild(appleTouchLink);
+    }
+    appleTouchLink.href = iconUrl;
+
+    // Inject favicon icon
+    let favIconLink = document.querySelector("link[rel='icon']");
+    if (!favIconLink) {
+      favIconLink = document.createElement('link');
+      favIconLink.rel = 'icon';
+      document.head.appendChild(favIconLink);
+    }
+    favIconLink.href = iconUrl;
+
+    // Set Document Title
+    document.title = "Support Link";
+
+    // Inject manifest dynamically to satisfy PWA touch requirements
+    const manifestObj = {
+      short_name: "Support Link",
+      name: "Support Link - Halswell Hub",
+      icons: [
+        {
+          src: iconUrl,
+          sizes: "180x180",
+          type: "image/svg+xml",
+          purpose: "any maskable"
+        }
+      ],
+      start_url: window.location.origin,
+      background_color: "#ffffff",
+      theme_color: "#6157e8",
+      display: "standalone"
+    };
+    
+    let manifestLink = document.querySelector("link[rel='manifest']");
+    if (!manifestLink) {
+      manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      document.head.appendChild(manifestLink);
+    }
+    const manifestBlob = new Blob([JSON.stringify(manifestObj)], {type: 'application/json'});
+    manifestLink.href = URL.createObjectURL(manifestBlob);
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('support_link_remember');
@@ -415,6 +471,7 @@ export default function App() {
               <span>Sign in with Google</span>
             </button>
 
+            {/* Remember Me Checkbox */}
             <div className="flex items-center pt-2 self-center">
               <input 
                 id="remember_me_checkbox"
@@ -429,6 +486,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* Quick Access Testing Shortcuts are ONLY displayed in safe Preview/Sandbox environments, securing live production */}
           {isSandbox && (
             <div className="w-full max-w-sm mt-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl">
               <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Quick Sign-In (Testing Shortcuts)</h3>
@@ -775,6 +833,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
   
+  // Duplication Tool States
   const [showCopyDayModal, setShowCopyDayModal] = useState(false);
   const [copyScope, setCopyScope] = useState('specific-staff'); 
   const [copySelectedTaId, setCopySelectedTaId] = useState('');
@@ -1059,7 +1118,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   setShowCopyDayModal(false);
                   setCopyTargetDays({ Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false });
                 }} 
-                className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm"
+                className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors"
               >
                 Cancel
               </button>
@@ -1182,7 +1241,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 </select>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
-                <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
+                <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">
                   Done
                 </button>
                 <button onClick={handleAddStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">
@@ -1204,6 +1263,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
           
           <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
+            {/* Soft Green Copy Day Schedule Button (No Bold Text) */}
             <button 
               onClick={() => setShowCopyDayModal(true)}
               className="flex items-center px-4 py-2.5 bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] font-medium text-sm rounded-xl transition-colors shadow-sm border border-[#a7f3d0]"
@@ -1213,7 +1273,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             </button>
             <button 
               onClick={() => setShowManageStaff(true)}
-              className="flex items-center px-4 py-2.5 bg-[#f0efff] text-[#6157e8] font-bold text-sm rounded-xl hover:bg-[#e0dfff] transition-colors"
+              className="flex items-center px-4 py-2.5 bg-[#f0efff] text-[#6157e8] font-medium text-sm rounded-xl hover:bg-[#e0dfff] transition-colors"
             >
               <Users className="w-4 h-4 mr-1.5" strokeWidth={3} /> Manage Staff
             </button>
