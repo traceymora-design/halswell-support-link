@@ -215,6 +215,23 @@ DAYS.forEach(day => {
   });
 });
 
+// --- RESTORED: UI TIER STYLING RULES ---
+const TIER_STYLES = {
+  [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-white', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
+  [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-white', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
+  [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-white', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
+  [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
+  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' }
+};
+
+const Toast = ({ message, type = 'success' }) => (
+  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50
+    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
+    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
+    <p className="font-medium text-sm">{message}</p>
+  </div>
+);
+
 // --- SECURE ERROR BOUNDARY (CRASH PROTECTOR) ---
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -457,7 +474,6 @@ function App() {
   const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
   const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
 
-  // RESTORED: clearAllDataDb declaration
   const clearAllDataDb = async () => {
     const deletePromises = [];
     users.forEach(u => {
@@ -484,7 +500,6 @@ function App() {
 
   const handleGoogleVerification = async (expectedProfile) => {
     if (isSandbox) {
-      // Sandbox bypass directly signs you in without popup blocker interruption
       handleSimpleSignIn(expectedProfile);
       return;
     }
@@ -503,7 +518,6 @@ function App() {
     } catch (e) {
       console.error("Popup failed, trying redirect fallback:", e);
       if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
-        // Fallback transparently to Google redirect authentication inside standalone/iOS frames
         await signInWithRedirect(auth, provider);
       } else {
         addToast("Secure verification blocked or failed.", "error");
@@ -1439,7 +1453,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Manage Staff Modal */}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
@@ -1720,7 +1733,6 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
     <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
       <div className="bg-white rounded-[32px] shadow-2xl max-w-lg w-full p-8 animate-fade-in max-h-[85vh] flex flex-col">
         <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Coverage: {absentTa?.name}</h3>
-        {/* Changed SVG group tag to semantic paragraph element to prevent rendering engine block */}
         <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
         
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
