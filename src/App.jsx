@@ -72,7 +72,8 @@ const TIERS = {
   HIGH_NEEDS: 'High Needs',
   ENRICHMENT: 'Enrichment',
   MORNING_TEA: 'Morning Tea',
-  LUNCH: 'Lunch'
+  LUNCH: 'Lunch',
+  NOT_WORKING: 'Not Working'
 };
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -221,7 +222,8 @@ const TIER_STYLES = {
   [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-white', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
   [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-white', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
   [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' }
+  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
+  [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-300', iconColor: 'text-slate-600', icon: Calendar, text: 'text-slate-500 font-normal line-through', subText: 'text-slate-400' }
 };
 
 const Toast = ({ message, type = 'success' }) => (
@@ -474,7 +476,6 @@ function App() {
   const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
   const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
 
-  // RESTORED: clearAllDataDb declaration
   const clearAllDataDb = async () => {
     const deletePromises = [];
     users.forEach(u => {
@@ -612,12 +613,15 @@ function App() {
 
   // Render Login Panel
   if (!currentUser) {
-    const listOptions = users.filter(u => {
-      if (activeLoginTab === 'TEACHER') return u.role === ROLES.TEACHER;
-      if (activeLoginTab === 'TA') return u.role === ROLES.TA;
-      if (activeLoginTab === 'TEAM_LEADER') return u.role === ROLES.TEAM_LEADER;
-      return false;
-    });
+    // ALPHABETICAL ORDER: Sort staff selections cleanly before rendering them on the sign-in dropdowns!
+    const listOptions = users
+      .filter(u => {
+        if (activeLoginTab === 'TEACHER') return u.role === ROLES.TEACHER;
+        if (activeLoginTab === 'TA') return u.role === ROLES.TA;
+        if (activeLoginTab === 'TEAM_LEADER') return u.role === ROLES.TEAM_LEADER;
+        return false;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
@@ -1044,7 +1048,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [copyOverwrite, setCopyOverwrite] = useState(true);
 
   const pendingAbsences = absences.filter(a => a.status === 'Pending');
-  const tas = users.filter(u => u.role === ROLES.TA);
+  
+  // ALPHABETICAL ORDER: Sort all TAs for dashboard controls
+  const tas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
 
   useEffect(() => {
     if (tas.length > 0 && !copySelectedTaId) {
@@ -1073,7 +1079,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     }
 
     if (editingStaff) {
-      // Edit mode: Preserve the ID and overwrite with setDoc
       const updatedStaff = {
         ...editingStaff,
         name: newStaffName,
@@ -1084,7 +1089,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       addToast(`${newStaffName} updated successfully.`, 'success');
       setEditingStaff(null);
     } else {
-      // Normal Add Mode
       const newStaff = {
         id: (newStaffRole === ROLES.TA ? 't' : 'u') + Date.now(),
         name: newStaffName,
@@ -1442,7 +1446,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">Manage Staff</h3>
             
             <div className="flex-1 overflow-y-auto pr-2 mb-6 space-y-2 border-b border-slate-100 pb-4">
-              {users.map(u => (
+              {/* ALPHABETICAL ORDER: Display staff list cleanly in alphabetical order! */}
+              {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
                 <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <div>
                     <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
@@ -1641,10 +1646,12 @@ function TeacherDashboard({ user, sessions, users }) {
 // --- SHARED TIMETABLE GRID COMPONENT ---
 function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
   const [viewMode, setViewMode] = useState('single'); // 'single' | 'all'
-  const tas = users.filter(u => u.role === ROLES.TA);
+  
+  // ALPHABETICAL ORDER: Alphabetically sort TAs inside the Master Timetable Grid and pill selectors
+  const tas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
   const [activeTaId, setActiveTaId] = useState('');
 
-  // Fallback to select first TA initially
+  // Fallback to select first sorted TA initially
   useEffect(() => {
     if (tas.length > 0 && !activeTaId) {
       setActiveTaId(tas[0].id);
@@ -1865,7 +1872,11 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
 function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
   const absentTa = users.find(u => u.id === absence.taId);
   const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
-  const otherTas = users.filter(u => u.role === ROLES.TA && u.id !== absence.taId);
+  
+  // ALPHABETICAL ORDER: Sort potential covering TAs alphabetically!
+  const otherTas = users
+    .filter(u => u.role === ROLES.TA && u.id !== absence.taId)
+    .sort((a, b) => a.name.localeCompare(b.name));
   
   const [assignments, setAssignments] = useState({});
 
