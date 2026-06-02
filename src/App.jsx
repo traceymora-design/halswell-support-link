@@ -501,7 +501,6 @@ function App() {
 
   const handleGoogleVerification = async (expectedProfile) => {
     if (isSandbox) {
-      // Sandbox bypass directly signs you in without popup blocker interruption
       handleSimpleSignIn(expectedProfile);
       return;
     }
@@ -520,7 +519,6 @@ function App() {
     } catch (e) {
       console.error("Popup failed, trying redirect fallback:", e);
       if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
-        // Fallback transparently to Google redirect authentication inside standalone/iOS frames
         await signInWithRedirect(auth, provider);
       } else {
         addToast("Secure verification blocked or failed.", "error");
@@ -1642,76 +1640,223 @@ function TeacherDashboard({ user, sessions, users }) {
 
 // --- SHARED TIMETABLE GRID COMPONENT ---
 function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
+  const [viewMode, setViewMode] = useState('single'); // 'single' | 'all'
   const tas = users.filter(u => u.role === ROLES.TA);
-  
+  const [activeTaId, setActiveTaId] = useState('');
+
+  // Fallback to select first TA initially
+  useEffect(() => {
+    if (tas.length > 0 && !activeTaId) {
+      setActiveTaId(tas[0].id);
+    }
+  }, [tas, activeTaId]);
+
+  // Handle active TA profile deletion cleanly
+  useEffect(() => {
+    if (activeTaId && !tas.some(t => t.id === activeTaId) && tas.length > 0) {
+      setActiveTaId(tas[0].id);
+    }
+  }, [tas]);
+
   return (
-    <div className="relative max-h-[75vh] overflow-auto">
-      <table className="w-full text-left border-collapse min-w-max table-fixed">
-        <thead>
-          <tr>
-            <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
+    <div className="space-y-4">
+      {/* Layout Mode Control Panel */}
+      <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
+        </div>
+        <div className="flex bg-slate-200/60 p-1 rounded-xl">
+          <button
+            onClick={() => setViewMode('single')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              viewMode === 'single' 
+                ? 'bg-white text-[#1a1f36] shadow-sm' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Individual TA
+          </button>
+          <button
+            onClick={() => setViewMode('all')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              viewMode === 'all' 
+                ? 'bg-white text-[#1a1f36] shadow-sm' 
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Full Grid
+          </button>
+        </div>
+      </div>
+
+      {viewMode === 'single' ? (
+        <div className="p-4 sm:p-6 space-y-6">
+          {/* Horizontal scrollable TA Pill Row */}
+          <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
             {tas.map(ta => (
-              <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-medium text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: `calc((100% - 8rem) / ${tas.length || 1})` }}>
+              <button
+                key={ta.id}
+                onClick={() => setActiveTaId(ta.id)}
+                className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 ${
+                  activeTaId === ta.id 
+                    ? 'bg-[#6157e8] text-white shadow-md' 
+                    : 'bg-slate-50 border border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                }`}
+              >
                 {ta.name}
-              </th>
+              </button>
             ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {TIME_SLOTS.map(slot => (
-            <tr key={slot.id} className="hover:bg-slate-50/50 transition-colors">
-              <td className="p-4 font-medium text-slate-800 text-sm whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
-                {slot.start} <span className="text-slate-400 text-xs ml-1 font-medium">{slot.end}</span>
-              </td>
-              {tas.map(ta => {
-                const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === ta.id);
+          </div>
+
+          {/* Single TA Vertical Timeline */}
+          {activeTaId ? (
+            <div className="space-y-4 max-w-2xl mx-auto">
+              {TIME_SLOTS.map(slot => {
+                const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === activeTaId);
                 const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
-                
+                const IconComponent = style ? style.icon : null;
+
                 return (
-                  <td 
-                    key={`${slot.id}-${ta.id}`} 
-                    className={`p-2 relative group ${isEditable ? 'cursor-pointer' : ''}`}
-                    onClick={() => isEditable && onCellClick(slot.id, ta.id, session)}
-                    style={{ width: `calc((100% - 8rem) / ${tas.length || 1})` }}
+                  <div 
+                    key={slot.id} 
+                    className={`flex items-stretch group ${isEditable ? 'cursor-pointer' : ''}`}
+                    onClick={() => isEditable && onCellClick(slot.id, activeTaId, session)}
                   >
-                    {isEditable && (
-                       <div className="absolute inset-2 bg-[#6157e8]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex justify-center items-center z-10 pointer-events-none">
-                          <Edit3 className="text-[#6157e8] w-5 h-5" />
-                       </div>
-                    )}
-                    {session ? (
-                      <div className={`border ${style.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
-                        <span className={`text-[9px] font-medium tracking-wider uppercase mb-1 ${style.text}`}>{session.tier}</span>
-                        <div className="font-medium text-slate-800 text-sm leading-tight">{session.subject}</div>
-                        
-                        {/* Display assigned staff on the cell */}
-                        {(session.teacherId || session.teamLeaderId) && (
-                          <div className="mt-2 pt-1 border-t border-slate-100 flex flex-wrap gap-1 text-[9px] text-slate-400 font-semibold">
-                            {session.teacherId && (
-                              <span className="bg-slate-100 px-1 py-0.5 rounded text-slate-600">
-                                T: {users.find(u => u.id === session.teacherId)?.name}
+                    {/* Time Slot column */}
+                    <div className="w-20 sm:w-24 flex-shrink-0 flex flex-col items-end pr-4 sm:pr-6 pt-4 border-r border-slate-100">
+                      <span className="font-bold text-slate-800 text-xs sm:text-sm">{slot.start}</span>
+                      <span className="text-[10px] font-semibold text-slate-400 mt-0.5">{slot.end}</span>
+                    </div>
+
+                    {/* Duty Session Card */}
+                    <div className="flex-1 pl-4 sm:pl-6 relative">
+                      {session ? (
+                        <div className={`border-[1.5px] p-4 rounded-[20px] transition-all flex items-center shadow-sm hover:border-[#6157e8]/40 ${style.wrapper}`}>
+                          <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center mr-4 shadow-sm ${style.iconBg} ${style.iconColor}`}>
+                            {IconComponent && <IconComponent size={18} strokeWidth={2.5} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1 gap-2">
+                              <span className={`text-[9px] font-bold tracking-wider uppercase ${style.text}`}>
+                                {session.tier}
                               </span>
-                            )}
-                            {session.teamLeaderId && (
-                              <span className="bg-purple-50 px-1 py-0.5 rounded text-purple-600">
-                                L: {users.find(u => u.id === session.teamLeaderId)?.name}
-                              </span>
+                              {isEditable && (
+                                <span className="opacity-0 group-hover:opacity-100 text-[10px] font-bold text-[#6157e8] transition-opacity">
+                                  Edit
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{session.subject}</h4>
+                            
+                            {/* Assigned Teachers / Leaders */}
+                            {(session.teacherId || session.teamLeaderId) && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {session.teacherId && (
+                                  <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
+                                    T: {users.find(u => u.id === session.teacherId)?.name || 'Teacher'}
+                                  </span>
+                                )}
+                                {session.teamLeaderId && (
+                                  <span className="bg-purple-50 text-purple-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
+                                    L: {users.find(u => u.id === session.teamLeaderId)?.name || 'Leader'}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">
-                        Free
-                      </div>
-                    )}
-                  </td>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50/50 rounded-[20px] p-4 border border-dashed border-slate-200/80 hover:border-[#6157e8]/50 hover:bg-[#f0efff]/20 transition-all flex items-center justify-between min-h-[72px]">
+                          <span className="text-slate-400 text-xs font-semibold">Free Session</span>
+                          {isEditable && (
+                            <span className="text-[10px] font-bold text-[#6157e8] opacity-0 group-hover:opacity-100 transition-opacity">
+                              + Assign Duty
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            </div>
+          ) : (
+            <div className="text-center p-12 bg-slate-50 rounded-[32px] border border-dashed border-slate-200 text-slate-400 font-medium">
+              Loading staff...
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Full Grid overview (Wider fixed columns with horizontal scrolling to prevent squashing) */
+        <div className="relative max-h-[75vh] overflow-auto">
+          <table className="w-full text-left border-collapse min-w-max table-fixed">
+            <thead>
+              <tr>
+                <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
+                {tas.map(ta => (
+                  <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-semibold text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: '220px' }}>
+                    {ta.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {TIME_SLOTS.map(slot => (
+                <tr key={slot.id} className="hover:bg-slate-50/50 transition-colors">
+                  <td className="p-4 font-medium text-slate-800 text-sm whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
+                    {slot.start} <span className="text-slate-400 text-xs ml-1 font-medium">{slot.end}</span>
+                  </td>
+                  {tas.map(ta => {
+                    const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === ta.id);
+                    const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
+                    
+                    return (
+                      <td 
+                        key={`${slot.id}-${ta.id}`} 
+                        className={`p-2 relative group ${isEditable ? 'cursor-pointer' : ''}`}
+                        onClick={() => isEditable && onCellClick(slot.id, ta.id, session)}
+                        style={{ width: '220px' }}
+                      >
+                        {isEditable && (
+                           <div className="absolute inset-2 bg-[#6157e8]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex justify-center items-center z-10 pointer-events-none">
+                              <Edit3 className="text-[#6157e8] w-5 h-5" />
+                           </div>
+                        )}
+                        {session ? (
+                          <div className={`border ${style.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
+                            <span className={`text-[9px] font-medium tracking-wider uppercase mb-1 ${style.text}`}>{session.tier}</span>
+                            <div className="font-medium text-slate-800 text-sm leading-tight">{session.subject}</div>
+                            
+                            {/* Display assigned staff on the cell */}
+                            {(session.teacherId || session.teamLeaderId) && (
+                              <div className="mt-2 pt-1 border-t border-slate-100 flex flex-wrap gap-1 text-[9px] text-slate-400 font-semibold">
+                                {session.teacherId && (
+                                  <span className="bg-slate-100 px-1 py-0.5 rounded text-slate-600">
+                                    T: {users.find(u => u.id === session.teacherId)?.name}
+                                  </span>
+                                )}
+                                {session.teamLeaderId && (
+                                  <span className="bg-purple-50 px-1 py-0.5 rounded text-purple-600">
+                                    L: {users.find(u => u.id === session.teamLeaderId)?.name}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">
+                            Free
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
