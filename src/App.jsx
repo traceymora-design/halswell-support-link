@@ -216,14 +216,14 @@ DAYS.forEach(day => {
   });
 });
 
-// --- RESTORED: UI TIER STYLING RULES ---
+// --- UI TIER STYLING RULES ---
 const TIER_STYLES = {
   [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-white', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
   [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-white', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
   [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-white', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
   [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
   [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-300', iconColor: 'text-slate-600', icon: Calendar, text: 'text-slate-500 font-normal line-through', subText: 'text-slate-400' }
+  [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
 };
 
 const Toast = ({ message, type = 'success' }) => (
@@ -1744,7 +1744,8 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1 gap-2">
-                              <span className={`text-[9px] font-bold tracking-wider uppercase ${style.text}`}>
+                              {/* DYNAMIC BOLDNESS: Applied clean, non-bold weight to "Not Working" pill tag */}
+                              <span className={`text-[9px] tracking-wider uppercase ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-400' : 'font-bold'} ${style.text}`}>
                                 {session.tier}
                               </span>
                               {isEditable && (
@@ -1753,7 +1754,11 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                                 </span>
                               )}
                             </div>
-                            <h4 className="font-bold text-slate-800 text-sm leading-tight truncate">{session.subject}</h4>
+                            
+                            {/* DYNAMIC BOLDNESS: Applied clean, normal weight and dark-slate color for "Not Working" card subject */}
+                            <h4 className={`text-sm leading-tight truncate ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-bold text-slate-800'}`}>
+                              {session.subject}
+                            </h4>
                             
                             {/* Assigned Teachers / Leaders */}
                             {(session.teacherId || session.teamLeaderId) && (
@@ -1831,8 +1836,13 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                         )}
                         {session ? (
                           <div className={`border ${style.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
-                            <span className={`text-[9px] font-medium tracking-wider uppercase mb-1 ${style.text}`}>{session.tier}</span>
-                            <div className="font-medium text-slate-800 text-sm leading-tight">{session.subject}</div>
+                            {/* DYNAMIC BOLDNESS: Applied clean, non-bold weight to "Not Working" text inside the master birds-eye table */}
+                            <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style.text}`}>
+                              {session.tier}
+                            </span>
+                            <div className={`text-sm leading-tight ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-semibold text-slate-800'}`}>
+                              {session.subject}
+                            </div>
                             
                             {/* Display assigned staff on the cell */}
                             {(session.teacherId || session.teamLeaderId) && (
