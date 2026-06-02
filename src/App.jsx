@@ -301,7 +301,7 @@ function App() {
 
   // Dynamic Touch/Homescreen Icon Injection Effect
   useEffect(() => {
-    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><rect width="180" height="180" rx="46" fill="#6157e8"/><g transform="translate(40, 40) scale(4.16)"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08v0c.8.8 2.1 1 2.96.47l2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m12 5 2.96 2.96a2.17 2.17 0 0 1 0 3.08v0c-.8.8-2.1 1-2.96.47l-2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.43 13.43a2.17 2.17 0 0 1-3.06 0L9 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.57 13.43a2.17 2.17 0 0 0 3.06 0L15 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
+    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><rect width="180" height="180" rx="46" fill="#6157e8"/><g transform="translate(40, 40) scale(4.16)"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 5 9.04(7.96)a2.17 2.17 0 0 0 0 3.08v0c.8.8 2.1 1 2.96.47l2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m12 5 2.96 2.96a2.17 2.17 0 0 1 0 3.08v0c-.8.8-2.1 1-2.96.47l-2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.43 13.43a2.17 2.17 0 0 1-3.06 0L9 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.57 13.43a2.17 2.17 0 0 0 3.06 0L15 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
     const svgBase64 = btoa(svgString);
     const iconUrl = `data:image/svg+xml;base64,${svgBase64}`;
 
@@ -474,6 +474,7 @@ function App() {
   const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
   const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
 
+  // RESTORED: clearAllDataDb declaration
   const clearAllDataDb = async () => {
     const deletePromises = [];
     users.forEach(u => {
@@ -500,6 +501,7 @@ function App() {
 
   const handleGoogleVerification = async (expectedProfile) => {
     if (isSandbox) {
+      // Sandbox bypass directly signs you in without popup blocker interruption
       handleSimpleSignIn(expectedProfile);
       return;
     }
@@ -518,6 +520,7 @@ function App() {
     } catch (e) {
       console.error("Popup failed, trying redirect fallback:", e);
       if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+        // Fallback transparently to Google redirect authentication inside standalone/iOS frames
         await signInWithRedirect(auth, provider);
       } else {
         addToast("Secure verification blocked or failed.", "error");
@@ -1030,6 +1033,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
   
+  // Staff Editing States
+  const [editingStaff, setEditingStaff] = useState(null);
+
   // Duplication Tool States
   const [showCopyDayModal, setShowCopyDayModal] = useState(false);
   const [copyScope, setCopyScope] = useState('specific-staff'); 
@@ -1042,64 +1048,64 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const pendingAbsences = absences.filter(a => a.status === 'Pending');
   const tas = users.filter(u => u.role === ROLES.TA);
 
-  // Auto-scans if Val or Ruby are missing on the live db list
-  const isValMissing = !users.some(u => u.id === 't_val');
-  const isRubyMissing = !users.some(u => u.id === 't_ruby');
-  const showImportBanner = isValMissing || isRubyMissing;
-
   useEffect(() => {
     if (tas.length > 0 && !copySelectedTaId) {
       setCopySelectedTaId(tas[0].id);
     }
   }, [tas, copySelectedTaId]);
 
-  const handleImportValRuby = async () => {
-    try {
-      // 1. Write Val Murray
-      if (isValMissing) {
-        const valProfile = INITIAL_USERS.find(u => u.id === 't_val');
-        await addUserToDb(valProfile);
-      }
-      // 2. Write Ruby
-      if (isRubyMissing) {
-        const rubyProfile = INITIAL_USERS.find(u => u.id === 't_ruby');
-        await addUserToDb(rubyProfile);
-      }
-      
-      // 3. Sync Timetable Sessions
-      const writePromises = [];
-      INITIAL_SESSIONS.forEach(s => {
-        if (s.taId === 't_val' || s.taId === 't_ruby') {
-          writePromises.push(saveSessionToDb(s));
-        }
-      });
-      await Promise.all(writePromises);
-      addToast("Successfully imported Val Murray and Ruby timetables to your live database!", "success");
-    } catch (e) {
-      console.error(e);
-      addToast("Failed to write to live database.", "error");
-    }
+  const handleStartEditStaff = (staff) => {
+    setEditingStaff(staff);
+    setNewStaffName(staff.name);
+    setNewStaffEmail(staff.email || '');
+    setNewStaffRole(staff.role);
   };
 
-  const handleAddStaff = () => {
+  const handleCancelEditStaff = () => {
+    setEditingStaff(null);
+    setNewStaffName('');
+    setNewStaffEmail('');
+    setNewStaffRole(ROLES.TA);
+  };
+
+  const handleAddOrUpdateStaff = () => {
     if(!newStaffName.trim() || !newStaffEmail.trim()) {
       addToast('Please provide both name and email.', 'error');
       return;
     }
-    const newStaff = {
-      id: (newStaffRole === ROLES.TA ? 't' : 'u') + Date.now(),
-      name: newStaffName,
-      role: newStaffRole,
-      email: newStaffEmail.toLowerCase().trim()
-    };
-    addUserToDb(newStaff);
+
+    if (editingStaff) {
+      // Edit mode: Preserve the ID and overwrite with setDoc
+      const updatedStaff = {
+        ...editingStaff,
+        name: newStaffName,
+        email: newStaffEmail.toLowerCase().trim(),
+        role: newStaffRole
+      };
+      addUserToDb(updatedStaff);
+      addToast(`${newStaffName} updated successfully.`, 'success');
+      setEditingStaff(null);
+    } else {
+      // Normal Add Mode
+      const newStaff = {
+        id: (newStaffRole === ROLES.TA ? 't' : 'u') + Date.now(),
+        name: newStaffName,
+        role: newStaffRole,
+        email: newStaffEmail.toLowerCase().trim()
+      };
+      addUserToDb(newStaff);
+      addToast(`${newStaffName} added as ${newStaffRole} successfully.`, 'success');
+    }
+
     setNewStaffName('');
     setNewStaffEmail('');
     setNewStaffRole(ROLES.TA);
-    addToast(`${newStaffName} added as ${newStaffRole} successfully.`);
   };
 
   const handleDeleteStaff = (userId, name) => {
+    if (editingStaff && editingStaff.id === userId) {
+      handleCancelEditStaff();
+    }
     deleteUserFromDb(userId);
     addToast(`${name} has been removed.`, 'info');
   };
@@ -1220,28 +1226,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Import Val & Ruby Schedules Banner */}
-      {showImportBanner && (
-        <div className="bg-[#f5f3ff] border border-[#ddd6fe] rounded-[24px] p-6 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-fade-in">
-          <div>
-            <h3 className="font-bold text-[#1a1f36] text-lg flex items-center">
-              <Star className="w-5 h-5 mr-2 text-[#6157e8]" />
-              New Staff Timetables Available (Val Murray & Ruby)
-            </h3>
-            <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-              We detected that Val Murray and Ruby are not yet added to your live cloud database list. Click the button to import their profiles and timetables now.
-            </p>
-          </div>
-          <button
-            onClick={handleImportValRuby}
-            className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm transition-colors shadow-sm whitespace-nowrap"
-          >
-            <Download size={16} />
-            <span>Import Timetables</span>
-          </button>
-        </div>
-      )}
-
       {/* Alerts Section */}
       {pendingAbsences.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-[24px] p-6 shadow-sm">
@@ -1453,6 +1437,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
+      {/* Manage Staff Modal */}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
@@ -1465,17 +1450,29 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
                   </div>
-                  {u.id !== currentUser.id && (
-                    <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title={`Delete ${u.name}`}>
-                      <Trash2 className="w-4 h-4" />
+                  <div className="flex items-center space-x-1">
+                    {/* EDIT STAFF BUTTON */}
+                    <button 
+                      onClick={() => handleStartEditStaff(u)} 
+                      className="p-2 text-[#6157e8] hover:bg-violet-100 rounded-lg transition-colors"
+                      title={`Edit ${u.name}`}
+                    >
+                      <Edit3 className="w-4 h-4" />
                     </button>
-                  )}
+                    {u.id !== currentUser.id && (
+                      <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title={`Delete ${u.name}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
 
             <div className="space-y-4">
-              <h4 className="font-bold text-[#1a1f36] text-sm">Add New Staff</h4>
+              <h4 className="font-bold text-[#1a1f36] text-sm">
+                {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
+              </h4>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
                 <input 
@@ -1506,11 +1503,16 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 </select>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
+                {editingStaff && (
+                  <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-semibold transition-colors mr-auto">
+                    Cancel Edit
+                  </button>
+                )}
                 <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
                   Done
                 </button>
-                <button onClick={handleAddStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">
-                  Add Staff
+                <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">
+                  {editingStaff ? 'Update Staff' : 'Add Staff'}
                 </button>
               </div>
             </div>
@@ -1644,12 +1646,12 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
   
   return (
     <div className="relative max-h-[75vh] overflow-auto">
-      <table className="w-full text-left border-collapse min-w-max">
+      <table className="w-full text-left border-collapse min-w-max table-fixed">
         <thead>
           <tr>
             <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
             {tas.map(ta => (
-              <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-medium text-sm min-w-[150px] sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]">
+              <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-medium text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: `calc((100% - 8rem) / ${tas.length || 1})` }}>
                 {ta.name}
               </th>
             ))}
@@ -1670,6 +1672,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                     key={`${slot.id}-${ta.id}`} 
                     className={`p-2 relative group ${isEditable ? 'cursor-pointer' : ''}`}
                     onClick={() => isEditable && onCellClick(slot.id, ta.id, session)}
+                    style={{ width: `calc((100% - 8rem) / ${tas.length || 1})` }}
                   >
                     {isEditable && (
                        <div className="absolute inset-2 bg-[#6157e8]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex justify-center items-center z-10 pointer-events-none">
