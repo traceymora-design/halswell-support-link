@@ -442,6 +442,18 @@ function App() {
         INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
         INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
       }
+
+      // Automatically match email if they are logged in with Google on reload
+      if (auth.currentUser && !auth.currentUser.isAnonymous && auth.currentUser.email) {
+        const email = auth.currentUser.email.toLowerCase();
+        const matchedUser = fetchedUsers.find(u => u.email?.toLowerCase() === email);
+        if (matchedUser) {
+          setCurrentUser(matchedUser);
+          setAccessDenied(false);
+        } else {
+          setAccessDenied(true);
+        }
+      }
       
       if(!usersLoaded) { usersLoaded = true; checkReady(); }
     }, (error) => {
@@ -488,7 +500,7 @@ function App() {
   const addToast = (message, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+    setTimeout(() => toasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
   const handleSimpleSignIn = (staffObj) => {
