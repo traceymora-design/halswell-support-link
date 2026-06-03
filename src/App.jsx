@@ -521,6 +521,7 @@ function App() {
     } catch (e) {
       console.error("Popup failed, trying redirect fallback:", e);
       if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+        // Fallback transparently to Google redirect authentication inside standalone/iOS frames
         await signInWithRedirect(auth, provider);
       } else {
         addToast("Secure verification blocked or failed.", "error");
@@ -1756,8 +1757,8 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                               )}
                             </div>
                             
-                            {/* DYNAMIC BOLDNESS FIXED: All subjects rendered with a clean, unbolded layout as requested */}
-                            <h4 className={`text-sm leading-tight truncate font-normal ${session.tier === TIERS.NOT_WORKING ? 'text-slate-500' : 'text-slate-800'}`}>
+                            {/* DYNAMIC BOLDNESS FIXED: Changed from 'font-normal' to 'font-medium' for active sessions to hit the perfect sweet spot! */}
+                            <h4 className={`text-sm leading-tight truncate ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </h4>
                             
@@ -1842,8 +1843,8 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                               {session.tier}
                             </span>
                             
-                            {/* DYNAMIC BOLDNESS FIXED: Master birds-eye table cells now also render subjects with font-normal weight */}
-                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'text-slate-500' : 'text-slate-800'}`}>
+                            {/* DYNAMIC BOLDNESS FIXED: Changed from 'font-normal' to 'font-medium' for active master table subjects too! */}
+                            <div className={`text-sm leading-tight ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </div>
                             
