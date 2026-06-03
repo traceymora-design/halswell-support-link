@@ -291,9 +291,7 @@ function App() {
   const [rememberMe, setRememberMe] = useState(true);
   const [showMobileSync, setShowMobileSync] = useState(false);
 
-  // Simple Entrance Flow States
-  const [activeLoginTab, setActiveLoginTab] = useState(null); // 'SENCO' | 'TEAM_LEADER' | 'TEACHER' | 'TA'
-  const [selectedStaffId, setSelectedStaffId] = useState('');
+  // Single-Sign-On States
   const [verifyingGoogle, setVerifyingGoogle] = useState(false);
 
   const [users, setUsers] = useState([]);
@@ -357,17 +355,40 @@ function App() {
     if (saved !== null) {
       setRememberMe(saved === 'true');
     }
-    
-    const savedStaffProfile = localStorage.getItem('support_link_active_profile');
-    if (savedStaffProfile && saved !== 'false') {
-      try {
-        const profile = JSON.parse(savedStaffProfile);
-        setCurrentUser(profile);
-      } catch (e) {
-        console.error("Failed to restore saved profile", e);
-      }
-    }
   }, []);
+
+  // Securely look up emails to map current user roles
+  const handlePostSignIn = async (firebaseUser) => {
+    if (!firebaseUser) return;
+    const email = firebaseUser.email?.toLowerCase();
+    if (!email) return;
+
+    try {
+      const usersSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users'));
+      const fetchedUsersList = usersSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+      
+      const matchedUser = fetchedUsersList.find(u => u.email?.toLowerCase() === email);
+      if (matchedUser) {
+        setCurrentUser(matchedUser);
+        setAccessDenied(false);
+      } else if (fetchedUsersList.length === 0) {
+        const newSenco = {
+          id: 'u' + Date.now(),
+          name: firebaseUser.displayName || 'School Admin',
+          role: ROLES.SENCO,
+          email: email
+        };
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSenco.id), newSenco);
+        setCurrentUser(newSenco);
+        setAccessDenied(false);
+      } else {
+        setCurrentUser(null);
+        setAccessDenied(true);
+      }
+    } catch (err) {
+      console.error("Post-auth mapping failed:", err);
+    }
+  };
 
   // 1. Initialize Authentication and track load status
   useEffect(() => {
@@ -379,31 +400,9 @@ function App() {
         // Standardize handling of redirect result logins (greatly prevents standalone blank-screen bugs)
         const redirectResult = await getRedirectResult(auth);
         if (redirectResult && redirectResult.user) {
-          const email = redirectResult.user.email?.toLowerCase();
-          if (email) {
-            // Fetch users snapshots directly to see if profile needs matching
-            const usersSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users'));
-            const fetchedUsersList = usersSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-            const matchedUser = fetchedUsersList.find(u => u.email.toLowerCase() === email);
-            
-            if (matchedUser) {
-              handleSimpleSignIn(matchedUser);
-            } else if (fetchedUsersList.length === 0) {
-              // Auto initialize empty database with the redirect result user
-              const newSencoProfile = {
-                id: 'u' + Date.now(),
-                name: redirectResult.user.displayName || 'School Admin',
-                role: ROLES.SENCO,
-                email: email
-              };
-              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSencoProfile.id), newSencoProfile);
-              handleSimpleSignIn(newSencoProfile);
-            }
-          }
-        }
-
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
+          await handlePostSignIn(redirectResult.user);
+        } else if (auth.currentUser && !auth.currentUser.isAnonymous) {
+          await handlePostSignIn(auth.currentUser);
         } else {
           await signInAnonymously(auth);
         }
@@ -500,101 +499,86 @@ function App() {
     addToast(`Signed in as ${staffObj.name}`, 'success');
   };
 
-  const handleGoogleVerification = async (expectedProfile) => {
-    if (isSandbox) {
-      handleSimpleSignIn(expectedProfile);
-      return;
-    }
-
+  const handleGoogleSignIn = async () => {
     setVerifyingGoogle(true);
     const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
-      const email = result.user?.email?.toLowerCase();
-      if (email && email === expectedProfile.email.toLowerCase()) {
-        handleSimpleSignIn(expectedProfile);
-      } else {
-        await signOut(auth);
-        addToast("Verification failed: Authenticated Google email does not match selected profile.", "error");
+      if (isSandbox) {
+        // Sandbox Dev Bypass Mock Sign-In
+        handleSimpleSignIn({
+          id: 'mock-senco-id-preview',
+          name: 'Sarah Admin (SENCO Preview)',
+          role: ROLES.SENCO,
+          email: 'senco@school.edu'
+        });
+        return;
+      }
+
+      // Standalone iOS and Safari-friendly auth popup/redirect pattern
+      try {
+        const result = await signInWithPopup(auth, provider);
+        await handlePostSignIn(result.user);
+      } catch (popupErr) {
+        console.warn("Popup blocked or failed, falling back to secure Redirect:", popupErr);
+        await signInWithRedirect(auth, provider);
       }
     } catch (e) {
-      console.error("Popup failed, trying redirect fallback:", e);
-      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
-        await signInWithRedirect(auth, provider);
-      } else {
-        addToast("Secure verification blocked or failed.", "error");
-      }
+      console.error("Google Sign-In Secure flow failed:", e);
+      addToast("Secure verification blocked or failed.", "error");
     } finally {
       setVerifyingGoogle(false);
     }
   };
 
-  const handleBypassSencoLogin = async () => {
-    const existingSenco = users.find(u => u.role === ROLES.SENCO);
-    
-    if (isSandbox) {
-      const sencoProfile = existingSenco || {
+  const handleBypassSignIn = async (role) => {
+    let mockProfile = {};
+    if (role === ROLES.SENCO) {
+      mockProfile = {
         id: 'mock-senco-id-preview',
-        name: 'Sarah Admin (SENCO Preview)',
+        name: 'Sarah Admin (SENCO)',
         role: ROLES.SENCO,
         email: 'senco@school.edu'
       };
-      if (!existingSenco) {
-        await addUserToDb(sencoProfile);
-      }
-      handleSimpleSignIn(sencoProfile);
-      return;
+    } else if (role === ROLES.TEACHER) {
+      mockProfile = {
+        id: 'u2',
+        name: 'Mr. Smith',
+        role: ROLES.TEACHER,
+        email: 'smith@school.edu'
+      };
+    } else if (role === ROLES.TEAM_LEADER) {
+      mockProfile = {
+        id: 'tl1',
+        name: 'Mrs. Davis',
+        role: ROLES.TEAM_LEADER,
+        email: 'davis@school.edu'
+      };
+    } else {
+      mockProfile = {
+        id: 't1',
+        name: 'Karen Cate',
+        role: ROLES.TA,
+        email: 'karen@school.edu'
+      };
     }
 
-    // Live Website Google Auth with Auto-Register Support
-    setVerifyingGoogle(true);
-    const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const email = result.user?.email?.toLowerCase();
-      const displayName = result.user?.displayName || 'School Admin';
-      
-      if (!email) {
-        throw new Error("No secure email received from Google account.");
-      }
-
-      if (existingSenco) {
-        if (email === existingSenco.email.toLowerCase()) {
-          handleSimpleSignIn(existingSenco);
-        } else {
-          await signOut(auth);
-          addToast("Verification failed: This Google email is not the registered SENCO.", "error");
-        }
-      } else {
-        const newSenco = {
-          id: 'u' + Date.now(),
-          name: displayName,
-          role: ROLES.SENCO,
-          email: email
-        };
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSenco.id), newSenco);
-        handleSimpleSignIn(newSenco);
-        addToast("Master SENCO profile successfully initialized with your Google Account!", "success");
-      }
-    } catch (e) {
-      console.error("Popup failed, trying redirect fallback:", e);
-      if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
-        await signInWithRedirect(auth, provider);
-      } else {
-        addToast(e.message || "Google Sign-In failed.", "error");
-      }
-    } finally {
-      setVerifyingGoogle(false);
-    }
+    await addUserToDb(mockProfile);
+    setCurrentUser(mockProfile);
+    setIsDbReady(true);
+    addToast(`Successfully entered as ${mockProfile.name}`, 'info');
   };
 
   const handleLogout = async () => {
     await signOut(auth);
     setCurrentUser(null);
-    setActiveLoginTab(null);
-    setSelectedStaffId('');
+    setAccessDenied(false);
     localStorage.removeItem('support_link_active_profile');
     addToast("Logged out of session.", "info");
+    try {
+      await signInAnonymously(auth);
+    } catch (err) {
+      console.error("Anonymous fallback failed:", err);
+    }
   };
 
   const toggleRememberMe = (val) => {
@@ -611,18 +595,8 @@ function App() {
     );
   }
 
-  // Render Login Panel
-  if (!currentUser) {
-    // ALPHABETICAL ORDER: Sort staff selections cleanly before rendering them on the sign-in dropdowns!
-    const listOptions = users
-      .filter(u => {
-        if (activeLoginTab === 'TEACHER') return u.role === ROLES.TEACHER;
-        if (activeLoginTab === 'TA') return u.role === ROLES.TA;
-        if (activeLoginTab === 'TEAM_LEADER') return u.role === ROLES.TEAM_LEADER;
-        return false;
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-
+  // Render Access Denied Panel
+  if (accessDenied && !currentUser) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
         <div className="flex flex-col items-center max-w-md w-full">
@@ -631,108 +605,93 @@ function App() {
           </div>
           
           <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
-          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-8 uppercase text-center">
+          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-12 uppercase text-center">
+            Halswell School TA Management Portal
+          </p>
+
+          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-red-100 text-center animate-fade-in">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Access Denied</h2>
+            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+              The Google email address <b className="text-slate-800">{auth.currentUser?.email || "your Google Account"}</b> is not registered in the Support Link system. Please ask your SENCO to add your email via the Manage Staff panel.
+            </p>
+            <button 
+              onClick={handleLogout} 
+              className="w-full py-3 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm"
+            >
+              Sign out & try another account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Login Panel
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
+        <div className="flex flex-col items-center max-w-md w-full">
+          <div className="bg-[#6157e8] p-4 rounded-[20px] shadow-sm mb-6">
+            <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
+          </div>
+          
+          <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
+          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-12 uppercase text-center">
             Halswell School TA Management Portal
           </p>
 
           <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 animate-fade-in flex flex-col items-stretch space-y-4">
-            {activeLoginTab === null ? (
-              <>
-                <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Select Your Role</h3>
-                
-                <button 
-                  onClick={handleBypassSencoLogin}
-                  className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
-                >
-                  <User size={18} className="text-[#6157e8]" />
-                  <span>Enter as SENCO</span>
-                </button>
+            <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Welcome Staff</h3>
+            
+            <button 
+              onClick={handleGoogleSignIn}
+              disabled={verifyingGoogle}
+              className="w-full py-4 px-4 bg-[#6157e8] text-white text-sm font-bold rounded-xl hover:bg-[#5249d6] transition-all flex items-center justify-center space-x-3 shadow-md disabled:opacity-50"
+            >
+              {verifyingGoogle ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <ShieldCheck size={18} />
+                  <span>Sign in with Google</span>
+                </>
+              )}
+            </button>
 
+            {/* Developer / Sandbox Bypass Row (Muted at bottom of Card) */}
+            <div className="pt-4 border-t border-slate-100 text-center">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Sandbox Dev Bypass</span>
+              <div className="grid grid-cols-4 gap-1">
                 <button 
-                  onClick={() => { setActiveLoginTab('TEAM_LEADER'); setSelectedStaffId(users.filter(u => u.role === ROLES.TEAM_LEADER)[0]?.id || ''); }}
-                  className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+                  onClick={() => handleBypassSignIn(ROLES.SENCO)}
+                  className="py-1 px-1 bg-slate-50 hover:bg-slate-100 text-slate-500 font-semibold text-[8px] rounded border border-slate-200"
                 >
-                  <Users size={18} className="text-[#6157e8]" />
-                  <span>Enter as Team Leader</span>
+                  SENCO
                 </button>
-                
                 <button 
-                  onClick={() => { setActiveLoginTab('TEACHER'); setSelectedStaffId(users.filter(u => u.role === ROLES.TEACHER)[0]?.id || ''); }}
-                  className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+                  onClick={() => handleBypassSignIn(ROLES.TEAM_LEADER)}
+                  className="py-1 px-1 bg-slate-50 hover:bg-slate-100 text-slate-500 font-semibold text-[8px] rounded border border-slate-200"
                 >
-                  <Users size={18} className="text-[#6157e8]" />
-                  <span>Enter as Teacher</span>
+                  Leader
                 </button>
-                
                 <button 
-                  onClick={() => { setActiveLoginTab('TA'); setSelectedStaffId(users.filter(u => u.role === ROLES.TA)[0]?.id || ''); }}
-                  className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 text-[#1a1f36] text-sm font-bold rounded-xl hover:border-[#6157e8] hover:text-[#6157e8] hover:bg-violet-50/50 transition-all flex items-center justify-center space-x-3 shadow-sm"
+                  onClick={() => handleBypassSignIn(ROLES.TEACHER)}
+                  className="py-1 px-1 bg-slate-50 hover:bg-slate-100 text-slate-500 font-semibold text-[8px] rounded border border-slate-200"
                 >
-                  <Star size={18} className="text-[#6157e8]" />
-                  <span>Enter as Teacher Aide</span>
+                  Teacher
                 </button>
-              </>
-            ) : (
-              <div className="space-y-4 animate-fade-in">
                 <button 
-                  onClick={() => setActiveLoginTab(null)}
-                  className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-wider"
+                  onClick={() => handleBypassSignIn(ROLES.TA)}
+                  className="py-1 px-1 bg-slate-50 hover:bg-slate-100 text-[#6157e8] bg-violet-50 font-semibold text-[8px] rounded border border-[#ddd6fe]"
                 >
-                  <ChevronLeft size={16} className="mr-1" /> Back
+                  TA
                 </button>
-
-                <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">
-                  Choose Your Name
-                </h3>
-
-                {listOptions.length > 0 ? (
-                  <div className="space-y-4">
-                    <select
-                      value={selectedStaffId}
-                      onChange={(e) => setSelectedStaffId(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl px-4 py-3.5 focus:ring-[#6157e8] outline-none font-bold text-[#1a1f36] text-sm bg-slate-50"
-                    >
-                      <option value="" disabled>-- Select Name --</option>
-                      {listOptions.map(staff => (
-                        <option key={staff.id} value={staff.id}>{staff.name}</option>
-                      ))}
-                    </select>
-
-                    <button
-                      onClick={() => {
-                        const matched = users.find(u => u.id === selectedStaffId);
-                        if (matched) {
-                          handleGoogleVerification(matched);
-                        } else {
-                          addToast("Please select a profile to continue.", "error");
-                        }
-                      }}
-                      disabled={verifyingGoogle}
-                      className="w-full py-3.5 bg-[#6157e8] text-white font-bold rounded-xl hover:bg-[#5249d6] transition-colors shadow-md text-sm flex items-center justify-center space-x-2"
-                    >
-                      {verifyingGoogle ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          <ShieldCheck size={18} />
-                          <span>Verify & Sign In</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-center p-6 border border-dashed border-slate-200 rounded-2xl bg-slate-50">
-                    <AlertCircle className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                    <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                      No staff members are registered under this role yet. Please ask your SENCO to add your name in "Manage Staff".
-                    </p>
-                  </div>
-                )}
               </div>
-            )}
+            </div>
 
             {/* Remember Me Checkbox */}
-            <div className="flex items-center pt-3 self-center">
+            <div className="flex items-center pt-2 self-center">
               <input 
                 id="remember_me_checkbox"
                 type="checkbox" 
@@ -746,17 +705,6 @@ function App() {
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // Database loading state (Syncing live cloud records)
-  if (!isDbReady) {
-    return (
-      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
-        <Loader2 className="w-12 h-12 text-[#6157e8] animate-spin mb-4" />
-        <h2 className="text-[#1a1f36] font-bold text-lg">Syncing with Cloud...</h2>
-        <p className="text-xs text-slate-400 mt-2">Retrieving Halswell School Live Data</p>
       </div>
     );
   }
