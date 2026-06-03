@@ -476,6 +476,7 @@ function App() {
   const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
   const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
 
+  // RESTORED: clearAllDataDb declaration
   const clearAllDataDb = async () => {
     const deletePromises = [];
     users.forEach(u => {
@@ -1169,7 +1170,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
       if (sourceSessions.length === 0) {
         const staffName = copyScope === 'specific-staff' 
-          ? (users.find(u => u.id === copySelectedTaId)?.name || 'the selected TA')
+          ? `${users.find(u => u.id === copySelectedTaId)?.name || 'Staff'}`
           : 'anyone';
         addToast(`No duties found for ${staffName} on ${selectedDay} to copy.`, 'error');
         return;
@@ -1755,8 +1756,8 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                               )}
                             </div>
                             
-                            {/* DYNAMIC BOLDNESS: Applied clean, normal weight and dark-slate color for "Not Working" card subject */}
-                            <h4 className={`text-sm leading-tight truncate ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-bold text-slate-800'}`}>
+                            {/* DYNAMIC BOLDNESS FIXED: All subjects rendered with a clean, unbolded layout as requested */}
+                            <h4 className={`text-sm leading-tight truncate font-normal ${session.tier === TIERS.NOT_WORKING ? 'text-slate-500' : 'text-slate-800'}`}>
                               {session.subject}
                             </h4>
                             
@@ -1840,7 +1841,9 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                             <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style.text}`}>
                               {session.tier}
                             </span>
-                            <div className={`text-sm leading-tight ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-semibold text-slate-800'}`}>
+                            
+                            {/* DYNAMIC BOLDNESS FIXED: Master birds-eye table cells now also render subjects with font-normal weight */}
+                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'text-slate-500' : 'text-slate-800'}`}>
                               {session.subject}
                             </div>
                             
