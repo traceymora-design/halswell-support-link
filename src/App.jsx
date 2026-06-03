@@ -476,7 +476,6 @@ function App() {
   const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
   const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
 
-  // RESTORED: clearAllDataDb declaration
   const clearAllDataDb = async () => {
     const deletePromises = [];
     users.forEach(u => {
@@ -1741,14 +1740,14 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                     {/* Duty Session Card - Shifted left to balance empty padding space */}
                     <div className="flex-1 pl-3 sm:pl-6 relative">
                       {session ? (
-                        <div className={`border-[1.5px] p-4 rounded-[20px] transition-all flex items-center shadow-sm hover:border-[#6157e8]/40 ${style.wrapper}`}>
-                          <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center mr-4 shadow-sm ${style.iconBg} ${style.iconColor}`}>
+                        <div className={`border-[1.5px] p-4 rounded-[20px] transition-all flex items-center shadow-sm hover:border-[#6157e8]/40 ${style?.wrapper}`}>
+                          <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center mr-4 shadow-sm ${style?.iconBg} ${style?.iconColor}`}>
                             {IconComponent && <IconComponent size={18} strokeWidth={2.5} />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1 gap-2">
                               {/* DYNAMIC BOLDNESS: Applied clean, non-bold weight to "Not Working" pill tag */}
-                              <span className={`text-[9px] tracking-wider uppercase ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-400' : 'font-bold'} ${style.text}`}>
+                              <span className={`text-[9px] tracking-wider uppercase ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-400' : 'font-bold'} ${style?.text}`}>
                                 {session.tier}
                               </span>
                               {isEditable && (
@@ -1838,9 +1837,9 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                            </div>
                         )}
                         {session ? (
-                          <div className={`border ${style.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
+                          <div className={`border ${style?.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
                             {/* DYNAMIC BOLDNESS: Applied clean, non-bold weight to "Not Working" text inside the master birds-eye table */}
-                            <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style.text}`}>
+                            <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style?.text}`}>
                               {session.tier}
                             </span>
                             
@@ -1918,9 +1917,9 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
                   <div className="flex items-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                     <span>{slot?.start} - {slot?.end}</span>
                     <span className="mx-2">•</span>
-                    <span>{session.tier}</span>
+                    <span>{session?.tier}</span>
                   </div>
-                  <div className="font-bold text-[#1a1f36] text-sm">{session.subject}</div>
+                  <div className="font-bold text-[#1a1f36] text-sm">{session?.subject}</div>
                 </div>
                 <select
                   value={assignments[session.id] || ''}
