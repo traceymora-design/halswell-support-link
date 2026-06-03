@@ -503,6 +503,7 @@ function App() {
 
   const handleGoogleVerification = async (expectedProfile) => {
     if (isSandbox) {
+      // Sandbox bypass directly signs you in without popup blocker interruption
       handleSimpleSignIn(expectedProfile);
       return;
     }
@@ -995,8 +996,8 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb }) {
            </div>
         ) : (
           sortedSessions.map(({ slot, session }) => {
-            const style = TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT];
-            const IconComponent = style.icon;
+            const style = TIER_STYLES[session?.tier] || TIER_STYLES[TIERS.ENRICHMENT];
+            const IconComponent = style?.icon || Star;
             
             return (
               <div key={slot.id} className="flex items-stretch group">
@@ -1005,16 +1006,16 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb }) {
                   <span className="text-[11px] font-medium text-slate-400 mt-0.5">{slot.end}</span>
                 </div>
                 
-                <div className={`flex-1 flex items-center p-4 sm:p-5 rounded-[28px] border-[1.5px] transition-all duration-200 hover:shadow-sm ${style.wrapper}`}>
-                  <div className={`w-12 h-12 flex-shrink-0 rounded-full flex items-center justify-center ${style.iconBg} ${style.iconColor} mr-4 sm:mr-5 shadow-sm`}>
+                <div className={`flex-1 flex items-center p-4 sm:p-5 rounded-[28px] border-[1.5px] transition-all duration-200 hover:shadow-sm ${style?.wrapper}`}>
+                  <div className={`w-12 h-12 flex-shrink-0 rounded-full flex items-center justify-center ${style?.iconBg} ${style?.iconColor} mr-4 sm:mr-5 shadow-sm`}>
                     <IconComponent size={20} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <h3 className={`font-medium text-[15px] leading-tight mb-1 ${style.text}`}>
-                      {session.subject}
+                    <h3 className={`font-medium text-[15px] leading-tight mb-1 ${style?.text}`}>
+                      {session?.subject}
                     </h3>
-                    <p className={`text-[10px] font-medium tracking-[0.15em] uppercase ${style.subText}`}>
-                      {session.tier}
+                    <p className={`text-[10px] font-medium tracking-[0.15em] uppercase ${style?.subText}`}>
+                      {session?.tier}
                     </p>
                   </div>
                 </div>
@@ -1224,7 +1225,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       addToast(`Successfully duplicated ${scopeMessage} from ${selectedDay}!`, "success");
     } catch (error) {
       console.error("Duplicate timetable failed:", error);
-      addToast(`Duplicate failed.`, "error");
+      addToast("Duplicate failed.", "error");
     }
   };
 
@@ -1844,7 +1845,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                             </span>
                             
                             {/* DYNAMIC BOLDNESS FIXED: Changed from 'font-normal' to 'font-medium' for active master table subjects too! */}
-                            <div className={`text-sm leading-tight ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
+                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </div>
                             
