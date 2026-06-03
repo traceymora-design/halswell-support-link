@@ -1698,7 +1698,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
       </div>
 
       {viewMode === 'single' ? (
-        <div className="p-4 sm:p-6 space-y-6">
+        <div className="px-1.5 sm:px-6 py-4 space-y-6">
           {/* Horizontal scrollable TA Pill Row */}
           <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
             {tas.map(ta => (
@@ -1730,14 +1730,14 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                     className={`flex items-stretch group ${isEditable ? 'cursor-pointer' : ''}`}
                     onClick={() => isEditable && onCellClick(slot.id, activeTaId, session)}
                   >
-                    {/* Time Slot column */}
-                    <div className="w-20 sm:w-24 flex-shrink-0 flex flex-col items-end pr-4 sm:pr-6 pt-4 border-r border-slate-100">
+                    {/* Time Slot column - Centered and optimized for mobile screens */}
+                    <div className="w-14 sm:w-24 flex-shrink-0 flex flex-col items-end pr-2.5 sm:pr-6 pt-4 border-r border-slate-100">
                       <span className="font-bold text-slate-800 text-xs sm:text-sm">{slot.start}</span>
                       <span className="text-[10px] font-semibold text-slate-400 mt-0.5">{slot.end}</span>
                     </div>
 
-                    {/* Duty Session Card */}
-                    <div className="flex-1 pl-4 sm:pl-6 relative">
+                    {/* Duty Session Card - Shifted left to balance empty padding space */}
+                    <div className="flex-1 pl-3 sm:pl-6 relative">
                       {session ? (
                         <div className={`border-[1.5px] p-4 rounded-[20px] transition-all flex items-center shadow-sm hover:border-[#6157e8]/40 ${style.wrapper}`}>
                           <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center mr-4 shadow-sm ${style.iconBg} ${style.iconColor}`}>
