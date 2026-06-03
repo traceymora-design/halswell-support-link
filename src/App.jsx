@@ -502,7 +502,6 @@ function App() {
 
   const handleGoogleVerification = async (expectedProfile) => {
     if (isSandbox) {
-      // Sandbox bypass directly signs you in without popup blocker interruption
       handleSimpleSignIn(expectedProfile);
       return;
     }
@@ -521,7 +520,6 @@ function App() {
     } catch (e) {
       console.error("Popup failed, trying redirect fallback:", e);
       if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
-        // Fallback transparently to Google redirect authentication inside standalone/iOS frames
         await signInWithRedirect(auth, provider);
       } else {
         addToast("Secure verification blocked or failed.", "error");
