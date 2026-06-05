@@ -3,7 +3,7 @@ import {
   Calendar, AlertCircle, Users, CheckCircle, 
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
-  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Download
+  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -13,7 +13,6 @@ import {
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs } from 'firebase/firestore';
 
-// --- FIREBASE INITIALIZATION ---
 const getFirebaseConfig = () => {
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
@@ -24,7 +23,6 @@ const getFirebaseConfig = () => {
     }
   }
   
-  // LIVE HALSWELL SCHOOL FIREBASE WEB APP CONFIGURATION OBJECT:
   return {
     apiKey: "AIzaSyDnWi7OUCjyApvDC0nclGBKWJaaCc-Cr1s",
     authDomain: "support-link-app.firebaseapp.com",
@@ -59,12 +57,24 @@ const isSandboxEnv = () => {
 };
 const isSandbox = isSandboxEnv();
 
-// --- MOCK DATA & CONSTANTS ---
 const ROLES = {
   SENCO: 'SENCO',
   TEAM_LEADER: 'Team Leader',
   TEACHER: 'TEACHER',
   TA: 'TA'
+};
+
+const TEAMS = {
+  Y0_4: 'Years 0-4 Team',
+  Y5_8: 'Years 5-8 Team',
+  ACROSS: 'Across Both Teams (Y0-8)',
+  ALL: 'All Teams / Master Admin'
+};
+
+const SENCOS = {
+  CATHIE: 'Cathie',
+  TRACEY: 'Tracey',
+  BOTH: 'None / Both'
 };
 
 const TIERS = {
@@ -95,11 +105,13 @@ const TIME_SLOTS = [
 ];
 
 const INITIAL_USERS = [
-  { id: 'u2', name: 'Mr. Smith', role: ROLES.TEACHER, email: 'smith@school.edu' },
-  { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu' },
-  { id: 'tl1', name: 'Mrs. Davis', role: ROLES.TEAM_LEADER, email: 'davis@school.edu' },
-  { id: 't_val', name: 'Val Murray', role: ROLES.TA, email: 'val.murray@school.nz' },
-  { id: 't_ruby', name: 'Ruby', role: ROLES.TA, email: 'ruby@school.nz' }
+  { id: 'senco_cathie', name: 'Cathie', role: ROLES.SENCO, email: 'cathie@halswell.school.nz', team: TEAMS.Y0_4, allocatedSenco: SENCOS.CATHIE },
+  { id: 'senco_tracey', name: 'Tracey', role: ROLES.SENCO, email: 'tracey@halswell.school.nz', team: TEAMS.Y5_8, allocatedSenco: SENCOS.TRACEY },
+  { id: 'u2', name: 'Mr. Smith', role: ROLES.TEACHER, email: 'smith@school.edu', team: TEAMS.Y5_8, allocatedSenco: SENCOS.TRACEY },
+  { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu', team: TEAMS.ACROSS, allocatedSenco: SENCOS.TRACEY },
+  { id: 'tl1', name: 'Mrs. Davis', role: ROLES.TEAM_LEADER, email: 'davis@school.edu', team: TEAMS.Y5_8, allocatedSenco: SENCOS.TRACEY },
+  { id: 't_val', name: 'Val Murray', role: ROLES.TA, email: 'val.murray@school.nz', team: TEAMS.Y5_8, allocatedSenco: SENCOS.TRACEY },
+  { id: 't_ruby', name: 'Ruby', role: ROLES.TA, email: 'ruby@school.nz', team: TEAMS.Y0_4, allocatedSenco: SENCOS.CATHIE }
 ];
 
 let INITIAL_SESSIONS = [];
@@ -122,101 +134,11 @@ let sessionIdCounter = 1;
     { timeSlotId: 't12', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito' },
     { timeSlotId: 't13', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito' }
   ];
-  
   daySessions.forEach(s => {
-    INITIAL_SESSIONS.push({
-      id: `s${sessionIdCounter++}`, day, taId: 't1', teacherId: s.teacherId !== undefined ? s.teacherId : 'u2', ...s
-    });
+    INITIAL_SESSIONS.push({ id: `s${sessionIdCounter++}`, day, taId: 't1', teacherId: s.teacherId !== undefined ? s.teacherId : 'u2', ...s });
   });
 });
 
-// Seed Karen's Friday Schedule
-const fridaySessions = [
-  { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
-  { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
-  { timeSlotId: 't3', tier: TIERS.MORNING_TEA, subject: 'Morning Tea', teacherId: null },
-  { timeSlotId: 't4', tier: TIERS.ENRICHMENT, subject: 'Casey' },
-  { timeSlotId: 't5', tier: TIERS.CRITICAL, subject: 'Jess' },
-  { timeSlotId: 't6', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito - Sam C/Check Karlee' },
-  { timeSlotId: 't7', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito - Sam C/Check Karlee' },
-  { timeSlotId: 't8', tier: TIERS.ENRICHMENT, subject: 'Harry' }, 
-  { timeSlotId: 't9', tier: TIERS.LUNCH, subject: 'Lunch', teacherId: null },
-  { timeSlotId: 't10', tier: TIERS.ENRICHMENT, subject: 'Harry' },
-  { timeSlotId: 't12', tier: TIERS.ENRICHMENT, subject: 'Harry' },
-  { timeSlotId: 't13', tier: TIERS.ENRICHMENT, subject: 'Harry' }
-];
-fridaySessions.forEach(s => {
-  INITIAL_SESSIONS.push({
-    id: `s${sessionIdCounter++}`, day: 'Friday', taId: 't1', teacherId: s.teacherId !== undefined ? s.teacherId : 'u2', ...s
-  });
-});
-
-// Seed Val Murray's Timetable (Monday-Friday) from Val.png
-DAYS.forEach(day => {
-  const valDaySessions = [
-    { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
-    { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
-    { timeSlotId: 't3', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
-    { timeSlotId: 't4', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
-    { timeSlotId: 't5', tier: TIERS.MORNING_TEA, subject: 'Morning tea' },
-    { timeSlotId: 't6', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
-    { timeSlotId: 't7', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' },
-    { timeSlotId: 't12', tier: TIERS.ENRICHMENT, subject: 'Enrichment - ESOL' },
-    { timeSlotId: 't13', tier: TIERS.ENRICHMENT, subject: 'Enrichment - ESOL' }
-  ];
-
-  if (day === 'Thursday') {
-    valDaySessions.push({ timeSlotId: 't8', tier: TIERS.LUNCH, subject: 'Unpaid break' });
-  } else {
-    valDaySessions.push({ timeSlotId: 't8', tier: TIERS.CRITICAL, subject: 'Monitor S.C' });
-  }
-
-  if (day === 'Wednesday') {
-    valDaySessions.push({ timeSlotId: 't9', tier: TIERS.ENRICHMENT, subject: 'Enrichment ESOL' });
-    valDaySessions.push({ timeSlotId: 't10', tier: TIERS.ENRICHMENT, subject: 'Enrichment ESOL' });
-  } else if (day !== 'Friday') {
-    valDaySessions.push({ timeSlotId: 't9', tier: TIERS.HIGH_NEEDS, subject: '*E.S - Individual Support' });
-    valDaySessions.push({ timeSlotId: 't10', tier: TIERS.HIGH_NEEDS, subject: '*E.S - Individual Support' });
-  }
-
-  if (day === 'Thursday') {
-    valDaySessions.push({ timeSlotId: 't11', tier: TIERS.HIGH_NEEDS, subject: '*H.W - Individual Support' });
-  } else {
-    valDaySessions.push({ timeSlotId: 't11', tier: TIERS.LUNCH, subject: 'Unpaid break' });
-  }
-
-  valDaySessions.forEach(s => {
-    INITIAL_SESSIONS.push({
-      id: `s${sessionIdCounter++}`, day, taId: 't_val', teacherId: null, teamLeaderId: null, ...s
-    });
-  });
-});
-
-// Seed Ruby's Timetable (Monday-Friday) from Ruby.png
-DAYS.forEach(day => {
-  const rubyDaySessions = [
-    { timeSlotId: 't1', tier: TIERS.ENRICHMENT, subject: 'Ōrongonmai Enrichment' },
-    { timeSlotId: 't2', tier: TIERS.ENRICHMENT, subject: 'Ōrongonmai Enrichment' },
-    { timeSlotId: 't3', tier: TIERS.ENRICHMENT, subject: 'Ōrongonmai Enrichment' },
-    { timeSlotId: 't4', tier: TIERS.HIGH_NEEDS, subject: '*T.B Individual Support' },
-    { timeSlotId: 't5', tier: TIERS.MORNING_TEA, subject: 'Morning Tea' },
-    { timeSlotId: 't6', tier: TIERS.ENRICHMENT, subject: 'Ōtāwhito Enrichment' },
-    { timeSlotId: 't7', tier: TIERS.ENRICHMENT, subject: 'Ōtāwhito Enrichment' },
-    { timeSlotId: 't8', tier: TIERS.LUNCH, subject: 'Lunch' },
-    { timeSlotId: 't9', tier: TIERS.HIGH_NEEDS, subject: '*J.M Individual Support' },
-    { timeSlotId: 't10', tier: TIERS.HIGH_NEEDS, subject: '*J.M Individual Support' },
-    { timeSlotId: 't11', tier: TIERS.HIGH_NEEDS, subject: '*J.M Individual Support' },
-    { timeSlotId: 't12', tier: TIERS.HIGH_NEEDS, subject: '*J.M Individual Support (finishes at 2:45)' }
-  ];
-
-  rubyDaySessions.forEach(s => {
-    INITIAL_SESSIONS.push({
-      id: `s${sessionIdCounter++}`, day, taId: 't_ruby', teacherId: null, teamLeaderId: null, ...s
-    });
-  });
-});
-
-// --- UI TIER STYLING RULES ---
 const TIER_STYLES = {
   [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-white', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
   [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-white', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
@@ -234,7 +156,6 @@ const Toast = ({ message, type = 'success' }) => (
   </div>
 );
 
-// --- SECURE ERROR BOUNDARY (CRASH PROTECTOR) ---
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -273,7 +194,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// --- MAIN APP COMPONENT ---
 export default function SafeApp() {
   return (
     <ErrorBoundary>
@@ -290,8 +210,6 @@ function App() {
   const [authCompleted, setAuthCompleted] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showMobileSync, setShowMobileSync] = useState(false);
-
-  // Single-Sign-On States
   const [verifyingGoogle, setVerifyingGoogle] = useState(false);
 
   const [users, setUsers] = useState([]);
@@ -299,65 +217,10 @@ function App() {
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
-  // Dynamic Touch/Homescreen Icon Injection Effect
   useEffect(() => {
-    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180"><rect width="180" height="180" rx="46" fill="#6157e8"/><g transform="translate(40, 40) scale(4.16)"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 5 9.04(7.96)a2.17 2.17 0 0 0 0 3.08v0c.8.8 2.1 1 2.96.47l2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="m12 5 2.96 2.96a2.17 2.17 0 0 1 0 3.08v0c-.8.8-2.1 1-2.96.47l-2-1.23" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.43 13.43a2.17 2.17 0 0 1-3.06 0L9 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.57 13.43a2.17 2.17 0 0 0 3.06 0L15 12.04" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g></svg>`;
-    const svgBase64 = btoa(svgString);
-    const iconUrl = `data:image/svg+xml;base64,${svgBase64}`;
-
-    let appleTouchLink = document.querySelector("link[rel='apple-touch-icon']");
-    if (!appleTouchLink) {
-      appleTouchLink = document.createElement('link');
-      appleTouchLink.rel = 'apple-touch-icon';
-      document.head.appendChild(appleTouchLink);
-    }
-    appleTouchLink.href = iconUrl;
-
-    let favIconLink = document.querySelector("link[rel='icon']");
-    if (!favIconLink) {
-      favIconLink = document.createElement('link');
-      favIconLink.rel = 'icon';
-      document.head.appendChild(favIconLink);
-    }
-    favIconLink.href = iconUrl;
-
     document.title = "Support Link";
-
-    const manifestObj = {
-      short_name: "Support Link",
-      name: "Support Link - Halswell Hub",
-      icons: [
-        {
-          src: iconUrl,
-          sizes: "180x180",
-          type: "image/svg+xml",
-          purpose: "any maskable"
-        }
-      ],
-      start_url: window.location.origin,
-      background_color: "#ffffff",
-      theme_color: "#6157e8",
-      display: "standalone"
-    };
-    
-    let manifestLink = document.querySelector("link[rel='manifest']");
-    if (!manifestLink) {
-      manifestLink = document.createElement('link');
-      manifestLink.rel = 'manifest';
-      document.head.appendChild(manifestLink);
-    }
-    const manifestBlob = new Blob([JSON.stringify(manifestObj)], {type: 'application/json'});
-    manifestLink.href = URL.createObjectURL(manifestBlob);
   }, []);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('support_link_remember');
-    if (saved !== null) {
-      setRememberMe(saved === 'true');
-    }
-  }, []);
-
-  // Securely look up emails to map current user roles
   const handlePostSignIn = async (firebaseUser) => {
     if (!firebaseUser) return;
     const email = firebaseUser.email?.toLowerCase();
@@ -376,7 +239,9 @@ function App() {
           id: 'u' + Date.now(),
           name: firebaseUser.displayName || 'School Admin',
           role: ROLES.SENCO,
-          email: email
+          email: email,
+          team: TEAMS.ALL,
+          allocatedSenco: SENCOS.BOTH
         };
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSenco.id), newSenco);
         setCurrentUser(newSenco);
@@ -390,14 +255,12 @@ function App() {
     }
   };
 
-  // 1. Initialize Authentication and track load status
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const persistenceType = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+        const persistenceType = browserLocalPersistence;
         await setPersistence(auth, persistenceType);
 
-        // Standardize handling of redirect result logins (greatly prevents standalone blank-screen bugs)
         const redirectResult = await getRedirectResult(auth);
         if (redirectResult && redirectResult.user) {
           await handlePostSignIn(redirectResult.user);
@@ -420,7 +283,6 @@ function App() {
     return () => unsubscribe();
   }, [rememberMe]);
 
-  // 2. Sync Live Data & Check Authorization
   useEffect(() => {
     if (!authCompleted || !dbUser) return;
 
@@ -437,13 +299,11 @@ function App() {
       const fetchedUsers = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
       setUsers(fetchedUsers);
       
-      // Seed initial dummy users if database is fresh and completely empty
       if (fetchedUsers.length === 0) {
         INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
         INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
       }
 
-      // Automatically match email if they are logged in with Google on reload
       if (auth.currentUser && !auth.currentUser.isAnonymous && auth.currentUser.email) {
         const email = auth.currentUser.email.toLowerCase();
         const matchedUser = fetchedUsers.find(u => u.email?.toLowerCase() === email);
@@ -480,7 +340,6 @@ function App() {
     return () => { unsubUsers(); unsubSessions(); unsubAbsences(); };
   }, [authCompleted, dbUser]);
 
-  // Database Write Methods
   const addUserToDb = async (userObj) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
   const deleteUserFromDb = async (userId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
   const saveSessionToDb = async (sessionData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
@@ -500,7 +359,7 @@ function App() {
   const addToast = (message, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => toasts(prev => prev.filter(t => t.id !== id)), 4000);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
   const handleSimpleSignIn = (staffObj) => {
@@ -516,68 +375,38 @@ function App() {
     const provider = new GoogleAuthProvider();
     try {
       if (isSandbox) {
-        // Sandbox Dev Bypass Mock Sign-In
         handleSimpleSignIn({
           id: 'mock-senco-id-preview',
           name: 'Sarah Admin (SENCO Preview)',
           role: ROLES.SENCO,
-          email: 'senco@school.edu'
+          email: 'senco@school.edu',
+          team: TEAMS.ALL,
+          allocatedSenco: SENCOS.BOTH
         });
         return;
       }
 
-      // Standalone iOS and Safari-friendly auth popup/redirect pattern
       try {
         const result = await signInWithPopup(auth, provider);
         await handlePostSignIn(result.user);
       } catch (popupErr) {
-        console.warn("Popup blocked or failed, falling back to secure Redirect:", popupErr);
+        console.warn("Popup blocked, falling back to Redirect:", popupErr);
         await signInWithRedirect(auth, provider);
       }
     } catch (e) {
-      console.error("Google Sign-In Secure flow failed:", e);
+      console.error("Google Sign-In flow failed:", e);
       addToast("Secure verification blocked or failed.", "error");
     } finally {
       setVerifyingGoogle(false);
     }
   };
 
-  const handleBypassSignIn = async (role) => {
-    let mockProfile = {};
-    if (role === ROLES.SENCO) {
-      mockProfile = {
-        id: 'mock-senco-id-preview',
-        name: 'Sarah Admin (SENCO)',
-        role: ROLES.SENCO,
-        email: 'senco@school.edu'
-      };
-    } else if (role === ROLES.TEACHER) {
-      mockProfile = {
-        id: 'u2',
-        name: 'Mr. Smith',
-        role: ROLES.TEACHER,
-        email: 'smith@school.edu'
-      };
-    } else if (role === ROLES.TEAM_LEADER) {
-      mockProfile = {
-        id: 'tl1',
-        name: 'Mrs. Davis',
-        role: ROLES.TEAM_LEADER,
-        email: 'davis@school.edu'
-      };
-    } else {
-      mockProfile = {
-        id: 't1',
-        name: 'Karen Cate',
-        role: ROLES.TA,
-        email: 'karen@school.edu'
-      };
+  const handleBypassSignIn = async (id) => {
+    const found = users.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id);
+    if (found) {
+      setCurrentUser(found);
+      addToast(`Entered view for ${found.name}`, 'success');
     }
-
-    await addUserToDb(mockProfile);
-    setCurrentUser(mockProfile);
-    setIsDbReady(true);
-    addToast(`Successfully entered as ${mockProfile.name}`, 'info');
   };
 
   const handleLogout = async () => {
@@ -607,7 +436,6 @@ function App() {
     );
   }
 
-  // Render Access Denied Panel
   if (accessDenied && !currentUser) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
@@ -639,7 +467,6 @@ function App() {
     );
   }
 
-  // Render Login Panel
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
@@ -659,7 +486,7 @@ function App() {
             <button 
               onClick={handleGoogleSignIn}
               disabled={verifyingGoogle}
-              className="w-full py-4 px-4 bg-[#6157e8] text-white text-sm font-bold rounded-xl hover:bg-[#5249d6] transition-all flex items-center justify-center space-x-3 shadow-md disabled:opacity-50"
+              className="w-full py-4 px-4 bg-[#6157e8] text-white text-sm font-bold rounded-xl flex items-center justify-center space-x-3 shadow-md disabled:opacity-50"
             >
               {verifyingGoogle ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -671,38 +498,36 @@ function App() {
               )}
             </button>
 
-            {/* Developer / Sandbox Bypass Row (Muted at bottom of Card) */}
             <div className="pt-4 border-t border-slate-100 text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Sandbox Dev Bypass</span>
-              <div className="grid grid-cols-4 gap-1">
+              <span className="text-[9px] font-bold text-slate-400 tracking-wider block mb-2 text-center uppercase">Quick Sandbox Bypass Profiles</span>
+              <div className="grid grid-cols-2 gap-1">
                 <button 
-                  onClick={() => handleBypassSignIn(ROLES.SENCO)}
-                  className="py-1 px-1 bg-slate-50 hover:bg-slate-100 text-slate-500 font-semibold text-[8px] rounded border border-slate-200"
+                  onClick={() => handleBypassSignIn('senco_cathie')}
+                  className="py-2 bg-slate-50 border rounded text-[11px] font-medium text-slate-700 hover:bg-slate-100"
                 >
-                  SENCO
+                  Cathie (SENCO Y0-4)
                 </button>
                 <button 
-                  onClick={() => handleBypassSignIn(ROLES.TEAM_LEADER)}
-                  className="py-1 px-1 bg-slate-50 hover:bg-slate-100 text-slate-500 font-semibold text-[8px] rounded border border-slate-200"
+                  onClick={() => handleBypassSignIn('senco_tracey')}
+                  className="py-2 bg-slate-50 border rounded text-[11px] font-medium text-slate-700 hover:bg-slate-100"
                 >
-                  Leader
+                  Tracey (SENCO Y5-8)
                 </button>
                 <button 
-                  onClick={() => handleBypassSignIn(ROLES.TEACHER)}
-                  className="py-1 px-1 bg-slate-50 hover:bg-slate-100 text-slate-500 font-semibold text-[8px] rounded border border-slate-200"
+                  onClick={() => handleBypassSignIn('t1')}
+                  className="py-2 bg-violet-50 border border-violet-200 rounded text-[11px] font-bold text-[#6157e8] hover:bg-violet-100"
                 >
-                  Teacher
+                  Karen Cate (Across Y0-8)
                 </button>
                 <button 
-                  onClick={() => handleBypassSignIn(ROLES.TA)}
-                  className="py-1 px-1 bg-slate-50 hover:bg-slate-100 text-[#6157e8] bg-violet-50 font-semibold text-[8px] rounded border border-[#ddd6fe]"
+                  onClick={() => handleBypassSignIn('t_ruby')}
+                  className="py-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
                 >
-                  TA
+                  Ruby (TA Y0-4)
                 </button>
               </div>
             </div>
 
-            {/* Remember Me Checkbox */}
             <div className="flex items-center pt-2 self-center">
               <input 
                 id="remember_me_checkbox"
@@ -728,7 +553,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans">
-      <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 sticky top-0 bg-white/90 backdrop-blur-md z-40">
+      <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 bg-white sticky top-0 bg-white/90 backdrop-blur-md z-40 shadow-sm">
         <div className="flex items-center space-x-4">
           <div className="bg-[#f0efff] p-2 rounded-xl text-[#6157e8]">
             <HeartHandshake size={24} strokeWidth={2.5} />
@@ -742,6 +567,9 @@ function App() {
         </div>
         
         <div className="flex items-center space-x-3">
+          <div className="hidden md:flex items-center space-x-1.5 mr-2 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-semibold">
+            <Laptop size={14} /> <span>Desktop Optimized Layout</span>
+          </div>
           <button 
             onClick={() => setShowMobileSync(true)}
             className="flex items-center space-x-2 bg-[#f8f9fa] hover:bg-[#f1f3f5] text-slate-600 font-bold text-xs tracking-wider uppercase px-4 py-2.5 rounded-xl transition-colors"
@@ -759,7 +587,7 @@ function App() {
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {activeUser.role === ROLES.SENCO && (
           <SencoDashboard 
             currentUser={activeUser}
@@ -788,6 +616,7 @@ function App() {
             absences={safeAbsences} 
             addToast={addToast}
             saveAbsenceToDb={saveAbsenceToDb}
+            users={safeUsers}
           />
         )}
       </main>
@@ -834,8 +663,8 @@ function App() {
   );
 }
 
-// --- TA DASHBOARD ---
-function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb }) {
+// --- TA DASHBOARD (ALLOCATED SENCO REPORTING ALERTS) ---
+function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, users }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [showAbsenceForm, setShowAbsenceForm] = useState(false);
   const [absenceReason, setAbsenceReason] = useState('');
@@ -860,7 +689,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb }) {
     }
     
     saveAbsenceToDb({
-      id: Math.random().toString(36).substr(2, 9),
+      id: 'abs_' + Date.now(),
       taId: user.id,
       day: selectedDay,
       reason: absenceReason,
@@ -869,111 +698,85 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb }) {
 
     setShowAbsenceForm(false);
     setAbsenceReason('');
-    addToast(`Absence reported to SENCO.`, 'success');
+    addToast(`Absence reported cleanly to your supervisor ${user.allocatedSenco || 'SENCO'}.`, 'success');
   };
 
   return (
-    <div className="animate-fade-in pb-20">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-        <div className="flex items-center">
-          <button className="mr-4 text-slate-400 hover:text-slate-600 transition-colors">
-            <ChevronLeft size={24} />
-          </button>
-          <div>
-            <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name}</h2>
-            <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-0.5">
-              {selectedDay} Timeline
-            </p>
+    <div className="animate-fade-in pb-20 max-w-4xl mx-auto space-y-6">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <div className="flex items-center space-x-2">
+            <h2 className="text-2xl font-bold text-slate-800">{user.name} Timetable</h2>
+            <span className="text-[10px] font-bold bg-violet-50 text-[#6157e8] border border-violet-100 px-2 py-0.5 rounded uppercase tracking-wider">{user.team || 'No Team Registered'}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-xs text-slate-500">Allocated Supervisor:</p>
+            <span className="text-xs font-bold text-[#6157e8] bg-violet-50 px-2 py-0.5 rounded border border-violet-100">SENCO {user.allocatedSenco || 'None Assigned'}</span>
           </div>
         </div>
-        
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
-          <button 
-            onClick={() => setShowAbsenceForm(!showAbsenceForm)}
-            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-xs tracking-wider uppercase px-5 py-3 rounded-xl transition-colors"
-          >
-            <AlertCircle size={16} />
-            <span>Report Absence</span>
-          </button>
-        </div>
+        <button 
+          onClick={() => setShowAbsenceForm(!showAbsenceForm)} 
+          className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center"
+        >
+          Report Absence
+        </button>
       </div>
 
       {showAbsenceForm && (
-        <div className="mb-8 bg-red-50/50 p-6 rounded-[24px] border border-red-100">
-          <h3 className="text-lg font-bold text-[#1a1f36] mb-2 flex items-center">
-            <AlertCircle className="w-5 h-5 mr-2 text-red-500" />
-            Report Absence for {selectedDay}
-          </h3>
-          <p className="text-sm text-slate-600 mb-4">Please provide a reason so the SENCO can arrange coverage.</p>
-          <div className="flex flex-col space-y-4">
-            <textarea
-              value={absenceReason}
-              onChange={(e) => setAbsenceReason(e.target.value)}
-              placeholder="Reason for absence (e.g., Unwell, Appointment)..."
-              className="border border-red-200 bg-white rounded-xl p-4 w-full min-h-[100px] focus:ring-2 focus:ring-red-400 focus:outline-none transition-shadow"
-            />
-            <div className="flex items-center space-x-3">
-              <button 
-                onClick={handleReportAbsence}
-                className="px-6 py-3 bg-red-500 text-white rounded-xl font-bold text-sm shadow-md hover:bg-red-600 transition-colors"
-              >
-                Submit Absence
-              </button>
-              <button 
-                onClick={() => { setShowAbsenceForm(false); setAbsenceReason(''); }}
-                className="px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+        <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm space-y-3">
+          <h4 className="font-bold text-slate-800 text-md">Report Daily Absence ({selectedDay})</h4>
+          <p className="text-xs text-slate-400">This alert will route directly to your designated supervisor: <strong>SENCO-{user.allocatedSenco || 'Tracey/Cathie'}</strong></p>
+          <textarea 
+            value={absenceReason} 
+            onChange={e => setAbsenceReason(e.target.value)} 
+            className="w-full border p-3 rounded-xl text-sm focus:ring-2 focus:ring-red-400 focus:outline-none" 
+            rows={3} 
+            placeholder="Please provide details (e.g. Unwell, medical appointment)..." 
+          />
+          <div className="flex justify-end space-x-2">
+            <button onClick={() => setShowAbsenceForm(false)} className="px-4 py-2 text-xs font-semibold text-slate-500">Cancel</button>
+            <button onClick={handleReportAbsence} className="px-5 py-2 bg-red-500 text-white font-bold text-xs uppercase rounded-xl">Submit to supervisor</button>
           </div>
         </div>
       )}
 
-      <div className="flex space-x-2 overflow-x-auto pb-4 mb-6 scrollbar-hide">
+      <div className="flex space-x-1 overflow-x-auto bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm scrollbar-hide">
         {DAYS.map(d => (
           <button 
-            key={d}
-            onClick={() => setSelectedDay(d)}
-            className={`whitespace-nowrap px-6 py-2.5 rounded-full text-xs font-bold tracking-[0.1em] uppercase transition-all duration-200
-              ${selectedDay === d 
-                ? 'bg-[#1a1f36] text-white shadow-md' 
-                : 'bg-white border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600'
-              }`}
+            key={d} 
+            onClick={() => setSelectedDay(d)} 
+            className={`flex-1 min-w-[90px] py-2.5 text-center text-xs font-bold tracking-wider rounded-lg uppercase transition-all ${
+              selectedDay === d ? 'bg-[#1a1f36] text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'
+            }`}
           >
             {d}
           </button>
         ))}
       </div>
 
-      <div className="space-y-4 mt-8">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-8 space-y-4">
         {sortedSessions.length === 0 ? (
-           <div className="text-center p-12 bg-slate-50 rounded-[32px] border border-dashed border-slate-200 text-slate-400 font-medium">
-             No duties assigned for this day.
-           </div>
+          <div className="text-center p-12 text-slate-400 font-medium">No active support duties allocated for {selectedDay}.</div>
         ) : (
           sortedSessions.map(({ slot, session }) => {
             const style = TIER_STYLES[session?.tier] || TIER_STYLES[TIERS.ENRICHMENT];
             const IconComponent = style?.icon || Star;
-            
             return (
-              <div key={slot.id} className="flex items-stretch group">
-                <div className="w-16 sm:w-20 flex-shrink-0 flex flex-col items-end pr-4 sm:pr-6 pt-5">
-                  <span className="font-medium text-slate-800 text-sm">{slot.start}</span>
-                  <span className="text-[11px] font-medium text-slate-400 mt-0.5">{slot.end}</span>
+              <div key={slot.id} className="flex items-stretch group border-b border-slate-50 pb-4 last:border-0 last:pb-0">
+                <div className="w-16 md:w-24 flex-shrink-0 pr-4 border-r flex flex-col justify-center items-end text-right">
+                  <span className="font-bold text-slate-800 text-sm md:text-base">{slot.start}</span>
+                  <span className="text-[10px] md:text-xs font-semibold text-slate-400">{slot.end}</span>
                 </div>
-                
-                <div className={`flex-1 flex items-center p-4 sm:p-5 rounded-[28px] border-[1.5px] transition-all duration-200 hover:shadow-sm ${style?.wrapper}`}>
-                  <div className={`w-12 h-12 flex-shrink-0 rounded-full flex items-center justify-center ${style?.iconBg} ${style?.iconColor} mr-4 sm:mr-5 shadow-sm`}>
-                    <IconComponent size={20} strokeWidth={2.5} />
-                  </div>
+                <div className={`flex-1 ml-4 md:ml-6 p-4 rounded-xl border flex items-center ${style?.wrapper}`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${style?.iconBg} ${style?.iconColor}`}><IconComponent size={18} /></div>
                   <div>
-                    <h3 className={`font-medium text-[15px] leading-tight mb-1 ${style?.text}`}>
-                      {session?.subject}
-                    </h3>
-                    <p className={`text-[10px] font-medium tracking-[0.15em] uppercase ${style?.subText}`}>
-                      {session?.tier}
-                    </p>
+                    <span className={`text-[9px] font-bold tracking-wider uppercase block ${style?.text}`}>{session?.tier}</span>
+                    <h4 className="font-medium text-slate-800 text-sm md:text-base mt-0.5">{session?.subject}</h4>
+                    {session?.teacherId && (
+                      <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded mt-1.5">
+                        Teacher: {users.find(u => u.id === session.teacherId)?.name}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -985,7 +788,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb }) {
   );
 }
 
-// --- SENCO DASHBOARD ---
+// --- UPDATED SENCO DASHBOARD (TARGETED ALLOCATIONS & DIRECT MONITORING) ---
 function SencoDashboard({ currentUser, users, sessions, absences, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb, clearAllDataDb }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [resolvingAbsence, setResolvingAbsence] = useState(null);
@@ -994,11 +797,11 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
+  const [newStaffTeam, setNewStaffTeam] = useState(TEAMS.Y5_8);
+  const [newStaffSenco, setNewStaffSenco] = useState(SENCOS.BOTH);
   
-  // Staff Editing States
   const [editingStaff, setEditingStaff] = useState(null);
 
-  // Duplication Tool States
   const [showCopyDayModal, setShowCopyDayModal] = useState(false);
   const [copyScope, setCopyScope] = useState('specific-staff'); 
   const [copySelectedTaId, setCopySelectedTaId] = useState('');
@@ -1007,9 +810,32 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   });
   const [copyOverwrite, setCopyOverwrite] = useState(true);
 
-  const pendingAbsences = absences.filter(a => a.status === 'Pending');
-  
-  // ALPHABETICAL ORDER: Sort all TAs for dashboard controls
+  // Direct targeted routing: Sencos only see absences of TAs specifically allocated to them!
+  const relevantAbsences = absences.filter(a => {
+    if (a.status !== 'Pending') return false;
+    const ta = users.find(u => u.id === a.taId);
+    if (!ta) return false;
+    
+    // Determine the logged-in SENCO's name (e.g., Cathie or Tracey)
+    const sencoName = currentUser.name; 
+    
+    // Master admin sees everything
+    if (currentUser.team === TEAMS.ALL) return true;
+    
+    // Match based on allocated supervisor allocation
+    if (ta.allocatedSenco === sencoName) return true;
+    if (ta.allocatedSenco === SENCOS.BOTH || !ta.allocatedSenco) {
+      // Fallback matching to team if supervisor relationship is ambiguous
+      return ta.team === currentUser.team;
+    }
+    return false;
+  });
+
+  const handleUpdateAbsenceStatus = async (absence, newStatus) => {
+    await saveAbsenceToDb({ ...absence, status: newStatus });
+    addToast(`Absence marked as ${newStatus}`, 'success');
+  };
+
   const tas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
 
   useEffect(() => {
@@ -1023,6 +849,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setNewStaffName(staff.name);
     setNewStaffEmail(staff.email || '');
     setNewStaffRole(staff.role);
+    setNewStaffTeam(staff.team || TEAMS.Y5_8);
+    setNewStaffSenco(staff.allocatedSenco || SENCOS.BOTH);
   };
 
   const handleCancelEditStaff = () => {
@@ -1030,6 +858,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setNewStaffName('');
     setNewStaffEmail('');
     setNewStaffRole(ROLES.TA);
+    setNewStaffTeam(TEAMS.Y5_8);
+    setNewStaffSenco(SENCOS.BOTH);
   };
 
   const handleAddOrUpdateStaff = () => {
@@ -1043,7 +873,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         ...editingStaff,
         name: newStaffName,
         email: newStaffEmail.toLowerCase().trim(),
-        role: newStaffRole
+        role: newStaffRole,
+        team: newStaffTeam,
+        allocatedSenco: newStaffSenco
       };
       addUserToDb(updatedStaff);
       addToast(`${newStaffName} updated successfully.`, 'success');
@@ -1053,15 +885,19 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         id: (newStaffRole === ROLES.TA ? 't' : 'u') + Date.now(),
         name: newStaffName,
         role: newStaffRole,
-        email: newStaffEmail.toLowerCase().trim()
+        email: newStaffEmail.toLowerCase().trim(),
+        team: newStaffTeam,
+        allocatedSenco: newStaffSenco
       };
       addUserToDb(newStaff);
-      addToast(`${newStaffName} added as ${newStaffRole} successfully.`, 'success');
+      addToast(`${newStaffName} added successfully.`, 'success');
     }
 
     setNewStaffName('');
     setNewStaffEmail('');
     setNewStaffRole(ROLES.TA);
+    setNewStaffTeam(TEAMS.Y5_8);
+    setNewStaffSenco(SENCOS.BOTH);
   };
 
   const handleDeleteStaff = (userId, name) => {
@@ -1188,33 +1024,45 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Alerts Section */}
-      {pendingAbsences.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-[24px] p-6 shadow-sm">
-          <div className="flex items-center text-red-800 mb-4">
-            <AlertCircle className="w-6 h-6 mr-2" />
-            <h2 className="text-lg font-bold">Action Required: TA Absences</h2>
+      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser.name}</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Supervision Filter:</p>
+            <span className="bg-violet-50 text-[#6157e8] px-2 py-0.5 text-xs font-bold rounded border border-violet-100">SENCO {currentUser.name}</span>
           </div>
-          <div className="space-y-3">
-            {pendingAbsences.map(absence => {
-              const ta = users.find(u => u.id === absence.taId);
+        </div>
+        <div className="flex items-center space-x-2 w-full md:w-auto">
+          <button onClick={() => setShowManageStaff(true)} className="flex-1 md:flex-none py-2.5 px-4 bg-[#6157e8] text-white text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm flex items-center justify-center space-x-1">
+            <Users size={14} /> <span>Manage Staff & SENCOs</span>
+          </button>
+          <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="bg-white border text-sm font-semibold rounded-xl px-4 py-2.5">
+            {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {relevantAbsences.length > 0 && (
+        <div className="bg-red-50/60 border border-red-200/80 rounded-2xl p-6 space-y-4">
+          <h3 className="text-sm font-bold text-red-800 uppercase tracking-wider flex items-center">
+            <AlertCircle className="w-4 h-4 mr-1.5" /> Direct Supervisor Absence Alerts ({relevantAbsences.length})
+          </h3>
+          <p className="text-xs text-slate-500">Showing only absences for Teacher Aides allocated directly to you.</p>
+          <div className="grid grid-cols-1 gap-3">
+            {relevantAbsences.map(a => {
+              const ta = users.find(u => u.id === a.taId);
               return (
-                <div key={absence.id} className="bg-white p-5 rounded-2xl border border-red-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div key={a.id} className="bg-white p-5 rounded-xl border border-red-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in">
                   <div>
-                    <p className="font-bold text-[#1a1f36] text-lg">{ta?.name} has reported absent for {absence.day}</p>
-                    {absence.reason && (
-                      <p className="text-sm font-medium text-slate-600 mt-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        <span className="text-slate-400 mr-2 uppercase text-xs tracking-wider font-bold">Reason:</span> 
-                        {absence.reason}
-                      </p>
-                    )}
+                    <span className="text-[10px] font-bold bg-violet-50 text-[#6157e8] px-2 py-0.5 rounded border border-violet-100 uppercase tracking-wide">Allocated to {ta?.allocatedSenco || 'None/Both'}</span>
+                    <h4 className="font-bold text-slate-800 text-lg mt-1.5">{ta?.name} reported absent for {a.day}</h4>
+                    <p className="text-xs text-slate-500 font-medium mt-1">Reason: "{a.reason}"</p>
                   </div>
-                  <button
-                    onClick={() => setResolvingAbsence(absence)}
-                    className="w-full sm:w-auto px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 font-bold text-sm transition-colors shadow-sm"
-                  >
-                    Resolve Coverage
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <button onClick={() => setResolvingAbsence(a)} className="flex-1 md:flex-none px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm">Approve Coverage</button>
+                    <button onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Sick Leave)')} className="flex-1 md:flex-none px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all">Mark Sick</button>
+                    <button onClick={() => handleUpdateAbsenceStatus(a, 'Dismissed')} className="flex-1 md:flex-none px-4 py-2 bg-white border text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-wide rounded-lg transition-all">Dismiss</button>
+                  </div>
                 </div>
               );
             })}
@@ -1225,15 +1073,23 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       {resolvingAbsence && (
         <CoverageResolver 
           absence={resolvingAbsence} 
-          users={users}
+          users={users} 
           sessions={sessions} 
-          onClose={() => setResolvingAbsence(null)}
-          onResolve={(assignments) => handleApplyCoverage(assignments, resolvingAbsence)}
+          onClose={() => setResolvingAbsence(null)} 
+          onResolve={(assignments) => {
+            Object.entries(assignments).forEach(([sessId, coveringTaId]) => {
+              const match = sessions.find(s => s.id === sessId);
+              if (match && coveringTaId) saveSessionToDb({ ...match, taId: coveringTaId });
+            });
+            saveAbsenceToDb({ ...resolvingAbsence, status: 'Resolved' });
+            setResolvingAbsence(null);
+            addToast('Coverage applied successfully.');
+          }} 
         />
       )}
 
       {showCopyDayModal && (
-        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
             <div className="w-12 h-12 bg-[#ecfdf5] text-[#10b981] rounded-full flex items-center justify-center mb-4">
               <Copy className="w-6 h-6" />
@@ -1332,7 +1188,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Session Editor Modal */}
       {editingCell && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in">
@@ -1403,18 +1258,21 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
-            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">Manage Staff</h3>
+            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">Manage Staff & Teams</h3>
             
             <div className="flex-1 overflow-y-auto pr-2 mb-6 space-y-2 border-b border-slate-100 pb-4">
-              {/* ALPHABETICAL ORDER: Display staff list cleanly in alphabetical order! */}
               {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
                 <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <div>
                     <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
+                    {u.role === ROLES.TA && (
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        Team: <strong className="text-slate-600">{u.team || 'Unassigned'}</strong> | Supervisor: <strong className="text-[#6157e8]">{u.allocatedSenco || 'None / Both'}</strong>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center space-x-1">
-                    {/* EDIT STAFF BUTTON */}
                     <button 
                       onClick={() => handleStartEditStaff(u)} 
                       className="p-2 text-[#6157e8] hover:bg-violet-100 rounded-lg transition-colors"
@@ -1432,9 +1290,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               ))}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 text-xs">
               <h4 className="font-bold text-[#1a1f36] text-sm">
-                {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
+                {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff Record'}
               </h4>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
@@ -1452,22 +1310,53 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   placeholder="e.g. val.murray@school.nz"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Role / Access Level</label>
-                <select 
-                  value={newStaffRole} 
-                  onChange={(e) => setNewStaffRole(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none"
-                >
-                  <option value={ROLES.TA}>Teacher Aide (TA)</option>
-                  <option value={ROLES.TEACHER}>Teacher</option>
-                  <option value={ROLES.TEAM_LEADER}>Team Leader</option>
-                  <option value={ROLES.SENCO}>SENCO (Admin)</option>
-                </select>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Access Role</label>
+                  <select 
+                    value={newStaffRole} 
+                    onChange={(e) => setNewStaffRole(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
+                  >
+                    <option value={ROLES.TA}>Teacher Aide (TA)</option>
+                    <option value={ROLES.TEACHER}>Teacher</option>
+                    <option value={ROLES.TEAM_LEADER}>Team Leader</option>
+                    <option value={ROLES.SENCO}>SENCO (Admin)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Team Group</label>
+                  <select 
+                    value={newStaffTeam} 
+                    onChange={(e) => setNewStaffTeam(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
+                  >
+                    <option value={TEAMS.Y0_4}>{TEAMS.Y0_4}</option>
+                    <option value={TEAMS.Y5_8}>{TEAMS.Y5_8}</option>
+                    <option value={TEAMS.ACROSS}>{TEAMS.ACROSS}</option>
+                    <option value={TEAMS.ALL}>{TEAMS.ALL}</option>
+                  </select>
+                </div>
               </div>
+
+              {/* Designated SENCO field */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Designated SENCO supervisor</label>
+                <select 
+                  value={newStaffSenco} 
+                  onChange={(e) => setNewStaffSenco(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
+                >
+                  <option value={SENCOS.CATHIE}>Cathie (SENCO Years 0-4)</option>
+                  <option value={SENCOS.TRACEY}>Tracey (SENCO Years 5-8)</option>
+                  <option value={SENCOS.BOTH}>None / Both (Shared management)</option>
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">Directly controls which SENCO dashboard filters absences and manages assignments for this staff member.</p>
+              </div>
+
               <div className="flex justify-end space-x-3 pt-4">
                 {editingStaff && (
-                  <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl text-sm font-semibold transition-colors mr-auto">
+                  <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">
                     Cancel Edit
                   </button>
                 )}
@@ -1493,7 +1382,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
           
           <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
-            {/* Soft Green Copy Day Schedule Button (No Bold Text) */}
             <button 
               onClick={() => setShowCopyDayModal(true)}
               className="flex items-center px-4 py-2.5 bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] font-medium text-sm rounded-xl transition-colors shadow-sm border border-[#a7f3d0]"
@@ -1534,12 +1422,10 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 // --- TEAM LEADER DASHBOARD ---
 function TeamLeaderDashboard({ user, sessions, users }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
-
-  // Filter sessions where this Team Leader is explicitly assigned
   const teamSessions = sessions.filter(s => s.day === selectedDay && s.teamLeaderId === user.id);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
       <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
         <div>
           <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
@@ -1570,12 +1456,10 @@ function TeamLeaderDashboard({ user, sessions, users }) {
 // --- TEACHER DASHBOARD ---
 function TeacherDashboard({ user, sessions, users }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
-
-  // Teachers only see timetables where they are assigned as the teacher
   const teacherSessions = sessions.filter(s => s.day === selectedDay && s.teacherId === user.id);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
       <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
         <div>
           <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
@@ -1603,31 +1487,29 @@ function TeacherDashboard({ user, sessions, users }) {
   );
 }
 
-// --- SHARED TIMETABLE GRID COMPONENT ---
+// --- TIMETABLE GRID MATRIX (DOCKING ALLOCATED SENCOS VISUALLY) ---
 function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
-  const [viewMode, setViewMode] = useState('single'); // 'single' | 'all'
+  const [viewMode, setViewMode] = useState('single'); 
   
-  // ALPHABETICAL ORDER: Alphabetically sort TAs inside the Master Timetable Grid and pill selectors
   const tas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
   const [activeTaId, setActiveTaId] = useState('');
 
-  // Fallback to select first sorted TA initially
   useEffect(() => {
     if (tas.length > 0 && !activeTaId) {
       setActiveTaId(tas[0].id);
     }
   }, [tas, activeTaId]);
 
-  // Handle active TA profile deletion cleanly
   useEffect(() => {
     if (activeTaId && !tas.some(t => t.id === activeTaId) && tas.length > 0) {
       setActiveTaId(tas[0].id);
     }
   }, [tas]);
 
+  const activeTa = tas.find(t => t.id === activeTaId);
+
   return (
     <div className="space-y-4">
-      {/* Layout Mode Control Panel */}
       <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
           {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
@@ -1658,26 +1540,36 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
 
       {viewMode === 'single' ? (
         <div className="px-1.5 sm:px-6 py-4 space-y-6">
-          {/* Horizontal scrollable TA Pill Row */}
           <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
             {tas.map(ta => (
               <button
                 key={ta.id}
                 onClick={() => setActiveTaId(ta.id)}
-                className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 ${
+                className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 flex items-center gap-2 ${
                   activeTaId === ta.id 
                     ? 'bg-[#6157e8] text-white shadow-md' 
                     : 'bg-slate-50 border border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                 }`}
               >
-                {ta.name}
+                <span>{ta.name}</span>
+                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                  activeTaId === ta.id ? 'bg-white/20 text-white' : 'bg-slate-200/50 text-slate-600'
+                }`}>
+                  {ta.allocatedSenco || 'No Supervisor'}
+                </span>
               </button>
             ))}
           </div>
 
-          {/* Single TA Vertical Timeline */}
-          {activeTaId ? (
+          {activeTa ? (
             <div className="space-y-4 max-w-2xl mx-auto">
+              <div className="text-center pb-2">
+                <span className="text-xs text-slate-400">Primary Supervisor Contact: </span>
+                <strong className="text-[#6157e8] text-xs font-bold bg-violet-50 px-2 py-1 rounded border border-violet-100">
+                  {activeTa.allocatedSenco || 'None / Both'}
+                </strong>
+              </div>
+
               {TIME_SLOTS.map(slot => {
                 const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === activeTaId);
                 const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
@@ -1689,13 +1581,11 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                     className={`flex items-stretch group ${isEditable ? 'cursor-pointer' : ''}`}
                     onClick={() => isEditable && onCellClick(slot.id, activeTaId, session)}
                   >
-                    {/* Time Slot column - Centered and optimized for mobile screens */}
                     <div className="w-14 sm:w-24 flex-shrink-0 flex flex-col items-end pr-2.5 sm:pr-6 pt-4 border-r border-slate-100">
                       <span className="font-bold text-slate-800 text-xs sm:text-sm">{slot.start}</span>
                       <span className="text-[10px] font-semibold text-slate-400 mt-0.5">{slot.end}</span>
                     </div>
 
-                    {/* Duty Session Card - Shifted left to balance empty padding space */}
                     <div className="flex-1 pl-3 sm:pl-6 relative">
                       {session ? (
                         <div className={`border-[1.5px] p-4 rounded-[20px] transition-all flex items-center shadow-sm hover:border-[#6157e8]/40 ${style?.wrapper}`}>
@@ -1704,7 +1594,6 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1 gap-2">
-                              {/* DYNAMIC BOLDNESS: Applied clean, non-bold weight to "Not Working" pill tag */}
                               <span className={`text-[9px] tracking-wider uppercase ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-400' : 'font-bold'} ${style?.text}`}>
                                 {session.tier}
                               </span>
@@ -1715,12 +1604,10 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                               )}
                             </div>
                             
-                            {/* DYNAMIC BOLDNESS FIXED: Changed from 'font-normal' to 'font-medium' for active sessions to hit the perfect sweet spot! */}
                             <h4 className={`text-sm leading-tight truncate ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </h4>
                             
-                            {/* Assigned Teachers / Leaders */}
                             {(session.teacherId || session.teamLeaderId) && (
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 {session.teacherId && (
@@ -1759,7 +1646,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
           )}
         </div>
       ) : (
-        /* Full Grid overview (Wider fixed columns with horizontal scrolling to prevent squashing) */
+        /* Birds-Eye Full Grid with designated Supervisor allocations on columns */
         <div className="relative max-h-[75vh] overflow-auto">
           <table className="w-full text-left border-collapse min-w-max table-fixed">
             <thead>
@@ -1767,7 +1654,11 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                 <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
                 {tas.map(ta => (
                   <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-semibold text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: '220px' }}>
-                    {ta.name}
+                    <div className="truncate">{ta.name}</div>
+                    <div className="text-[10px] text-slate-400 font-normal mt-0.5 truncate flex items-center gap-1.5">
+                      <span>{ta.team === TEAMS.ACROSS ? 'Across Teams' : ta.team}</span>
+                      <span className="text-[#6157e8] font-bold bg-violet-50 px-1 py-0.2 rounded border border-violet-100">{ta.allocatedSenco || 'Both'}</span>
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -1796,17 +1687,14 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                         )}
                         {session ? (
                           <div className={`border ${style?.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
-                            {/* DYNAMIC BOLDNESS: Applied clean, non-bold weight to "Not Working" text inside the master birds-eye table */}
                             <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style?.text}`}>
                               {session.tier}
                             </span>
                             
-                            {/* DYNAMIC BOLDNESS FIXED: Changed from 'font-normal' to 'font-medium' for active master table subjects too! */}
                             <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </div>
                             
-                            {/* Display assigned staff on the cell */}
                             {(session.teacherId || session.teamLeaderId) && (
                               <div className="mt-2 pt-1 border-t border-slate-100 flex flex-wrap gap-1 text-[9px] text-slate-400 font-semibold">
                                 {session.teacherId && (
@@ -1845,7 +1733,6 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
   const absentTa = users.find(u => u.id === absence.taId);
   const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
   
-  // ALPHABETICAL ORDER: Sort potential covering TAs alphabetically!
   const otherTas = users
     .filter(u => u.role === ROLES.TA && u.id !== absence.taId)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -1861,9 +1748,9 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
   }, [sessions, absence]);
 
   return (
-    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-[32px] shadow-2xl max-w-lg w-full p-8 animate-fade-in max-h-[85vh] flex flex-col">
-        <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Coverage: {absentTa?.name}</h3>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {absentTa?.name}</h3>
         <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
         
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
