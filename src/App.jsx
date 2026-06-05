@@ -1258,7 +1258,38 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
-            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">Manage Staff & Teams</h3>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-[#1a1f36]">Manage Staff & Teams</h3>
+              
+              <button 
+                onClick={async () => {
+                  const seenEmails = new Set();
+                  const duplicates = [];
+                  users.forEach(u => {
+                    const email = u.email?.toLowerCase().trim();
+                    if (email) {
+                      if (seenEmails.has(email)) {
+                        duplicates.push(u);
+                      } else {
+                        seenEmails.add(email);
+                      }
+                    }
+                  });
+                  if (duplicates.length > 0) {
+                    const promises = duplicates.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', d.id)));
+                    await Promise.all(promises);
+                    addToast(`Successfully swept and deleted ${duplicates.length} duplicate database entries!`, 'success');
+                  } else {
+                    addToast('No duplicate email records found in your database.', 'info');
+                  }
+                }}
+                className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2.5 py-1.5 rounded-lg border border-red-200 uppercase tracking-wider transition-colors flex items-center space-x-1"
+                title="Automatically remove redundant database profiles sharing the same email"
+              >
+                <Trash2 size={12} />
+                <span>Clean Duplicates</span>
+              </button>
+            </div>
             
             <div className="flex-1 overflow-y-auto pr-2 mb-6 space-y-2 border-b border-slate-100 pb-4">
               {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
