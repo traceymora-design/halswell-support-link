@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Calendar, AlertCircle, Users, CheckCircle, 
+  Calendar, AlertCircle, Users, CheckCircle, MessageSquare,
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
   Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop
@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs } from 'firebase/firestore';
 
+// --- FIREBASE CONFIGURATION ---
 const getFirebaseConfig = () => {
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
@@ -57,6 +58,7 @@ const isSandboxEnv = () => {
 };
 const isSandbox = isSandboxEnv();
 
+// --- APP ENUMS & CONFIG ---
 const ROLES = {
   SENCO: 'SENCO',
   TEAM_LEADER: 'Team Leader',
@@ -67,14 +69,7 @@ const ROLES = {
 const TEAMS = {
   Y0_4: 'Years 0-4 Team',
   Y5_8: 'Years 5-8 Team',
-  ACROSS: 'Across Both Teams (Y0-8)',
   ALL: 'All Teams / Master Admin'
-};
-
-const SENCOS = {
-  CATHIE: 'Cathie',
-  TRACEY: 'Tracey',
-  BOTH: 'None / Both'
 };
 
 const TIERS = {
@@ -105,19 +100,19 @@ const TIME_SLOTS = [
 ];
 
 const INITIAL_USERS = [
-  { id: 'senco_cathie', name: 'Cathie', role: ROLES.SENCO, email: 'cathie@halswell.school.nz', team: TEAMS.Y0_4, allocatedSenco: SENCOS.CATHIE },
-  { id: 'senco_tracey', name: 'Tracey', role: ROLES.SENCO, email: 'tracey@halswell.school.nz', team: TEAMS.Y5_8, allocatedSenco: SENCOS.TRACEY },
-  { id: 'u2', name: 'Mr. Smith', role: ROLES.TEACHER, email: 'smith@school.edu', team: TEAMS.Y5_8, allocatedSenco: SENCOS.TRACEY },
-  { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu', team: TEAMS.ACROSS, allocatedSenco: SENCOS.TRACEY },
-  { id: 'tl1', name: 'Mrs. Davis', role: ROLES.TEAM_LEADER, email: 'davis@school.edu', team: TEAMS.Y5_8, allocatedSenco: SENCOS.TRACEY },
-  { id: 't_val', name: 'Val Murray', role: ROLES.TA, email: 'val.murray@school.nz', team: TEAMS.Y5_8, allocatedSenco: SENCOS.TRACEY },
-  { id: 't_ruby', name: 'Ruby', role: ROLES.TA, email: 'ruby@school.nz', team: TEAMS.Y0_4, allocatedSenco: SENCOS.CATHIE }
+  { id: 'senco_cathie', name: 'Cathie', role: ROLES.SENCO, email: 'cathie@halswell.school.nz', team: TEAMS.Y0_4 },
+  { id: 'senco_tracey', name: 'Tracey', role: ROLES.SENCO, email: 'tracey@halswell.school.nz', team: TEAMS.Y5_8 },
+  { id: 'u2', name: 'Mr. Smith', role: ROLES.TEACHER, email: 'smith@school.edu', team: TEAMS.Y5_8 },
+  { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu', team: TEAMS.Y5_8 },
+  { id: 'tl1', name: 'Mrs. Davis', role: ROLES.TEAM_LEADER, email: 'davis@school.edu', team: TEAMS.Y5_8 },
+  { id: 't_val', name: 'Val Murray', role: ROLES.TA, email: 'val.murray@school.nz', team: TEAMS.Y5_8 },
+  { id: 't_ruby', name: 'Ruby', role: ROLES.TA, email: 'ruby@school.nz', team: TEAMS.Y0_4 }
 ];
 
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
-// Seed Karen's Monday-Thursday Schedule
+// Seed Initial timetable schedules for Karen Mon-Thu
 ['Monday', 'Tuesday', 'Wednesday', 'Thursday'].forEach(day => {
   const daySessions = [
     { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
@@ -164,9 +159,6 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) {
     return { hasError: true, errorInfo: error.message };
   }
-  componentDidCatch(error, errorInfo) {
-    console.error("Support Link Crash caught:", error, errorInfo);
-  }
   render() {
     if (this.state.hasError) {
       return (
@@ -174,18 +166,8 @@ class ErrorBoundary extends React.Component {
           <div className="bg-white p-8 rounded-3xl shadow-xl border border-red-100 max-w-md w-full text-center">
             <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Something went wrong</h2>
-            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-              We caught a small visual layout error. Press the button below to cleanly refresh the app.
-            </p>
-            <div className="bg-red-50 text-red-700 text-xs font-mono p-3 rounded-xl mb-6 text-left overflow-auto max-h-32">
-              {this.state.errorInfo}
-            </div>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm transition-colors shadow-md"
-            >
-              Reload Support Link
-            </button>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">We caught a visual layout error. Please refresh cleanly.</p>
+            <button onClick={() => window.location.reload()} className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm">Reload Hub</button>
           </div>
         </div>
       );
@@ -240,8 +222,7 @@ function App() {
           name: firebaseUser.displayName || 'School Admin',
           role: ROLES.SENCO,
           email: email,
-          team: TEAMS.ALL,
-          allocatedSenco: SENCOS.BOTH
+          team: TEAMS.ALL
         };
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSenco.id), newSenco);
         setCurrentUser(newSenco);
@@ -346,16 +327,6 @@ function App() {
   const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
   const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
 
-  const clearAllDataDb = async () => {
-    const deletePromises = [];
-    users.forEach(u => {
-      if (u.role !== ROLES.SENCO) deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', u.id)));
-    });
-    sessions.forEach(s => deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id))));
-    absences.forEach(a => deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id))));
-    await Promise.all(deletePromises);
-  };
-
   const addToast = (message, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -364,9 +335,6 @@ function App() {
 
   const handleSimpleSignIn = (staffObj) => {
     setCurrentUser(staffObj);
-    if (rememberMe) {
-      localStorage.setItem('support_link_active_profile', JSON.stringify(staffObj));
-    }
     addToast(`Signed in as ${staffObj.name}`, 'success');
   };
 
@@ -379,9 +347,7 @@ function App() {
           id: 'mock-senco-id-preview',
           name: 'Sarah Admin (SENCO Preview)',
           role: ROLES.SENCO,
-          email: 'senco@school.edu',
-          team: TEAMS.ALL,
-          allocatedSenco: SENCOS.BOTH
+          email: 'senco@school.edu'
         });
         return;
       }
@@ -390,11 +356,11 @@ function App() {
         const result = await signInWithPopup(auth, provider);
         await handlePostSignIn(result.user);
       } catch (popupErr) {
-        console.warn("Popup blocked, falling back to Redirect:", popupErr);
+        console.warn("Fallback to Redirect secure authentication:", popupErr);
         await signInWithRedirect(auth, provider);
       }
     } catch (e) {
-      console.error("Google Sign-In flow failed:", e);
+      console.error("Secure Auth Error:", e);
       addToast("Secure verification blocked or failed.", "error");
     } finally {
       setVerifyingGoogle(false);
@@ -413,18 +379,12 @@ function App() {
     await signOut(auth);
     setCurrentUser(null);
     setAccessDenied(false);
-    localStorage.removeItem('support_link_active_profile');
     addToast("Logged out of session.", "info");
     try {
       await signInAnonymously(auth);
     } catch (err) {
-      console.error("Anonymous fallback failed:", err);
+      console.error(err);
     }
-  };
-
-  const toggleRememberMe = (val) => {
-    setRememberMe(val);
-    localStorage.setItem('support_link_remember', val ? 'true' : 'false');
   };
 
   if (!authCompleted) {
@@ -440,27 +400,17 @@ function App() {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
         <div className="flex flex-col items-center max-w-md w-full">
-          <div className="bg-[#6157e8] p-4 rounded-[20px] shadow-sm mb-6">
-            <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
+          <div className="bg-[#6157e8] p-4 rounded-[20px] mb-6 shadow-md text-white">
+            <HeartHandshake className="w-10 h-10" />
           </div>
-          
           <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
-          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-12 uppercase text-center">
-            Halswell School TA Management Portal
-          </p>
-
           <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-red-100 text-center animate-fade-in">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Access Denied</h2>
             <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              The Google email address <b className="text-slate-800">{auth.currentUser?.email || "your Google Account"}</b> is not registered in the Support Link system. Please ask your SENCO to add your email via the Manage Staff panel.
+              The Google address <b className="text-slate-800">{auth.currentUser?.email || "your Google Account"}</b> is not registered. Please ask Cathie or Tracey to add your email.
             </p>
-            <button 
-              onClick={handleLogout} 
-              className="w-full py-3 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm"
-            >
-              Sign out & try another account
-            </button>
+            <button onClick={handleLogout} className="w-full py-3 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm">Sign out & try again</button>
           </div>
         </div>
       </div>
@@ -475,70 +425,37 @@ function App() {
             <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
           </div>
           
-          <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
-          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-12 uppercase text-center">
-            Halswell School TA Management Portal
-          </p>
+          <h1 className="text-[36px] font-bold text-[#1a1f36] mb-1 tracking-tight">Support Link</h1>
+          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-8 uppercase text-center">Halswell School Hub</p>
 
-          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 animate-fade-in flex flex-col items-stretch space-y-4">
-            <h3 className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Welcome Staff</h3>
-            
+          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-md border border-slate-100 space-y-4 animate-fade-in">
             <button 
               onClick={handleGoogleSignIn}
               disabled={verifyingGoogle}
               className="w-full py-4 px-4 bg-[#6157e8] text-white text-sm font-bold rounded-xl flex items-center justify-center space-x-3 shadow-md disabled:opacity-50"
             >
-              {verifyingGoogle ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <ShieldCheck size={18} />
-                  <span>Sign in with Google</span>
-                </>
-              )}
+              {verifyingGoogle ? <Loader2 className="w-5 h-5 animate-spin" /> : <><ShieldCheck size={18} /><span>Sign in with Google</span></>}
             </button>
+
+            {/* Laptop / Computer Access Instruction Card */}
+            <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-xs text-slate-600 space-y-1.5 shadow-inner">
+              <div className="flex items-center space-x-1.5 font-bold text-slate-700">
+                <Laptop size={14} className="text-[#6157e8]" />
+                <span>Access on School Computers</span>
+              </div>
+              <p className="leading-normal">
+                Don't want this on your phone? You can bookmark this web portal directly in Chrome on any school laptop, computer, or Chromebook! Simply sign in with your school Google account above.
+              </p>
+            </div>
 
             <div className="pt-4 border-t border-slate-100 text-center">
               <span className="text-[9px] font-bold text-slate-400 tracking-wider block mb-2 text-center uppercase">Quick Sandbox Bypass Profiles</span>
               <div className="grid grid-cols-2 gap-1">
-                <button 
-                  onClick={() => handleBypassSignIn('senco_cathie')}
-                  className="py-2 bg-slate-50 border rounded text-[11px] font-medium text-slate-700 hover:bg-slate-100"
-                >
-                  Cathie (SENCO Y0-4)
-                </button>
-                <button 
-                  onClick={() => handleBypassSignIn('senco_tracey')}
-                  className="py-2 bg-slate-50 border rounded text-[11px] font-medium text-slate-700 hover:bg-slate-100"
-                >
-                  Tracey (SENCO Y5-8)
-                </button>
-                <button 
-                  onClick={() => handleBypassSignIn('t1')}
-                  className="py-2 bg-violet-50 border border-violet-200 rounded text-[11px] font-bold text-[#6157e8] hover:bg-violet-100"
-                >
-                  Karen Cate (Across Y0-8)
-                </button>
-                <button 
-                  onClick={() => handleBypassSignIn('t_ruby')}
-                  className="py-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
-                >
-                  Ruby (TA Y0-4)
-                </button>
+                <button onClick={() => handleBypassSignIn('senco_cathie')} className="py-2 bg-slate-50 border rounded text-[11px] font-medium text-slate-700 hover:bg-slate-100">Cathie (SENCO Y0-4)</button>
+                <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 bg-slate-50 border rounded text-[11px] font-medium text-slate-700 hover:bg-slate-100">Tracey (SENCO Y5-8)</button>
+                <button onClick={() => handleBypassSignIn('t1')} className="py-2 bg-violet-50 border border-violet-200 rounded text-[11px] font-bold text-[#6157e8] hover:bg-violet-100">Karen Cate (TA Y5-8)</button>
+                <button onClick={() => handleBypassSignIn('t_ruby')} className="py-2 bg-emerald-50 border border-emerald-200 rounded text-[11px] font-bold text-emerald-700 hover:bg-emerald-100">Ruby (TA Y0-4)</button>
               </div>
-            </div>
-
-            <div className="flex items-center pt-2 self-center">
-              <input 
-                id="remember_me_checkbox"
-                type="checkbox" 
-                checked={rememberMe}
-                onChange={(e) => toggleRememberMe(e.target.checked)}
-                className="w-4 h-4 text-[#6157e8] border-slate-300 rounded focus:ring-[#6157e8] cursor-pointer"
-              />
-              <label htmlFor="remember_me_checkbox" className="ml-2 text-xs font-bold text-slate-500 cursor-pointer uppercase tracking-wider select-none">
-                Keep me signed in
-              </label>
             </div>
           </div>
         </div>
@@ -549,20 +466,17 @@ function App() {
   const safeUsers = users.length > 0 ? users : INITIAL_USERS;
   const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
   const safeAbsences = absences;
-  const activeUser = currentUser;
 
   return (
-    <div className="min-h-screen bg-white flex flex-col font-sans">
-      <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 bg-white sticky top-0 bg-white/90 backdrop-blur-md z-40 shadow-sm">
+    <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
+      <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 bg-white sticky top-0 z-40 shadow-sm">
         <div className="flex items-center space-x-4">
           <div className="bg-[#f0efff] p-2 rounded-xl text-[#6157e8]">
             <HeartHandshake size={24} strokeWidth={2.5} />
           </div>
           <div>
             <h1 className="font-bold text-xl text-[#1a1f36] leading-tight">Support Link</h1>
-            <div className="flex items-center text-[10px] font-bold text-slate-400 tracking-[0.15em] uppercase mt-0.5">
-              Halswell Hub <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-2"></span>
-            </div>
+            <div className="flex items-center text-[10px] font-bold text-slate-400 tracking-[0.15em] uppercase mt-0.5">Halswell Hub</div>
           </div>
         </div>
         
@@ -588,68 +502,35 @@ function App() {
       </header>
 
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
-        {activeUser.role === ROLES.SENCO && (
+        {currentUser.role === ROLES.SENCO && (
           <SencoDashboard 
-            currentUser={activeUser}
-            users={safeUsers} 
-            sessions={safeSessions} 
-            absences={safeAbsences} 
-            addToast={addToast} 
-            addUserToDb={addUserToDb}
-            deleteUserFromDb={deleteUserFromDb}
-            saveSessionToDb={saveSessionToDb}
-            deleteSessionFromDb={deleteSessionFromDb}
-            saveAbsenceToDb={saveAbsenceToDb}
-            clearAllDataDb={clearAllDataDb}
+            currentUser={currentUser} users={safeUsers} sessions={safeSessions} absences={safeAbsences} addToast={addToast} 
+            addUserToDb={addUserToDb} deleteUserFromDb={deleteUserFromDb} saveSessionToDb={saveSessionToDb} deleteSessionFromDb={deleteSessionFromDb} saveAbsenceToDb={saveAbsenceToDb}
           />
         )}
-        {activeUser.role === ROLES.TEAM_LEADER && (
-          <TeamLeaderDashboard user={activeUser} sessions={safeSessions} users={safeUsers} />
+        {currentUser.role === ROLES.TEAM_LEADER && (
+          <TeamLeaderDashboard user={currentUser} sessions={safeSessions} users={safeUsers} />
         )}
-        {activeUser.role === ROLES.TEACHER && (
-          <TeacherDashboard user={activeUser} sessions={safeSessions} users={safeUsers} />
+        {currentUser.role === ROLES.TEACHER && (
+          <TeacherDashboard user={currentUser} sessions={safeSessions} users={safeUsers} />
         )}
-        {activeUser.role === ROLES.TA && (
+        {currentUser.role === ROLES.TA && (
           <TADashboard 
-            user={activeUser} 
-            sessions={safeSessions} 
-            absences={safeAbsences} 
-            addToast={addToast}
-            saveAbsenceToDb={saveAbsenceToDb}
-            users={safeUsers}
+            user={currentUser} sessions={safeSessions} absences={safeAbsences} addToast={addToast} saveAbsenceToDb={saveAbsenceToDb} users={safeUsers}
           />
         )}
       </main>
 
       {showMobileSync && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 animate-fade-in text-center">
-            <div className="w-12 h-12 bg-[#f0efff] text-[#6157e8] rounded-full flex items-center justify-center mb-4 mx-auto">
-              <Smartphone className="w-6 h-6" />
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 text-center animate-fade-in">
+            <Smartphone className="w-8 h-8 text-[#6157e8] mx-auto mb-3" />
+            <h3 className="text-xl font-bold mb-2">Sync with Your Phone</h3>
+            <p className="text-slate-500 text-sm mb-6">Scan QR code to synchronize live schedules on your mobile.</p>
+            <div className="bg-white p-6 rounded-2xl border inline-block mb-6 shadow-md">
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(window.location.origin)}`} alt="QR" className="w-44 h-44 block mx-auto" />
             </div>
-            <h3 className="text-xl font-bold text-[#1a1f36] mb-2">Sync with Your Phone</h3>
-            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-              Scan this QR code with your mobile camera to take your Support Link timetable on the go!
-            </p>
-            
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 inline-block mb-6 shadow-md">
-              <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : 'https://halswell-support-link.vercel.app')}`} 
-                alt="Live QR Code" 
-                className="w-44 h-44 mx-auto block"
-              />
-            </div>
-            
-            <div className="text-xs text-slate-400 font-semibold mb-6">
-              https://halswell-support-link.vercel.app
-            </div>
-
-            <button 
-              onClick={() => setShowMobileSync(false)}
-              className="w-full py-3 bg-[#1a1f36] hover:bg-black text-white rounded-xl font-bold text-sm transition-colors shadow-md"
-            >
-              Done
-            </button>
+            <button onClick={() => setShowMobileSync(false)} className="w-full py-3 bg-[#1a1f36] text-white rounded-xl font-bold text-sm shadow-md">Done</button>
           </div>
         </div>
       )}
@@ -663,28 +544,27 @@ function App() {
   );
 }
 
-// --- TA DASHBOARD (ALLOCATED SENCO REPORTING ALERTS) ---
+// --- TA DASHBOARD (COMPUTER FRIENDLY WORKFLOW & INBOX FEEDBACK) ---
 function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, users }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [showAbsenceForm, setShowAbsenceForm] = useState(false);
   const [absenceReason, setAbsenceReason] = useState('');
 
   const mySessions = sessions.filter(s => s.taId === user.id && s.day === selectedDay);
+  const myAbsences = absences.filter(a => a.taId === user.id).slice(-5).reverse(); // last 5 reported absences
   
-  const sortedSessions = TIME_SLOTS.map(slot => {
-    return {
-      slot,
-      session: mySessions.find(s => s.timeSlotId === slot.id)
-    };
-  }).filter(item => item.session);
+  const sortedSessions = TIME_SLOTS.map(slot => ({
+    slot,
+    session: mySessions.find(s => s.timeSlotId === slot.id)
+  })).filter(item => item.session);
 
   const handleReportAbsence = () => {
     if (!absenceReason.trim()) {
-      addToast('Please provide a reason for the absence.', 'error');
+      addToast('Please provide a reason.', 'error');
       return;
     }
-    if (absences.some(a => a.taId === user.id && a.day === selectedDay)) {
-      addToast(`You have already reported an absence for ${selectedDay}`, 'error');
+    if (absences.some(a => a.taId === user.id && a.day === selectedDay && a.status === 'Pending')) {
+      addToast(`You have a pending absence already submitted for ${selectedDay}`, 'error');
       return;
     }
     
@@ -694,29 +574,31 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       day: selectedDay,
       reason: absenceReason,
       status: 'Pending',
+      reply: '' // To hold the response from the Senco
     });
 
     setShowAbsenceForm(false);
     setAbsenceReason('');
-    addToast(`Absence reported cleanly to your supervisor ${user.allocatedSenco || 'SENCO'}.`, 'success');
+    addToast(`Absence submitted cleanly to SENCO.`, 'success');
   };
 
   return (
-    <div className="animate-fade-in pb-20 max-w-4xl mx-auto space-y-6">
+    <div className="animate-fade-in pb-20 max-w-5xl mx-auto space-y-6">
+      {/* Informative Header Banner */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <h2 className="text-2xl font-bold text-slate-800">{user.name} Timetable</h2>
+            <h2 className="text-2xl font-bold text-slate-800">{user.name} Timetable Portal</h2>
             <span className="text-[10px] font-bold bg-violet-50 text-[#6157e8] border border-violet-100 px-2 py-0.5 rounded uppercase tracking-wider">{user.team || 'No Team Registered'}</span>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-xs text-slate-500">Allocated Supervisor:</p>
-            <span className="text-xs font-bold text-[#6157e8] bg-violet-50 px-2 py-0.5 rounded border border-violet-100">SENCO {user.allocatedSenco || 'None Assigned'}</span>
-          </div>
+          <p className="text-xs text-slate-400 mt-1 flex items-center">
+            <Laptop size={14} className="mr-1 text-slate-500" />
+            Optimized for both personal smartphone screens and classroom desktop computers.
+          </p>
         </div>
         <button 
           onClick={() => setShowAbsenceForm(!showAbsenceForm)} 
-          className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center"
+          className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all"
         >
           Report Absence
         </button>
@@ -725,7 +607,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       {showAbsenceForm && (
         <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm space-y-3">
           <h4 className="font-bold text-slate-800 text-md">Report Daily Absence ({selectedDay})</h4>
-          <p className="text-xs text-slate-400">This alert will route directly to your designated supervisor: <strong>SENCO-{user.allocatedSenco || 'Tracey/Cathie'}</strong></p>
           <textarea 
             value={absenceReason} 
             onChange={e => setAbsenceReason(e.target.value)} 
@@ -735,11 +616,43 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
           />
           <div className="flex justify-end space-x-2">
             <button onClick={() => setShowAbsenceForm(false)} className="px-4 py-2 text-xs font-semibold text-slate-500">Cancel</button>
-            <button onClick={handleReportAbsence} className="px-5 py-2 bg-red-500 text-white font-bold text-xs uppercase rounded-xl">Submit to supervisor</button>
+            <button onClick={handleReportAbsence} className="px-5 py-2 bg-red-500 text-white font-bold text-xs uppercase rounded-xl">Submit to SENCO</button>
           </div>
         </div>
       )}
 
+      {/* TA Notifications and Absence Replies */}
+      {myAbsences.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-3 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
+            <MessageSquare size={16} className="text-[#6157e8] mr-2" /> Recent Absences & SENCO Feedback Replies
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {myAbsences.map(a => (
+              <div key={a.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-slate-700">{a.day} Absence</span>
+                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
+                    a.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' : 
+                    a.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}>{a.status}</span>
+                </div>
+                <div className="text-slate-500 text-xs italic">Reason: "{a.reason}"</div>
+                {a.reply ? (
+                  <div className="bg-violet-50/50 p-2.5 rounded-lg border border-violet-100 text-xs text-slate-700 mt-1 flex flex-col">
+                    <span className="font-bold text-[#6157e8] text-[9px] uppercase tracking-wider block mb-0.5">SENCO Reply:</span>
+                    <span>{a.reply}</span>
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-slate-400 italic">No reply message from SENCO yet.</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Responsive Day Nav Toolbar */}
       <div className="flex space-x-1 overflow-x-auto bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm scrollbar-hide">
         {DAYS.map(d => (
           <button 
@@ -788,8 +701,8 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   );
 }
 
-// --- UPDATED SENCO DASHBOARD (TARGETED ALLOCATIONS & DIRECT MONITORING) ---
-function SencoDashboard({ currentUser, users, sessions, absences, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb, clearAllDataDb }) {
+// --- UPDATED SENCO DASHBOARD (TARGETED TEAM ROUTING & RESPONSES) ---
+function SencoDashboard({ currentUser, users, sessions, absences, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [resolvingAbsence, setResolvingAbsence] = useState(null);
   const [editingCell, setEditingCell] = useState(null); 
@@ -798,51 +711,27 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
   const [newStaffTeam, setNewStaffTeam] = useState(TEAMS.Y5_8);
-  const [newStaffSenco, setNewStaffSenco] = useState(SENCOS.BOTH);
-  
   const [editingStaff, setEditingStaff] = useState(null);
 
-  const [showCopyDayModal, setShowCopyDayModal] = useState(false);
-  const [copyScope, setCopyScope] = useState('specific-staff'); 
-  const [copySelectedTaId, setCopySelectedTaId] = useState('');
-  const [copyTargetDays, setCopyTargetDays] = useState({
-    Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
-  });
-  const [copyOverwrite, setCopyOverwrite] = useState(true);
+  // local state to hold SENCO replies for absences before submit/approval
+  const [sencoReplies, setSencoReplies] = useState({});
 
-  // Direct targeted routing: Sencos only see absences of TAs specifically allocated to them!
+  // Filter absences so Cathie or Tracey only see relevant alerts for their assigned teams
   const relevantAbsences = absences.filter(a => {
     if (a.status !== 'Pending') return false;
     const ta = users.find(u => u.id === a.taId);
     if (!ta) return false;
-    
-    // Determine the logged-in SENCO's name (e.g., Cathie or Tracey)
-    const sencoName = currentUser.name; 
-    
-    // Master admin sees everything
     if (currentUser.team === TEAMS.ALL) return true;
-    
-    // Match based on allocated supervisor allocation
-    if (ta.allocatedSenco === sencoName) return true;
-    if (ta.allocatedSenco === SENCOS.BOTH || !ta.allocatedSenco) {
-      // Fallback matching to team if supervisor relationship is ambiguous
-      return ta.team === currentUser.team;
-    }
-    return false;
+    return ta.team === currentUser.team;
   });
 
   const handleUpdateAbsenceStatus = async (absence, newStatus) => {
-    await saveAbsenceToDb({ ...absence, status: newStatus });
+    const replyText = sencoReplies[absence.id] || "No response comment added.";
+    await saveAbsenceToDb({ ...absence, status: newStatus, reply: replyText });
     addToast(`Absence marked as ${newStatus}`, 'success');
   };
 
   const tas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
-
-  useEffect(() => {
-    if (tas.length > 0 && !copySelectedTaId) {
-      setCopySelectedTaId(tas[0].id);
-    }
-  }, [tas, copySelectedTaId]);
 
   const handleStartEditStaff = (staff) => {
     setEditingStaff(staff);
@@ -850,7 +739,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setNewStaffEmail(staff.email || '');
     setNewStaffRole(staff.role);
     setNewStaffTeam(staff.team || TEAMS.Y5_8);
-    setNewStaffSenco(staff.allocatedSenco || SENCOS.BOTH);
   };
 
   const handleCancelEditStaff = () => {
@@ -859,7 +747,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setNewStaffEmail('');
     setNewStaffRole(ROLES.TA);
     setNewStaffTeam(TEAMS.Y5_8);
-    setNewStaffSenco(SENCOS.BOTH);
   };
 
   const handleAddOrUpdateStaff = () => {
@@ -874,8 +761,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         name: newStaffName,
         email: newStaffEmail.toLowerCase().trim(),
         role: newStaffRole,
-        team: newStaffTeam,
-        allocatedSenco: newStaffSenco
+        team: newStaffTeam
       };
       addUserToDb(updatedStaff);
       addToast(`${newStaffName} updated successfully.`, 'success');
@@ -886,8 +772,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         name: newStaffName,
         role: newStaffRole,
         email: newStaffEmail.toLowerCase().trim(),
-        team: newStaffTeam,
-        allocatedSenco: newStaffSenco
+        team: newStaffTeam
       };
       addUserToDb(newStaff);
       addToast(`${newStaffName} added successfully.`, 'success');
@@ -897,7 +782,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setNewStaffEmail('');
     setNewStaffRole(ROLES.TA);
     setNewStaffTeam(TEAMS.Y5_8);
-    setNewStaffSenco(SENCOS.BOTH);
   };
 
   const handleDeleteStaff = (userId, name) => {
@@ -932,136 +816,80 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setEditingCell(null);
   };
 
-  const handleApplyCoverage = (assignments, resolvingAbsence) => {
-    Object.entries(assignments).forEach(([sessionId, coveringTaId]) => {
-      const session = sessions.find(s => s.id === sessionId);
-      if (session) saveSessionToDb({ ...session, taId: coveringTaId });
-      
-      const coveringTaSession = sessions.find(s => 
-        s.day === resolvingAbsence.day && s.timeSlotId === session.timeSlotId && s.taId === coveringTaId
-      );
-      if (coveringTaSession) {
-        saveSessionToDb({ ...coveringTaSession, subject: 'Coverage Reassigned', tier: TIERS.MORNING_TEA });
-      }
-    });
-
-    saveAbsenceToDb({ ...resolvingAbsence, status: 'Resolved' });
-    setResolvingAbsence(null);
-    addToast('Coverage Approved!');
-  };
-
-  const handleCopyDaySchedule = async () => {
-    try {
-      let sourceSessions = [];
-      if (copyScope === 'specific-staff') {
-        if (!copySelectedTaId) {
-          addToast('Please select a Teacher Aide to duplicate.', 'error');
-          return;
-        }
-        sourceSessions = sessions.filter(s => s.day === selectedDay && s.taId === copySelectedTaId);
-      } else {
-        sourceSessions = sessions.filter(s => s.day === selectedDay);
-      }
-
-      if (sourceSessions.length === 0) {
-        const staffName = copyScope === 'specific-staff' 
-          ? `${users.find(u => u.id === copySelectedTaId)?.name || 'Staff'}`
-          : 'anyone';
-        addToast(`No duties found for ${staffName} on ${selectedDay} to copy.`, 'error');
-        return;
-      }
-
-      const targetDays = Object.keys(copyTargetDays).filter(day => copyTargetDays[day] && day !== selectedDay);
-      if (targetDays.length === 0) {
-        addToast('Please select at least one other day to copy to.', 'error');
-        return;
-      }
-
-      if (copyOverwrite) {
-        const deletePromises = [];
-        sessions.forEach(s => {
-          if (targetDays.includes(s.day)) {
-            if (copyScope === 'specific-staff') {
-              if (s.taId === copySelectedTaId) {
-                deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
-              }
-            } else {
-              deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
-            }
-          }
-        });
-        await Promise.all(deletePromises);
-      }
-
-      const writePromises = [];
-      targetDays.forEach(day => {
-        sourceSessions.forEach(sourceSess => {
-          const newId = Math.random().toString(36).substr(2, 9) + '-' + day.substring(0, 3);
-          const duplicatedSession = {
-            ...sourceSess,
-            id: newId,
-            day: day
-          };
-          writePromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', newId), duplicatedSession));
-        });
-      });
-
-      await Promise.all(writePromises);
-      setShowCopyDayModal(false);
-      setCopyTargetDays({
-        Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
-      });
-      
-      const scopeMessage = copyScope === 'specific-staff'
-        ? `${users.find(u => u.id === copySelectedTaId)?.name || 'Staff'}'s schedule`
-        : "The whole day's schedule";
-      addToast(`Successfully duplicated ${scopeMessage} from ${selectedDay}!`, "success");
-    } catch (error) {
-      console.error("Duplicate timetable failed:", error);
-      addToast("Duplicate failed.", "error");
-    }
-  };
-
   return (
     <div className="space-y-8 pb-12">
+      {/* CONSOLIDATED MAIN BUTTON: Only ONE Manage button in the entire interface! */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser.name}</h2>
           <div className="flex items-center gap-2 mt-1">
-            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Supervision Filter:</p>
-            <span className="bg-violet-50 text-[#6157e8] px-2 py-0.5 text-xs font-bold rounded border border-violet-100">SENCO {currentUser.name}</span>
+            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Supervision filter:</p>
+            <span className="bg-violet-50 text-[#6157e8] px-2 py-0.5 text-xs font-bold rounded border border-violet-100">{currentUser.team || TEAMS.Y5_8}</span>
           </div>
         </div>
         <div className="flex items-center space-x-2 w-full md:w-auto">
-          <button onClick={() => setShowManageStaff(true)} className="flex-1 md:flex-none py-2.5 px-4 bg-[#6157e8] text-white text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm flex items-center justify-center space-x-1">
-            <Users size={14} /> <span>Manage Staff & SENCOs</span>
+          {/* Main Consolidated Control Button */}
+          <button onClick={() => setShowManageStaff(true)} className="flex-1 md:flex-none py-2.5 px-4 bg-[#6157e8] hover:bg-[#5249d6] text-white text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all">
+            <Users size={14} /> <span>Manage Staff & Teams</span>
           </button>
-          <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="bg-white border text-sm font-semibold rounded-xl px-4 py-2.5">
+          <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="bg-white border text-sm font-semibold rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-[#6157e8]">
             {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
       </div>
 
+      {/* Relevant Absence Cards with Direct Reply Box */}
       {relevantAbsences.length > 0 && (
         <div className="bg-red-50/60 border border-red-200/80 rounded-2xl p-6 space-y-4">
           <h3 className="text-sm font-bold text-red-800 uppercase tracking-wider flex items-center">
-            <AlertCircle className="w-4 h-4 mr-1.5" /> Direct Supervisor Absence Alerts ({relevantAbsences.length})
+            <AlertCircle className="w-4 h-4 mr-1.5" /> Direct Team Absence Alerts ({relevantAbsences.length})
           </h3>
-          <p className="text-xs text-slate-500">Showing only absences for Teacher Aides allocated directly to you.</p>
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-4">
             {relevantAbsences.map(a => {
               const ta = users.find(u => u.id === a.taId);
               return (
-                <div key={a.id} className="bg-white p-5 rounded-xl border border-red-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-fade-in">
-                  <div>
-                    <span className="text-[10px] font-bold bg-violet-50 text-[#6157e8] px-2 py-0.5 rounded border border-violet-100 uppercase tracking-wide">Allocated to {ta?.allocatedSenco || 'None/Both'}</span>
-                    <h4 className="font-bold text-slate-800 text-lg mt-1.5">{ta?.name} reported absent for {a.day}</h4>
-                    <p className="text-xs text-slate-500 font-medium mt-1">Reason: "{a.reason}"</p>
+                <div key={a.id} className="bg-white p-5 rounded-xl border border-red-100 shadow-sm flex flex-col gap-4 animate-fade-in">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 pb-3 border-b border-slate-100">
+                    <div>
+                      <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 uppercase tracking-wide">{ta?.team}</span>
+                      <h4 className="font-bold text-slate-800 text-lg mt-1">{ta?.name} reported absent for {a.day}</h4>
+                      <p className="text-xs text-slate-500 font-medium mt-1">Reason: "{a.reason}"</p>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                    <button onClick={() => setResolvingAbsence(a)} className="flex-1 md:flex-none px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm">Approve Coverage</button>
-                    <button onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Sick Leave)')} className="flex-1 md:flex-none px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all">Mark Sick</button>
-                    <button onClick={() => handleUpdateAbsenceStatus(a, 'Dismissed')} className="flex-1 md:flex-none px-4 py-2 bg-white border text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-wide rounded-lg transition-all">Dismiss</button>
+
+                  {/* Reply Input Box for Senco Response */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                      <MessageSquare size={12} className="mr-1 text-[#6157e8]" /> Leave a Response Reply Note:
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Thanks for letting me know, get well soon! Tracey"
+                      value={sencoReplies[a.id] || ''}
+                      onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
+                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 self-end">
+                    <button 
+                      onClick={() => setResolvingAbsence(a)} 
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
+                    >
+                      Approve Coverage
+                    </button>
+                    <button 
+                      onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Sick Leave)')} 
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
+                    >
+                      Mark Sick
+                    </button>
+                    <button 
+                      onClick={() => handleUpdateAbsenceStatus(a, 'Dismissed')} 
+                      className="px-4 py-2 bg-white border text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
               );
@@ -1081,119 +909,18 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               const match = sessions.find(s => s.id === sessId);
               if (match && coveringTaId) saveSessionToDb({ ...match, taId: coveringTaId });
             });
-            saveAbsenceToDb({ ...resolvingAbsence, status: 'Resolved' });
+            const replyText = sencoReplies[resolvingAbsence.id] || "Coverage has been approved and organized.";
+            saveAbsenceToDb({ ...resolvingAbsence, status: 'Resolved', reply: replyText });
             setResolvingAbsence(null);
             addToast('Coverage applied successfully.');
           }} 
         />
       )}
 
-      {showCopyDayModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
-            <div className="w-12 h-12 bg-[#ecfdf5] text-[#10b981] rounded-full flex items-center justify-center mb-4">
-              <Copy className="w-6 h-6" />
-            </div>
-            <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Duplicate Schedule</h3>
-            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-              Copy assignments from <b>{selectedDay}</b> to other days.
-            </p>
-
-            <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-slate-100 rounded-xl">
-              <button
-                onClick={() => setCopyScope('specific-staff')}
-                className={`py-2 px-3 text-xs font-bold rounded-lg transition-all ${copyScope === 'specific-staff' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-              >
-                Specific TA
-              </button>
-              <button
-                onClick={() => setCopyScope('whole-day')}
-                className={`py-2 px-3 text-xs font-bold rounded-lg transition-all ${copyScope === 'whole-day' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-              >
-                Whole Day (All TAs)
-              </button>
-            </div>
-
-            {copyScope === 'specific-staff' && (
-              <div className="mb-4">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Teacher Aide</label>
-                <select 
-                  value={copySelectedTaId}
-                  onChange={(e) => setCopySelectedTaId(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none font-medium text-[#1a1f36] text-sm"
-                >
-                  {tas.map(ta => (
-                    <option key={ta.id} value={ta.id}>{ta.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Destination Days</label>
-            <div className="space-y-2 mb-6">
-              {DAYS.map(day => (
-                <label 
-                  key={day} 
-                  className={`flex items-center p-3 border rounded-xl cursor-pointer transition-all ${
-                    day === selectedDay 
-                      ? 'opacity-40 bg-slate-100 border-slate-200 cursor-not-allowed'
-                      : copyTargetDays[day]
-                        ? 'border-[#10b981] bg-[#ecfdf5]/40'
-                        : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <input 
-                    type="checkbox"
-                    disabled={day === selectedDay}
-                    checked={day === selectedDay ? false : copyTargetDays[day]}
-                    onChange={(e) => setCopyTargetDays(prev => ({ ...prev, [day]: e.target.checked }))}
-                    className="w-4 h-4 text-[#10b981] focus:ring-[#10b981] border-slate-300 rounded cursor-pointer disabled:cursor-not-allowed mr-3"
-                  />
-                  <span className="font-semibold text-sm text-[#1a1f36]">{day} {day === selectedDay && "(Selected Day)"}</span>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 mb-6">
-              <div>
-                <span className="font-bold text-xs text-[#1a1f36] block uppercase tracking-wider">Overwrite Target Days</span>
-                <span className="text-[11px] text-slate-500">Deletes existing schedules before copying</span>
-              </div>
-              <input 
-                type="checkbox"
-                checked={copyOverwrite}
-                onChange={(e) => setCopyOverwrite(e.target.checked)}
-                className="w-5 h-5 text-[#10b981] focus:ring-[#10b981] border-slate-300 rounded cursor-pointer"
-              />
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <button 
-                onClick={() => {
-                  setShowCopyDayModal(false);
-                  setCopyTargetDays({ Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false });
-                }} 
-                className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleCopyDaySchedule} 
-                className="px-6 py-3 bg-[#10b981] text-white font-bold hover:bg-[#059669] rounded-xl transition-colors shadow-md text-sm"
-              >
-                Copy Timetable
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {editingCell && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in">
-            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">
-              {editingCell.session ? 'Edit Duty' : 'Assign Duty'}
-            </h3>
+            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">{editingCell.session ? 'Edit Duty' : 'Assign Duty'}</h3>
             <form onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.target);
@@ -1206,11 +933,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             }} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Subject / Task Name</label>
-                <input 
-                  type="text" name="subject" required defaultValue={editingCell.session?.subject}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none"
-                  placeholder="e.g. Reading Support..."
-                />
+                <input type="text" name="subject" required defaultValue={editingCell.session?.subject} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Reading Support..." />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tier</label>
@@ -1222,18 +945,14 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Teacher</label>
                 <select name="teacherId" defaultValue={editingCell.session?.teacherId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
                   <option value="">None / Self-Directed</option>
-                  {users.filter(u => u.role === ROLES.TEACHER).map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
+                  {users.filter(u => u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Team Leader</label>
                 <select name="teamLeaderId" defaultValue={editingCell.session?.teamLeaderId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
                   <option value="">None / No Team Leader</option>
-                  {users.filter(u => u.role === ROLES.TEAM_LEADER).map(tl => (
-                    <option key={tl.id} value={tl.id}>{tl.name}</option>
-                  ))}
+                  {users.filter(u => u.role === ROLES.TEAM_LEADER).map(tl => <option key={tl.id} value={tl.id}>{tl.name}</option>)}
                 </select>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
@@ -1242,54 +961,18 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <Trash2 className="w-4 h-4 mr-2" /> Remove
                   </button>
                 )}
-                <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
-                  Cancel
-                </button>
-                <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">
-                  Save Changes
-                </button>
+                <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Cancel</button>
+                <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm font-sans">Save Changes</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Manage Staff Modal */}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-[#1a1f36]">Manage Staff & Teams</h3>
-              
-              <button 
-                onClick={async () => {
-                  const seenEmails = new Set();
-                  const duplicates = [];
-                  users.forEach(u => {
-                    const email = u.email?.toLowerCase().trim();
-                    if (email) {
-                      if (seenEmails.has(email)) {
-                        duplicates.push(u);
-                      } else {
-                        seenEmails.add(email);
-                      }
-                    }
-                  });
-                  if (duplicates.length > 0) {
-                    const promises = duplicates.map(d => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', d.id)));
-                    await Promise.all(promises);
-                    addToast(`Successfully swept and deleted ${duplicates.length} duplicate database entries!`, 'success');
-                  } else {
-                    addToast('No duplicate email records found in your database.', 'info');
-                  }
-                }}
-                className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2.5 py-1.5 rounded-lg border border-red-200 uppercase tracking-wider transition-colors flex items-center space-x-1"
-                title="Automatically remove redundant database profiles sharing the same email"
-              >
-                <Trash2 size={12} />
-                <span>Clean Duplicates</span>
-              </button>
-            </div>
+            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">Manage Staff & Teams</h3>
             
             <div className="flex-1 overflow-y-auto pr-2 mb-6 space-y-2 border-b border-slate-100 pb-4">
               {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
@@ -1297,24 +980,11 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   <div>
                     <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
-                    {u.role === ROLES.TA && (
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        Team: <strong className="text-slate-600">{u.team || 'Unassigned'}</strong> | Supervisor: <strong className="text-[#6157e8]">{u.allocatedSenco || 'None / Both'}</strong>
-                      </div>
-                    )}
                   </div>
                   <div className="flex items-center space-x-1">
-                    <button 
-                      onClick={() => handleStartEditStaff(u)} 
-                      className="p-2 text-[#6157e8] hover:bg-violet-100 rounded-lg transition-colors"
-                      title={`Edit ${u.name}`}
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
+                    <button onClick={() => handleStartEditStaff(u)} className="p-2 text-[#6157e8] hover:bg-violet-100 rounded-lg transition-colors"><Edit3 className="w-4 h-4" /></button>
                     {u.id !== currentUser.id && (
-                      <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors" title={`Delete ${u.name}`}>
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                     )}
                   </div>
                 </div>
@@ -1322,33 +992,19 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             </div>
 
             <div className="space-y-4 text-xs">
-              <h4 className="font-bold text-[#1a1f36] text-sm">
-                {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff Record'}
-              </h4>
+              <h4 className="font-bold text-[#1a1f36] text-sm">{editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}</h4>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
-                <input 
-                  type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none mb-3"
-                  placeholder="e.g. Val Murray"
-                />
+                <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none mb-3" placeholder="e.g. Val Murray" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Email Address</label>
-                <input 
-                  type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none mb-3"
-                  placeholder="e.g. val.murray@school.nz"
-                />
+                <input type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none mb-3" placeholder="e.g. val.murray@school.nz" />
               </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Access Role</label>
-                  <select 
-                    value={newStaffRole} 
-                    onChange={(e) => setNewStaffRole(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                  >
+                  <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
                     <option value={ROLES.TA}>Teacher Aide (TA)</option>
                     <option value={ROLES.TEACHER}>Teacher</option>
                     <option value={ROLES.TEAM_LEADER}>Team Leader</option>
@@ -1357,75 +1013,32 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Team Group</label>
-                  <select 
-                    value={newStaffTeam} 
-                    onChange={(e) => setNewStaffTeam(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                  >
+                  <select value={newStaffTeam} onChange={(e) => setNewStaffTeam(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
                     <option value={TEAMS.Y0_4}>{TEAMS.Y0_4}</option>
                     <option value={TEAMS.Y5_8}>{TEAMS.Y5_8}</option>
-                    <option value={TEAMS.ACROSS}>{TEAMS.ACROSS}</option>
                     <option value={TEAMS.ALL}>{TEAMS.ALL}</option>
                   </select>
                 </div>
               </div>
-
-              {/* Designated SENCO field */}
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Designated SENCO supervisor</label>
-                <select 
-                  value={newStaffSenco} 
-                  onChange={(e) => setNewStaffSenco(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                >
-                  <option value={SENCOS.CATHIE}>Cathie (SENCO Years 0-4)</option>
-                  <option value={SENCOS.TRACEY}>Tracey (SENCO Years 5-8)</option>
-                  <option value={SENCOS.BOTH}>None / Both (Shared management)</option>
-                </select>
-                <p className="text-[10px] text-slate-400 mt-1">Directly controls which SENCO dashboard filters absences and manages assignments for this staff member.</p>
-              </div>
-
               <div className="flex justify-end space-x-3 pt-4">
-                {editingStaff && (
-                  <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">
-                    Cancel Edit
-                  </button>
-                )}
-                <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
-                  Done
-                </button>
-                <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">
-                  {editingStaff ? 'Update Staff' : 'Add Staff'}
-                </button>
+                {editingStaff && <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">Cancel Edit</button>}
+                <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Done</button>
+                <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">Save Staff</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* Grid Timetable Section */}
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-[#1a1f36] flex items-center">
-              Master Timetable
-            </h2>
+            <h2 className="text-2xl font-bold text-[#1a1f36]">Master Timetable</h2>
             <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-1">Live Database Connected</p>
           </div>
           
           <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
-            <button 
-              onClick={() => setShowCopyDayModal(true)}
-              className="flex items-center px-4 py-2.5 bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] font-medium text-sm rounded-xl transition-colors shadow-sm border border-[#a7f3d0]"
-            >
-              <Copy className="w-4 h-4 mr-1.5" /> 
-              <span>Copy Schedule</span>
-            </button>
-            <button 
-              onClick={() => setShowManageStaff(true)}
-              className="flex items-center px-4 py-2.5 bg-[#f0efff] text-[#6157e8] font-medium text-sm rounded-xl hover:bg-[#e0dfff] transition-colors border border-slate-100"
-            >
-              <Users className="w-4 h-4 mr-1.5" strokeWidth={3} /> Manage Staff
-            </button>
             <select 
               value={selectedDay}
               onChange={(e) => setSelectedDay(e.target.value)}
@@ -1462,11 +1075,7 @@ function TeamLeaderDashboard({ user, sessions, users }) {
           <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
           <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Team Leader View</p>
         </div>
-        <select 
-          value={selectedDay}
-          onChange={(e) => setSelectedDay(e.target.value)}
-          className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none focus:ring-[#6157e8]"
-        >
+        <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none">
           {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
       </div>
@@ -1474,7 +1083,6 @@ function TeamLeaderDashboard({ user, sessions, users }) {
       <div className="bg-white rounded-[28px] border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-6 border-b border-slate-100 bg-slate-50/50">
           <h3 className="font-bold text-slate-800 text-md">Your Assigned Team Schedules</h3>
-          <p className="text-xs text-slate-400 mt-1">Showing only duties where you are designated as Supporting Team Leader</p>
         </div>
         <div className="p-0">
           <TimetableGrid sessions={teamSessions} day={selectedDay} users={users} isEditable={false} />
@@ -1496,11 +1104,7 @@ function TeacherDashboard({ user, sessions, users }) {
           <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
           <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Teacher View</p>
         </div>
-        <select 
-          value={selectedDay}
-          onChange={(e) => setSelectedDay(e.target.value)}
-          className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none focus:ring-[#6157e8]"
-        >
+        <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5">
           {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
       </div>
@@ -1508,7 +1112,6 @@ function TeacherDashboard({ user, sessions, users }) {
       <div className="bg-white rounded-[28px] border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-6 border-b border-slate-100 bg-slate-50/50">
           <h3 className="font-bold text-slate-800 text-md">Your Supporting TAs</h3>
-          <p className="text-xs text-slate-400 mt-1">Showing only duties where you are designated as Supporting Teacher</p>
         </div>
         <div className="p-0">
           <TimetableGrid sessions={teacherSessions} day={selectedDay} users={users} isEditable={false} />
@@ -1521,7 +1124,6 @@ function TeacherDashboard({ user, sessions, users }) {
 // --- TIMETABLE GRID MATRIX (DOCKING ALLOCATED SENCOS VISUALLY) ---
 function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
   const [viewMode, setViewMode] = useState('single'); 
-  
   const tas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
   const [activeTaId, setActiveTaId] = useState('');
 
@@ -1537,8 +1139,6 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
     }
   }, [tas]);
 
-  const activeTa = tas.find(t => t.id === activeTaId);
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
@@ -1546,61 +1146,29 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
           {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
         </div>
         <div className="flex bg-slate-200/60 p-1 rounded-xl">
-          <button
-            onClick={() => setViewMode('single')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              viewMode === 'single' 
-                ? 'bg-white text-[#1a1f36] shadow-sm' 
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Individual TA
-          </button>
-          <button
-            onClick={() => setViewMode('all')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              viewMode === 'all' 
-                ? 'bg-white text-[#1a1f36] shadow-sm' 
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Full Grid
-          </button>
+          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Individual TA</button>
+          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Full Grid</button>
         </div>
       </div>
 
       {viewMode === 'single' ? (
-        <div className="px-1.5 sm:px-6 py-4 space-y-6">
+        <div className="px-1.5 sm:px-6 py-4 space-y-6 animate-fade-in">
           <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
             {tas.map(ta => (
               <button
                 key={ta.id}
                 onClick={() => setActiveTaId(ta.id)}
-                className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 flex items-center gap-2 ${
-                  activeTaId === ta.id 
-                    ? 'bg-[#6157e8] text-white shadow-md' 
-                    : 'bg-slate-50 border border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 ${
+                  activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                 }`}
               >
-                <span>{ta.name}</span>
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                  activeTaId === ta.id ? 'bg-white/20 text-white' : 'bg-slate-200/50 text-slate-600'
-                }`}>
-                  {ta.allocatedSenco || 'No Supervisor'}
-                </span>
+                {ta.name}
               </button>
             ))}
           </div>
 
-          {activeTa ? (
+          {activeTaId ? (
             <div className="space-y-4 max-w-2xl mx-auto">
-              <div className="text-center pb-2">
-                <span className="text-xs text-slate-400">Primary Supervisor Contact: </span>
-                <strong className="text-[#6157e8] text-xs font-bold bg-violet-50 px-2 py-1 rounded border border-violet-100">
-                  {activeTa.allocatedSenco || 'None / Both'}
-                </strong>
-              </div>
-
               {TIME_SLOTS.map(slot => {
                 const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === activeTaId);
                 const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
@@ -1629,9 +1197,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                                 {session.tier}
                               </span>
                               {isEditable && (
-                                <span className="opacity-0 group-hover:opacity-100 text-[10px] font-bold text-[#6157e8] transition-opacity">
-                                  Edit
-                                </span>
+                                <span className="opacity-0 group-hover:opacity-100 text-[10px] font-bold text-[#6157e8] transition-opacity">Edit</span>
                               )}
                             </div>
                             
@@ -1658,11 +1224,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                       ) : (
                         <div className="bg-slate-50/50 rounded-[20px] p-4 border border-dashed border-slate-200/80 hover:border-[#6157e8]/50 hover:bg-[#f0efff]/20 transition-all flex items-center justify-between min-h-[72px]">
                           <span className="text-slate-400 text-xs font-semibold">Free Session</span>
-                          {isEditable && (
-                            <span className="text-[10px] font-bold text-[#6157e8] opacity-0 group-hover:opacity-100 transition-opacity">
-                              + Assign Duty
-                            </span>
-                          )}
+                          {isEditable && <span className="text-[10px] font-bold text-[#6157e8] opacity-0 group-hover:opacity-100 transition-opacity">+ Assign Duty</span>}
                         </div>
                       )}
                     </div>
@@ -1671,14 +1233,11 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
               })}
             </div>
           ) : (
-            <div className="text-center p-12 bg-slate-50 rounded-[32px] border border-dashed border-slate-200 text-slate-400 font-medium">
-              Loading staff...
-            </div>
+            <div className="text-center p-12 bg-slate-50 rounded-[32px] border border-dashed text-slate-400 font-medium">Loading staff...</div>
           )}
         </div>
       ) : (
-        /* Birds-Eye Full Grid with designated Supervisor allocations on columns */
-        <div className="relative max-h-[75vh] overflow-auto">
+        <div className="relative max-h-[75vh] overflow-auto animate-fade-in">
           <table className="w-full text-left border-collapse min-w-max table-fixed">
             <thead>
               <tr>
@@ -1686,10 +1245,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                 {tas.map(ta => (
                   <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-semibold text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: '220px' }}>
                     <div className="truncate">{ta.name}</div>
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5 truncate flex items-center gap-1.5">
-                      <span>{ta.team === TEAMS.ACROSS ? 'Across Teams' : ta.team}</span>
-                      <span className="text-[#6157e8] font-bold bg-violet-50 px-1 py-0.2 rounded border border-violet-100">{ta.allocatedSenco || 'Both'}</span>
-                    </div>
+                    <div className="text-[10px] text-slate-400 font-normal mt-0.5 truncate">{ta.team}</div>
                   </th>
                 ))}
               </tr>
@@ -1721,30 +1277,12 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
                             <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style?.text}`}>
                               {session.tier}
                             </span>
-                            
                             <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </div>
-                            
-                            {(session.teacherId || session.teamLeaderId) && (
-                              <div className="mt-2 pt-1 border-t border-slate-100 flex flex-wrap gap-1 text-[9px] text-slate-400 font-semibold">
-                                {session.teacherId && (
-                                  <span className="bg-slate-100 px-1 py-0.5 rounded text-slate-600">
-                                    T: {users.find(u => u.id === session.teacherId)?.name}
-                                  </span>
-                                )}
-                                {session.teamLeaderId && (
-                                  <span className="bg-purple-50 px-1 py-0.5 rounded text-purple-600">
-                                    L: {users.find(u => u.id === session.teamLeaderId)?.name}
-                                  </span>
-                                )}
-                              </div>
-                            )}
                           </div>
                         ) : (
-                          <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">
-                            Free
-                          </div>
+                          <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">Free</div>
                         )}
                       </td>
                     );
@@ -1780,8 +1318,8 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
-        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {absentTa?.name}</h3>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in">
+        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-sans">Coverage: {absentTa?.name}</h3>
         <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
         
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
@@ -1818,12 +1356,8 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
         </div>
 
         <div className="flex justify-end space-x-3 border-t border-slate-100 pt-4">
-          <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">
-            Cancel
-          </button>
-          <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">
-            Approve Coverage
-          </button>
+          <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
+          <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
         </div>
       </div>
     </div>
