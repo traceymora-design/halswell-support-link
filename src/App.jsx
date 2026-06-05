@@ -595,9 +595,10 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
             <h2 className="text-2xl font-bold text-slate-800">{user.name} Timetable Portal</h2>
             <span className="text-[10px] font-bold bg-violet-50 text-[#6157e8] border border-violet-100 px-2 py-0.5 rounded uppercase tracking-wider">{user.team || 'No Team Registered'}</span>
           </div>
+          {}
           <p className="text-xs text-slate-400 mt-1 flex items-center">
             <Laptop size={14} className="mr-1 text-slate-500" />
-            Allocated Supervisor: <strong className="ml-1 text-[#6157e8]">{user.allocatedSenco === 'senco_cathie' ? 'Cathie' : user.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'Shared (None / Both)'}</strong>
+            Allocated SENCO: <strong className="ml-1 text-[#6157e8]">{user.allocatedSenco === 'senco_cathie' ? 'Cathie' : user.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'Shared (None / Both)'}</strong>
           </p>
         </div>
         <button 
@@ -732,7 +733,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     const ta = users.find(u => u.id === a.taId);
     if (!ta) return false;
     
-    // Direct Supervisor allocation override
+    // Direct SENCO allocation override
     if (ta.allocatedSenco) {
       return ta.allocatedSenco === currentUser.id;
     }
@@ -787,7 +788,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         email: newStaffEmail.toLowerCase().trim(),
         role: newStaffRole,
         team: newStaffTeam,
-        allocatedSenco: newStaffSenco
+        allocatedSenco: newStaffRole === ROLES.TA ? newStaffSenco : ''
       };
       addUserToDb(updatedStaff);
       addToast(`${newStaffName} updated successfully.`, 'success');
@@ -799,7 +800,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         role: newStaffRole,
         email: newStaffEmail.toLowerCase().trim(),
         team: newStaffTeam,
-        allocatedSenco: newStaffSenco
+        allocatedSenco: newStaffRole === ROLES.TA ? newStaffSenco : ''
       };
       addUserToDb(newStaff);
       addToast(`${newStaffName} added successfully.`, 'success');
@@ -1165,83 +1166,104 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Manage Staff Modal -- Matches layout in Screenshot 2026-06-06 at 11.35.04 AM.jpg */}
+      {}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
-            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">Manage Staff & Teams</h3>
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col md:grid md:grid-cols-12 md:gap-8 overflow-hidden">
             
-            <div className="flex-1 overflow-y-auto pr-2 mb-6 space-y-2 border-b border-slate-100 pb-4">
-              {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
-                <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <div>
-                    <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
-                    <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                      Supervisor: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span>
+            {/* Header spans all 12 columns on desktop */}
+            <div className="col-span-12 border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
+              <h3 className="text-2xl font-bold text-[#1a1f36]">Manage Staff & Teams</h3>
+              <button onClick={() => setShowManageStaff(false)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
+            </div>
+
+            {/* Left Column (Independent Scroll Container): Current Staff Members List */}
+            <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
+              <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
+                {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
+                  <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div>
+                      <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
+                      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
+                      {/* Only apply the SENCO supervisor field to TAs, not teachers or team leaders */}
+                      {u.role === ROLES.TA && (
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                          SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <button onClick={() => handleStartEditStaff(u)} className="p-2 text-[#6157e8] hover:bg-violet-100 rounded-lg transition-colors"><Edit3 className="w-4 h-4" /></button>
+                      {u.id !== currentUser.id && (
+                        <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center space-x-1">
-                    <button onClick={() => handleStartEditStaff(u)} className="p-2 text-[#6157e8] hover:bg-violet-100 rounded-lg transition-colors"><Edit3 className="w-4 h-4" /></button>
-                    {u.id !== currentUser.id && (
-                      <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                    )}
+                ))}
+              </div>
+            </div>
+
+            {}
+            {/* Right Column (Independent Scroll Container): Add/Edit Details Form */}
+            <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
+              <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
+                {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
+              </h4>
+              <div className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
+                  <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Ruby Gray" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Email Address</label>
+                  <input type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. ruby.gray@halswell.school.nz" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Access Role</label>
+                    <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                      <option value={ROLES.TA}>Teacher Aide (TA)</option>
+                      <option value={ROLES.TEACHER}>Teacher</option>
+                      <option value={ROLES.TEAM_LEADER}>Team Leader</option>
+                      <option value={ROLES.SENCO}>SENCO (Admin)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Team Group</label>
+                    <select value={newStaffTeam} onChange={(e) => setNewStaffTeam(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                      <option value={TEAMS.Y0_4}>{TEAMS.Y0_4}</option>
+                      <option value={TEAMS.Y5_8}>{TEAMS.Y5_8}</option>
+                      <option value={TEAMS.BOTH}>{TEAMS.BOTH}</option>
+                      <option value={TEAMS.ALL}>{TEAMS.ALL}</option>
+                    </select>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            {/* Form Fields Matching Screenshot verbatim */}
-            <div className="space-y-4 text-xs overflow-y-auto max-h-[45vh] pr-1">
-              <h4 className="font-bold text-[#1a1f36] text-sm">{editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}</h4>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
-                <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Ruby Gray" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Email Address</label>
-                <input type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. ruby.gray@halswell.school.nz" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Access Role</label>
-                  <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
-                    <option value={ROLES.TA}>Teacher Aide (TA)</option>
-                    <option value={ROLES.TEACHER}>Teacher</option>
-                    <option value={ROLES.TEAM_LEADER}>Team Leader</option>
-                    <option value={ROLES.SENCO}>SENCO (Admin)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Team Group</label>
-                  <select value={newStaffTeam} onChange={(e) => setNewStaffTeam(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
-                    <option value={TEAMS.Y0_4}>{TEAMS.Y0_4}</option>
-                    <option value={TEAMS.Y5_8}>{TEAMS.Y5_8}</option>
-                    <option value={TEAMS.BOTH}>{TEAMS.BOTH}</option> {/* Re-instated "Both Teams" option here */}
-                    <option value={TEAMS.ALL}>{TEAMS.ALL}</option>
-                  </select>
+                {/* Only apply the Allocated SENCO selection field to TAs, not teachers or team leaders */}
+                {newStaffRole === ROLES.TA && (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Allocated SENCO</label>
+                    <select 
+                      value={newStaffSenco} 
+                      onChange={(e) => setNewStaffSenco(e.target.value)} 
+                      className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
+                    >
+                      <option value="">None / Both (Shared)</option>
+                      <option value="senco_cathie">Cathie (SENCO Y0-4)</option>
+                      <option value="senco_tracey">Tracey (SENCO Y5-8)</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                  {editingStaff && <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">Cancel Edit</button>}
+                  <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Done</button>
+                  <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">Save Staff</button>
                 </div>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Allocated Supervisor SENCO</label>
-                <select 
-                  value={newStaffSenco} 
-                  onChange={(e) => setNewStaffSenco(e.target.value)} 
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                >
-                  <option value="">None / Both (Shared)</option>
-                  <option value="senco_cathie">Cathie (SENCO Y0-4)</option>
-                  <option value="senco_tracey">Tracey (SENCO Y5-8)</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                {editingStaff && <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">Cancel Edit</button>}
-                <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Done</button>
-                <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">Save Staff</button>
-              </div>
             </div>
+
           </div>
         </div>
       )}
