@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Calendar, AlertCircle, Users, CheckCircle, MessageSquare,
+  Calendar, AlertCircle, Users, CheckCircle, 
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
   Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop
@@ -57,6 +57,7 @@ const isSandboxEnv = () => {
 };
 const isSandbox = isSandboxEnv();
 
+// --- ROLES & TEAMS ---
 const ROLES = {
   SENCO: 'SENCO',
   TEAM_LEADER: 'Team Leader',
@@ -67,6 +68,7 @@ const ROLES = {
 const TEAMS = {
   Y0_4: 'Years 0-4 Team',
   Y5_8: 'Years 5-8 Team',
+  BOTH: 'Both Teams',
   ALL: 'All Teams / Master Admin'
 };
 
@@ -93,7 +95,7 @@ const TIME_SLOTS = [
   { id: 't9', start: '12:30', end: '1:00' },
   { id: 't10', start: '1:00', end: '1:30' },
   { id: 't11', start: '1:30', end: '2:00' },
-  { id: 't12', start: '2:00', end: '2:30' },
+  { id: 't12', py: '2:00', start: '2:00', end: '2:30' },
   { id: 't13', start: '2:30', end: '3:00' }
 ];
 
@@ -104,13 +106,13 @@ const INITIAL_USERS = [
   { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey' },
   { id: 'tl1', name: 'Mrs. Davis', role: ROLES.TEAM_LEADER, email: 'davis@school.edu', team: TEAMS.Y5_8 },
   { id: 't_val', name: 'Val Murray', role: ROLES.TA, email: 'val.murray@school.nz', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey' },
-  { id: 't_ruby', name: 'Ruby', role: ROLES.TA, email: 'ruby@school.nz', team: TEAMS.Y0_4, allocatedSenco: 'senco_cathie' }
+  { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
 ];
 
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
-// Seed Initial timetable schedules for Karen Mon-Thu
+// Seed Karen's Monday-Thursday Schedule
 ['Monday', 'Tuesday', 'Wednesday', 'Thursday'].forEach(day => {
   const daySessions = [
     { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
@@ -157,6 +159,9 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) {
     return { hasError: true, errorInfo: error.message };
   }
+  componentDidCatch(error, errorInfo) {
+    console.error("Support Link Crash caught:", error, errorInfo);
+  }
   render() {
     if (this.state.hasError) {
       return (
@@ -164,8 +169,12 @@ class ErrorBoundary extends React.Component {
           <div className="bg-white p-8 rounded-3xl shadow-xl border border-red-100 max-w-md w-full text-center">
             <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Something went wrong</h2>
-            <p className="text-sm text-slate-500 mb-6 leading-relaxed">We caught a visual layout error. Please refresh cleanly.</p>
-            <button onClick={() => window.location.reload()} className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm">Reload Hub</button>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm transition-colors"
+            >
+              Reload Support Link
+            </button>
           </div>
         </div>
       );
@@ -319,45 +328,11 @@ function App() {
     return () => { unsubUsers(); unsubSessions(); unsubAbsences(); };
   }, [authCompleted, dbUser]);
 
-  const addUserToDb = async (userObj) => {
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
-    } catch(e) {
-      addToast('Error saving staff member.', 'error');
-    }
-  };
-
-  const deleteUserFromDb = async (userId) => {
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
-    } catch(e) {
-      addToast('Error deleting staff member.', 'error');
-    }
-  };
-
-  const saveSessionToDb = async (sessionData) => {
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
-    } catch(e) {
-      addToast('Error saving duties.', 'error');
-    }
-  };
-
-  const deleteSessionFromDb = async (sessionId) => {
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
-    } catch(e) {
-      addToast('Error deleting duty.', 'error');
-    }
-  };
-
-  const saveAbsenceToDb = async (absenceData) => {
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
-    } catch(e) {
-      addToast('Error updating absence record.', 'error');
-    }
-  };
+  const addUserToDb = async (userObj) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
+  const deleteUserFromDb = async (userId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
+  const saveSessionToDb = async (sessionData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
+  const deleteSessionFromDb = async (sessionId) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
+  const saveAbsenceToDb = async (absenceData) => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
 
   const addToast = (message, type = 'success') => {
     const id = Date.now();
@@ -376,10 +351,11 @@ function App() {
     try {
       if (isSandbox) {
         handleSimpleSignIn({
-          id: 'mock-senco-id-preview',
-          name: 'Sarah Admin (SENCO Preview)',
+          id: 'senco_tracey',
+          name: 'Tracey Mora (SENCO Preview)',
           role: ROLES.SENCO,
-          email: 'senco@school.edu'
+          email: 'tracey@halswell.school.nz',
+          team: TEAMS.Y5_8
         });
         return;
       }
@@ -388,11 +364,11 @@ function App() {
         const result = await signInWithPopup(auth, provider);
         await handlePostSignIn(result.user);
       } catch (popupErr) {
-        console.warn("Fallback to Redirect secure authentication:", popupErr);
+        console.warn("Popup blocked or failed, falling back to secure Redirect:", popupErr);
         await signInWithRedirect(auth, provider);
       }
     } catch (e) {
-      console.error("Secure Auth Error:", e);
+      console.error("Google Sign-In failed:", e);
       addToast("Secure verification blocked or failed.", "error");
     } finally {
       setVerifyingGoogle(false);
@@ -415,7 +391,7 @@ function App() {
     try {
       await signInAnonymously(auth);
     } catch (err) {
-      console.error(err);
+      console.error("Anonymous fallback failed:", err);
     }
   };
 
@@ -432,17 +408,17 @@ function App() {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
         <div className="flex flex-col items-center max-w-md w-full">
-          <div className="bg-[#6157e8] p-4 rounded-[20px] mb-6 shadow-md text-white">
-            <HeartHandshake className="w-10 h-10" />
+          <div className="bg-[#6157e8] p-4 rounded-[20px] shadow-sm mb-6">
+            <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
           </div>
           <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
           <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-red-100 text-center animate-fade-in">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Access Denied</h2>
             <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              The Google address <b className="text-slate-800">{auth.currentUser?.email || "your Google Account"}</b> is not registered. Please ask Cathie or Tracey to add your email.
+              The Google email address <b className="text-slate-800">{auth.currentUser?.email || "your Google Account"}</b> is not registered. Please ask Tracey or Cathie to add your email.
             </p>
-            <button onClick={handleLogout} className="w-full py-3 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm">Sign out & try again</button>
+            <button onClick={handleLogout} className="w-full py-3 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm">Sign out & try another account</button>
           </div>
         </div>
       </div>
@@ -457,10 +433,10 @@ function App() {
             <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
           </div>
           
-          <h1 className="text-[36px] font-bold text-[#1a1f36] mb-1 tracking-tight">Support Link</h1>
-          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-8 uppercase text-center font-semibold">Halswell School Hub</p>
+          <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
+          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-12 uppercase text-center">Halswell School TA Management Portal</p>
 
-          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-md border border-slate-100 space-y-4 animate-fade-in">
+          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 space-y-4 animate-fade-in flex flex-col items-stretch">
             <button 
               onClick={handleGoogleSignIn}
               disabled={verifyingGoogle}
@@ -469,7 +445,6 @@ function App() {
               {verifyingGoogle ? <Loader2 className="w-5 h-5 animate-spin" /> : <><ShieldCheck size={18} /><span>Sign in with Google</span></>}
             </button>
 
-            {}
             <div className="pt-4 border-t border-slate-100 text-center space-y-3">
               <span className="text-[10px] font-bold text-slate-400 tracking-wider block uppercase">Staff Demo Bypass Profiles</span>
               
@@ -487,14 +462,6 @@ function App() {
                   <button onClick={() => handleBypassSignIn('t1')} className="py-2 px-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 rounded text-[10px] transition-colors">Karen (Tracey)</button>
                   <button onClick={() => handleBypassSignIn('t_ruby')} className="py-2 px-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 rounded text-[10px] transition-colors">Ruby (Cathie)</button>
                   <button onClick={() => handleBypassSignIn('t_val')} className="py-2 px-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 rounded text-[10px] transition-colors">Val (Tracey)</button>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="text-[9px] font-bold text-slate-400 uppercase text-left">Classroom Teachers:</div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button onClick={() => handleBypassSignIn('u2')} className="py-2 px-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium border rounded text-[11px] transition-colors">Mr. Smith (Teacher)</button>
-                  <button onClick={() => handleBypassSignIn('tl1')} className="py-2 px-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium border rounded text-[11px] transition-colors">Mrs. Davis (Leader)</button>
                 </div>
               </div>
             </div>
@@ -522,9 +489,6 @@ function App() {
         </div>
         
         <div className="flex items-center space-x-3">
-          <div className="hidden md:flex items-center space-x-1.5 mr-2 px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-semibold">
-            <Laptop size={14} /> <span>Desktop Optimized Layout</span>
-          </div>
           <button 
             onClick={() => setShowMobileSync(true)}
             className="flex items-center space-x-2 bg-[#f8f9fa] hover:bg-[#f1f3f5] text-slate-600 font-bold text-xs tracking-wider uppercase px-4 py-2.5 rounded-xl transition-colors"
@@ -542,7 +506,6 @@ function App() {
         </div>
       </header>
 
-      {}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {currentUser.role === ROLES.SENCO && (
           <SencoDashboard 
@@ -570,7 +533,7 @@ function App() {
             <h3 className="text-xl font-bold mb-2">Sync with Your Phone</h3>
             <p className="text-slate-500 text-sm mb-6">Scan QR code to synchronize live schedules on your mobile.</p>
             <div className="bg-white p-6 rounded-2xl border inline-block mb-6 shadow-md">
-              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(window.location.origin)}`} alt="QR" className="w-44 h-44 block mx-auto" />
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : 'https://halswell-support-link.vercel.app')}`} alt="QR" className="w-44 h-44 block mx-auto" />
             </div>
             <button onClick={() => setShowMobileSync(false)} className="w-full py-3 bg-[#1a1f36] text-white rounded-xl font-bold text-sm shadow-md">Done</button>
           </div>
@@ -662,7 +625,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         </div>
       )}
 
-      {}
       {myAbsences.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-3 shadow-sm">
           <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
@@ -755,18 +717,29 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
   const [sencoReplies, setSencoReplies] = useState({});
 
-  // Filter absences: Direct Senco allocation, fall back to team group filter
-  const relevantAbsences = (absences || []).filter(a => {
+  // Duplication Tool States
+  const [showCopyDayModal, setShowCopyDayModal] = useState(false);
+  const [copyScope, setCopyScope] = useState('specific-staff'); 
+  const [copySelectedTaId, setCopySelectedTaId] = useState('');
+  const [copyTargetDays, setCopyTargetDays] = useState({
+    Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
+  });
+  const [copyOverwrite, setCopyOverwrite] = useState(true);
+
+  // Filter absences so Cathie or Tracey see alerts from TAs that they supervise (or belong to their group)
+  const relevantAbsences = absences.filter(a => {
     if (a.status !== 'Pending') return false;
     const ta = users.find(u => u.id === a.taId);
     if (!ta) return false;
     
+    // Direct Supervisor allocation override
     if (ta.allocatedSenco) {
       return ta.allocatedSenco === currentUser.id;
     }
     
+    // Fall back to general team mapping
     if (currentUser.team === TEAMS.ALL) return true;
-    return ta.team === currentUser.team;
+    return ta.team === currentUser.team || ta.team === TEAMS.BOTH;
   });
 
   const handleUpdateAbsenceStatus = async (absence, newStatus) => {
@@ -774,6 +747,14 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     await saveAbsenceToDb({ ...absence, status: newStatus, reply: replyText });
     addToast(`Absence marked as ${newStatus}`, 'success');
   };
+
+  const tas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
+
+  useEffect(() => {
+    if (tas.length > 0 && !copySelectedTaId) {
+      setCopySelectedTaId(tas[0].id);
+    }
+  }, [tas, copySelectedTaId]);
 
   const handleStartEditStaff = (staff) => {
     setEditingStaff(staff);
@@ -863,9 +844,81 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setEditingCell(null);
   };
 
+  const handleCopyDaySchedule = async () => {
+    try {
+      let sourceSessions = [];
+      if (copyScope === 'specific-staff') {
+        if (!copySelectedTaId) {
+          addToast('Please select a Teacher Aide to duplicate.', 'error');
+          return;
+        }
+        sourceSessions = sessions.filter(s => s.day === selectedDay && s.taId === copySelectedTaId);
+      } else {
+        sourceSessions = sessions.filter(s => s.day === selectedDay);
+      }
+
+      if (sourceSessions.length === 0) {
+        const staffName = copyScope === 'specific-staff' 
+          ? `${users.find(u => u.id === copySelectedTaId)?.name || 'Staff'}`
+          : 'anyone';
+        addToast(`No duties found for ${staffName} on ${selectedDay} to copy.`, 'error');
+        return;
+      }
+
+      const targetDays = Object.keys(copyTargetDays).filter(day => copyTargetDays[day] && day !== selectedDay);
+      if (targetDays.length === 0) {
+        addToast('Please select at least one other day to copy to.', 'error');
+        return;
+      }
+
+      if (copyOverwrite) {
+        const deletePromises = [];
+        sessions.forEach(s => {
+          if (targetDays.includes(s.day)) {
+            if (copyScope === 'specific-staff') {
+              if (s.taId === copySelectedTaId) {
+                deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
+              }
+            } else {
+              deletePromises.push(deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id)));
+            }
+          }
+        });
+        await Promise.all(deletePromises);
+      }
+
+      const writePromises = [];
+      targetDays.forEach(day => {
+        sourceSessions.forEach(sourceSess => {
+          const newId = Math.random().toString(36).substr(2, 9) + '-' + day.substring(0, 3);
+          const duplicatedSession = {
+            ...sourceSess,
+            id: newId,
+            day: day
+          };
+          writePromises.push(setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', newId), duplicatedSession));
+        });
+      });
+
+      await Promise.all(writePromises);
+      setShowCopyDayModal(false);
+      setCopyTargetDays({
+        Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
+      });
+      
+      const scopeMessage = copyScope === 'specific-staff'
+        ? `${users.find(u => u.id === copySelectedTaId)?.name || 'Staff'}'s schedule`
+        : "The whole day's schedule";
+      addToast(`Successfully duplicated ${scopeMessage} from ${selectedDay}!`, "success");
+    } catch (error) {
+      console.error("Duplicate timetable failed:", error);
+      addToast("Duplicate failed.", "error");
+    }
+  };
+
   return (
     <div className="space-y-8 pb-12">
-      {/* Welcome & Single Main Control button */}
+      {/* CONSOLIDATED Day dropdown removed here -- now exclusively controlled on Master Timetable card below */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser.name}</h2>
@@ -875,12 +928,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
         </div>
         <div className="flex items-center space-x-2 w-full md:w-auto">
-          <button onClick={() => setShowManageStaff(true)} className="flex-1 md:flex-none py-2.5 px-4 bg-[#6157e8] hover:bg-[#5249d6] text-white text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all">
+          <button onClick={() => setShowManageStaff(true)} className="w-full md:w-auto py-2.5 px-4 bg-[#6157e8] hover:bg-[#5249d6] text-white text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all">
             <Users size={14} /> <span>Manage Staff & Teams</span>
           </button>
-          <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="bg-white border text-sm font-semibold rounded-xl px-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-[#6157e8]">
-            {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
         </div>
       </div>
 
@@ -903,14 +953,13 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     </div>
                   </div>
 
-                  {/* Senco Response Reply text box */}
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
                       <MessageSquare size={12} className="mr-1 text-[#6157e8]" /> Leave a Response Reply Note:
                     </label>
                     <input 
                       type="text" 
-                      placeholder="e.g. Thanks for letting me know, rest up! Cathie"
+                      placeholder="e.g. Thanks for letting me know, rest up! Tracey"
                       value={sencoReplies[a.id] || ''}
                       onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
                       className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
@@ -961,6 +1010,107 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             addToast('Coverage applied successfully.');
           }} 
         />
+      )}
+
+      {/* Copy Timetable Day Modal */}
+      {showCopyDayModal && (
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
+            <div className="w-12 h-12 bg-[#ecfdf5] text-[#10b981] rounded-full flex items-center justify-center mb-4">
+              <Copy className="w-6 h-6" />
+            </div>
+            <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Duplicate Schedule</h3>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+              Copy assignments from <b>{selectedDay}</b> to other days.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-slate-100 rounded-xl">
+              <button
+                onClick={() => setCopyScope('specific-staff')}
+                className={`py-2 px-3 text-xs font-bold rounded-lg transition-all ${copyScope === 'specific-staff' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                Specific TA
+              </button>
+              <button
+                onClick={() => setCopyScope('whole-day')}
+                className={`py-2 px-3 text-xs font-bold rounded-lg transition-all ${copyScope === 'whole-day' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                Whole Day (All TAs)
+              </button>
+            </div>
+
+            {copyScope === 'specific-staff' && (
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Teacher Aide</label>
+                <select 
+                  value={copySelectedTaId}
+                  onChange={(e) => setCopySelectedTaId(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none font-medium text-[#1a1f36] text-sm"
+                >
+                  {tas.map(ta => (
+                    <option key={ta.id} value={ta.id}>{ta.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Select Destination Days</label>
+            <div className="space-y-2 mb-6">
+              {DAYS.map(day => (
+                <label 
+                  key={day} 
+                  className={`flex items-center p-3 border rounded-xl cursor-pointer transition-all ${
+                    day === selectedDay 
+                      ? 'opacity-40 bg-slate-100 border-slate-200 cursor-not-allowed'
+                      : copyTargetDays[day]
+                        ? 'border-[#10b981] bg-[#ecfdf5]/40'
+                        : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <input 
+                    type="checkbox"
+                    disabled={day === selectedDay}
+                    checked={day === selectedDay ? false : copyTargetDays[day]}
+                    onChange={(e) => setCopyTargetDays(prev => ({ ...prev, [day]: e.target.checked }))}
+                    className="w-4 h-4 text-[#10b981] focus:ring-[#10b981] border-slate-300 rounded cursor-pointer disabled:cursor-not-allowed mr-3"
+                  />
+                  <span className="font-semibold text-sm text-[#1a1f36]">{day} {day === selectedDay && "(Selected Day)"}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 mb-6">
+              <div>
+                <span className="font-bold text-xs text-[#1a1f36] block uppercase tracking-wider">Overwrite Target Days</span>
+                <span className="text-[11px] text-slate-500">Deletes existing schedules before copying</span>
+              </div>
+              <input 
+                type="checkbox"
+                checked={copyOverwrite}
+                onChange={(e) => setCopyOverwrite(e.target.checked)}
+                className="w-5 h-5 text-[#10b981] focus:ring-[#10b981] border-slate-300 rounded cursor-pointer"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button 
+                onClick={() => {
+                  setShowCopyDayModal(false);
+                  setCopyTargetDays({ Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false });
+                }} 
+                className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleCopyDaySchedule} 
+                className="px-6 py-3 bg-[#10b981] text-white font-bold hover:bg-[#059669] rounded-xl transition-colors shadow-md text-sm"
+              >
+                Copy Timetable
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {editingCell && (
@@ -1015,7 +1165,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {}
+      {/* Manage Staff Modal -- Matches layout in Screenshot 2026-06-06 at 11.35.04 AM.jpg */}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in max-h-[90vh] flex flex-col">
@@ -1041,17 +1191,18 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               ))}
             </div>
 
-            <div className="space-y-4 text-xs">
+            {/* Form Fields Matching Screenshot verbatim */}
+            <div className="space-y-4 text-xs overflow-y-auto max-h-[45vh] pr-1">
               <h4 className="font-bold text-[#1a1f36] text-sm">{editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}</h4>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
-                <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none mb-3" placeholder="e.g. Val Murray" />
+                <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Ruby Gray" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Email Address</label>
-                <input type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none mb-3" placeholder="e.g. val.murray@school.nz" />
+                <input type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. ruby.gray@halswell.school.nz" />
               </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Access Role</label>
                   <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
@@ -1066,18 +1217,18 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   <select value={newStaffTeam} onChange={(e) => setNewStaffTeam(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
                     <option value={TEAMS.Y0_4}>{TEAMS.Y0_4}</option>
                     <option value={TEAMS.Y5_8}>{TEAMS.Y5_8}</option>
+                    <option value={TEAMS.BOTH}>{TEAMS.BOTH}</option> {/* Re-instated "Both Teams" option here */}
                     <option value={TEAMS.ALL}>{TEAMS.ALL}</option>
                   </select>
                 </div>
               </div>
 
-              {}
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Allocated Supervisor SENCO</label>
                 <select 
                   value={newStaffSenco} 
                   onChange={(e) => setNewStaffSenco(e.target.value)} 
-                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none mb-3"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
                 >
                   <option value="">None / Both (Shared)</option>
                   <option value="senco_cathie">Cathie (SENCO Y0-4)</option>
@@ -1097,6 +1248,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
       {/* Grid Timetable Section */}
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
+        {/* Single master header day box remains, duplicate day dropdown removed from top card banner */}
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-[#1a1f36]">Master Timetable</h2>
@@ -1104,10 +1256,17 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
           
           <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
+            <button 
+              onClick={() => setShowCopyDayModal(true)}
+              className="flex items-center px-4 py-2.5 bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] font-medium text-sm rounded-xl transition-colors shadow-sm border border-[#a7f3d0]"
+            >
+              <Copy className="w-4 h-4 mr-1.5" /> 
+              <span>Copy Schedule</span>
+            </button>
             <select 
               value={selectedDay}
               onChange={(e) => setSelectedDay(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-[#1a1f36] font-semibold rounded-xl focus:ring-[#6157e8] focus:border-[#6157e8] block px-4 py-2.5 outline-none flex-1 sm:flex-none"
+              className="bg-slate-50 border border-slate-200 text-[#1a1f36] font-semibold rounded-xl focus:ring-[#6157e8] focus:border-[#6157e8] block px-4 py-2.5 outline-none flex-1 sm:flex-none cursor-pointer"
             >
               {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
