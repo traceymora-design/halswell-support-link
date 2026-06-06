@@ -741,6 +741,41 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   );
 }
 
+const isSencoSupervisingTa = (senco, ta) => {
+  if (!senco || !ta) return false;
+  
+  // 1. Master Admins / Global SENCOs supervise everyone
+  if (senco.team === TEAMS.ALL) return true;
+  
+  // 2. Direct allocation check with fuzzy name & email matching fallbacks
+  if (ta.allocatedSenco) {
+    // Exact match
+    if (ta.allocatedSenco === senco.id) return true;
+    
+    // Fuzzy match for Tracey
+    if (ta.allocatedSenco === 'senco_tracey') {
+      const isTracey = senco.id === 'senco_tracey' || 
+                       senco.email?.toLowerCase().includes('tracey') || 
+                       senco.name?.toLowerCase().includes('tracey');
+      if (isTracey) return true;
+    }
+    
+    // Fuzzy match for Cathie
+    if (ta.allocatedSenco === 'senco_cathie') {
+      const isCathie = senco.id === 'senco_cathie' || 
+                       senco.email?.toLowerCase().includes('cathie') || 
+                       senco.name?.toLowerCase().includes('cathie');
+      if (isCathie) return true;
+    }
+  }
+  
+  // 3. Fallback team matching for unassigned or shared TAs
+  if (ta.team === TEAMS.BOTH) return true; // Shared TAs are monitored by both teams
+  if (senco.team === ta.team) return true;
+  
+  return false;
+};
+
 function SencoDashboard({ currentUser, users, sessions, absences, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [resolvingAbsence, setResolvingAbsence] = useState(null);
@@ -767,33 +802,18 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   });
   const [copyOverwrite, setCopyOverwrite] = useState(true);
 
-  // Filter absences so Cathie or Tracey see alerts from TAs that they supervise (or belong to their group)
+  // Filter absences robustly so Cathie or Tracey see alerts from TAs that they supervise
   const relevantAbsences = absences.filter(a => {
     if (a.status !== 'Pending') return false;
     const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
-    if (!ta) return false;
-    
-    // Direct SENCO allocation override
-    if (ta.allocatedSenco) {
-      return ta.allocatedSenco === currentUser.id;
-    }
-    
-    // Fall back to general team mapping
-    if (currentUser.team === TEAMS.ALL) return true;
-    return ta.team === currentUser.team || ta.team === TEAMS.BOTH;
+    return isSencoSupervisingTa(currentUser, ta);
   });
 
-  // Collect historical absences so they aren't lost once replied to!
+  // Collect historical absences robustly so they are mapped correctly in the logs
   const resolvedAbsences = absences.filter(a => {
     if (a.status === 'Pending') return false;
     const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
-    if (!ta) return false;
-    
-    if (ta.allocatedSenco) {
-      return ta.allocatedSenco === currentUser.id;
-    }
-    if (currentUser.team === TEAMS.ALL) return true;
-    return ta.team === currentUser.team || ta.team === TEAMS.BOTH;
+    return isSencoSupervisingTa(currentUser, ta);
   }).sort((a,b) => b.id.localeCompare(a.id));
 
   const handleUpdateAbsenceStatus = async (absence, newStatus) => {
