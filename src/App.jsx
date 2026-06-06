@@ -118,7 +118,8 @@ const INITIAL_ABSENCES = [
     reply: '',
     isAdvance: false,
     date: '',
-    formattedDate: ''
+    formattedDate: '',
+    approvedByStuart: 'Yes'
   }
 ];
 
@@ -499,7 +500,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
-      {/* 🧪 Sandbox Testing Role Switcher Banner */}
+      {/* Sandbox Testing Role Switcher Banner */}
       {isSandbox && (
         <div className="bg-amber-50 border-b border-amber-200/60 px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-amber-800 select-none shadow-inner">
           <div className="flex items-center gap-1.5 font-bold">
@@ -526,7 +527,6 @@ function App() {
         </div>
       )}
 
-      {}
       <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 bg-white sticky top-0 z-40 shadow-sm">
         <div className="flex items-center space-x-4">
           <div className="bg-[#f0efff] p-2 rounded-xl text-[#6157e8]">
@@ -556,7 +556,6 @@ function App() {
         </div>
       </header>
 
-      {}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {currentUser.role === ROLES.SENCO && (
           <SencoDashboard 
@@ -605,6 +604,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   const [showAbsenceForm, setShowAbsenceForm] = useState(false);
   const [absenceReason, setAbsenceReason] = useState('');
   const [absenceType, setAbsenceType] = useState('sick'); // 'sick' or 'advance'
+  const [approvedByStuart, setApprovedByStuart] = useState(''); // 'Yes' or 'No'
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -623,6 +623,10 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   const handleReportAbsence = () => {
     if (!absenceReason.trim()) {
       addToast('Please provide a reason.', 'error');
+      return;
+    }
+    if (!approvedByStuart) {
+      addToast('Please confirm if Stuart has approved your leave.', 'error');
       return;
     }
 
@@ -657,11 +661,13 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       isAdvance: absenceType === 'advance',
       reason: absenceReason,
       status: 'Pending',
-      reply: '' 
+      reply: '',
+      approvedByStuart: approvedByStuart // Save the status securely in db
     });
 
     setShowAbsenceForm(false);
     setAbsenceReason('');
+    setApprovedByStuart('');
     addToast(absenceType === 'advance' ? `Future leave request submitted to SENCO.` : `Absence submitted cleanly to your SENCO.`, 'success');
   };
 
@@ -680,18 +686,16 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         </div>
         <button 
           onClick={() => setShowAbsenceForm(!showAbsenceForm)} 
-          className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all"
+          className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all animate-pulse"
         >
           Report Absence / Leave
         </button>
       </div>
 
-      {}
       {showAbsenceForm && (
         <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm space-y-4 animate-fade-in">
           <h4 className="font-bold text-slate-800 text-md">Report Leave or Absence</h4>
           
-          {/* Absence Type Selector */}
           <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
             <button
               type="button"
@@ -709,7 +713,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
             </button>
           </div>
 
-          {/* Date Picker if Leave in Advance */}
           {absenceType === 'advance' && (
             <div className="space-y-1.5 animate-fade-in">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -724,6 +727,38 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
               />
             </div>
           )}
+
+          {}
+          <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
+            <span className="block text-xs font-bold text-amber-900 uppercase tracking-wide">
+              * Stuart Leave Authorization Checklist
+            </span>
+            <p className="text-[11px] text-amber-800">Has your leave been approved by Stuart?</p>
+            <div className="flex gap-4 pt-1">
+              <label className="flex items-center space-x-2 text-xs font-bold text-slate-700 cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="stuartApproval" 
+                  value="Yes" 
+                  checked={approvedByStuart === 'Yes'}
+                  onChange={(e) => setApprovedByStuart(e.target.value)}
+                  className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8]" 
+                />
+                <span>Yes, approved by Stuart</span>
+              </label>
+              <label className="flex items-center space-x-2 text-xs font-bold text-slate-700 cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="stuartApproval" 
+                  value="No" 
+                  checked={approvedByStuart === 'No'}
+                  onChange={(e) => setApprovedByStuart(e.target.value)}
+                  className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8]" 
+                />
+                <span>No, not yet approved / pending</span>
+              </label>
+            </div>
+          </div>
 
           <div className="space-y-1.5">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -745,7 +780,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         </div>
       )}
 
-      {}
       {myAbsences.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-3 shadow-sm">
           <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
@@ -763,6 +797,15 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                     a.status.startsWith('Approved') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
                   }`}>{a.status.startsWith('Approved') ? 'Approved' : a.status}</span>
                 </div>
+                
+                {/* Display Stuart approval value on TA Recent Absences card */}
+                <div className="flex items-center gap-1.5 text-[10px] font-bold mt-0.5">
+                  <span className="text-slate-400">Stuart Approved:</span>
+                  <span className={a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-600'}>
+                    {a.approvedByStuart || 'No'}
+                  </span>
+                </div>
+
                 <div className="text-slate-500 text-xs italic bg-white border border-slate-100 p-2 rounded-lg mt-1">Reason: "{a.reason}"</div>
                 {a.reply ? (
                   <div className="bg-violet-50/70 p-3 rounded-xl border border-violet-100 text-xs text-slate-700 mt-1.5 flex flex-col relative shadow-sm">
@@ -863,6 +906,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [resolvingAbsence, setResolvingAbsence] = useState(null);
   const [editingCell, setEditingCell] = useState(null); 
   const [showManageStaff, setShowManageStaff] = useState(false);
+  const [showCriticalCoverBoard, setShowCriticalCoverBoard] = useState(false); // Standalone critical coverage manager
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
@@ -915,7 +959,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       reply: '',
       isAdvance: false,
       date: '',
-      formattedDate: ''
+      formattedDate: '',
+      approvedByStuart: 'Yes'
     });
     addToast('Simulated real-time absence alert triggered!', 'success');
   };
@@ -1090,7 +1135,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
   return (
     <div className="space-y-8 pb-12">
-      {/* INTERACTIVE TEAM SELECTOR */}
+      {/* Senco Interactive Header with Critical student coverage board option */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser.name}</h2>
@@ -1108,8 +1153,17 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             </select>
           </div>
         </div>
-        <div className="flex items-center space-x-2 w-full md:w-auto">
-          <button onClick={() => setShowManageStaff(true)} className="w-full md:w-auto py-2.5 px-4 bg-[#6157e8] hover:bg-[#5249d6] text-white text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all">
+        <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+          {/* STANDALONE SEPARATE BUTTON TO ASSIGN CRITICAL COVERAGE */}
+          <button 
+            onClick={() => setShowCriticalCoverBoard(true)} 
+            className="w-full sm:w-auto py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl uppercase tracking-wider shadow-md flex items-center justify-center space-x-2 transition-all border border-amber-600"
+          >
+            <AlertTriangle size={14} className="text-white" />
+            <span>Critical Coverage Board</span>
+          </button>
+          
+          <button onClick={() => setShowManageStaff(true)} className="w-full sm:w-auto py-2.5 px-4 bg-[#6157e8] hover:bg-[#5249d6] text-white text-xs font-bold rounded-xl uppercase tracking-wider shadow-sm flex items-center justify-center space-x-2 transition-all">
             <Users size={14} /> <span>Manage Staff & Teams</span>
           </button>
         </div>
@@ -1138,7 +1192,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 pb-3 border-b border-slate-100 pl-2">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 uppercase tracking-wide">{ta?.team}</span>
                         <span className="text-[9px] font-bold bg-red-100 text-red-800 px-2 py-0.5 rounded uppercase tracking-wide">Directly Under Your Care</span>
                         {a.isAdvance && (
@@ -1146,6 +1200,13 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                             <Calendar size={10} /> Leave In Advance
                           </span>
                         )}
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase border ${
+                          a.approvedByStuart === 'Yes' 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}>
+                          Approved by Stuart: {a.approvedByStuart || 'No'}
+                        </span>
                       </div>
                       <h4 className="font-bold text-slate-800 text-lg mt-1">
                         {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
@@ -1154,7 +1215,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     </div>
                   </div>
 
-                  {}
                   <div className="space-y-1.5 pl-2">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
                       <MessageSquare size={12} className="mr-1 text-[#6157e8]" /> Write a Reply Response Note:
@@ -1207,7 +1267,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-400"></div>
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 pb-3 border-b border-slate-100 pl-2">
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase tracking-wide">{ta?.team}</span>
                         <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wide">Shared View / Other Team</span>
                         {a.isAdvance && (
@@ -1215,6 +1275,13 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                             <Calendar size={10} /> Leave In Advance
                           </span>
                         )}
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase border ${
+                          a.approvedByStuart === 'Yes' 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}>
+                          Approved by Stuart: {a.approvedByStuart || 'No'}
+                        </span>
                       </div>
                       <h4 className="font-bold text-slate-700 text-lg mt-1">
                         {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
@@ -1285,7 +1352,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {}
       {resolvingAbsence && (
         <CoverageResolver 
           absence={resolvingAbsence} 
@@ -1319,16 +1385,20 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
               return (
                 <div key={a.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 text-xs">
-                  <div>
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
-                    <span className="text-slate-400 mx-2">•</span>
-                    <span className="font-semibold text-slate-500">
+                    <span className="text-slate-400 font-semibold">
                       {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `${a.day} Absence`}
                     </span>
-                    <span className="mx-2 text-slate-400">•</span>
+                    <span className="text-slate-400">•</span>
                     <span className="text-slate-500 italic">" {a.reason} "</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      a.approvedByStuart === 'Yes' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      Approved by Stuart: {a.approvedByStuart || 'No'}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {a.reply && (
                       <span className="text-[10px] bg-purple-50 text-[#6157e8] border border-purple-100 font-bold px-2 py-0.5 rounded-md truncate max-w-[200px]" title={a.reply}>
                         Reply: "{a.reply}"
@@ -1343,6 +1413,18 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             })}
           </div>
         </div>
+      )}
+
+      {}
+      {showCriticalCoverBoard && (
+        <CriticalCoverageBoard 
+          day={selectedDay}
+          users={users}
+          sessions={sessions}
+          saveSessionToDb={saveSessionToDb}
+          onClose={() => setShowCriticalCoverBoard(false)}
+          addToast={addToast}
+        />
       )}
 
       {showCopyDayModal && (
@@ -1497,7 +1579,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Two-Column Staff Management Modal */}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col md:grid md:grid-cols-12 md:gap-8 overflow-hidden">
@@ -1593,7 +1674,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {}
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -1628,6 +1708,109 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             teamFilter={activeTeamFilter}
             onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} 
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose, addToast }) {
+  const criticalSessions = sessions.filter(s => 
+    s.day === day && 
+    (s.tier === TIERS.CRITICAL || s.tier === TIERS.HIGH_NEEDS)
+  );
+
+  const tas = users.filter(u => u.role === ROLES.TA);
+
+  return (
+    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col overflow-hidden border border-amber-200">
+        <div className="border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="text-amber-500 w-6 h-6" />
+              <h3 className="text-2xl font-bold text-[#1a1f36]">Critical Student Coverage Manager</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Directly reallocate available Teacher Aides from other duties to ensure high-priority students on {day} are covered.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          {criticalSessions.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 font-semibold">
+              No Critical or High Needs students require duties on {day}.
+            </div>
+          ) : (
+            criticalSessions.map(session => {
+              const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+              const assignedTa = tas.find(t => t.id === session.taId);
+              
+              return (
+                <div key={session.id} className="border border-slate-100 bg-slate-50 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-amber-300 transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {session.tier}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {slot?.start} - {slot?.end}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-base">{session.subject}</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Current Caretaker: <strong className="text-[#6157e8]">{assignedTa ? assignedTa.name : 'Unassigned'}</strong>
+                    </p>
+                  </div>
+
+                  <div className="w-full md:w-auto">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Reassign Cover:</label>
+                    <select
+                      value={session.taId || ''}
+                      onChange={(e) => {
+                        const newTaId = e.target.value;
+                        if (newTaId) {
+                          saveSessionToDb({ ...session, taId: newTaId });
+                          const targetTaName = tas.find(t => t.id === newTaId)?.name || 'TA';
+                          addToast(`Reassigned "${session.subject}" to ${targetTaName}`, 'success');
+                        }
+                      }}
+                      className="w-full md:w-64 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-1 focus:ring-[#6157e8] outline-none cursor-pointer"
+                    >
+                      <option value="">-- Select cover TA --</option>
+                      {tas.map(ta => {
+                        const otherSession = sessions.find(s => 
+                          s.day === day && 
+                          s.timeSlotId === session.timeSlotId && 
+                          s.taId === ta.id && 
+                          s.id !== session.id
+                        );
+                        
+                        let currentDutyText = "Available";
+                        if (otherSession) {
+                          currentDutyText = `${otherSession.tier}: ${otherSession.subject}`;
+                        }
+
+                        return (
+                          <option key={ta.id} value={ta.id}>
+                            {ta.name} ({currentDutyText})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 mt-4 flex justify-end">
+          <button onClick={onClose} className="px-6 py-3 bg-[#1a1f36] hover:bg-black text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-sm transition-all">
+            Close Board
+          </button>
         </div>
       </div>
     </div>
@@ -1727,7 +1910,6 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
         </div>
       </div>
 
-      {}
       {viewMode === 'single' ? (
         <div className="px-1.5 sm:px-6 py-4 space-y-6 animate-fade-in">
           <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
