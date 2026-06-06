@@ -57,7 +57,6 @@ const isSandboxEnv = () => {
 };
 const isSandbox = isSandboxEnv();
 
-// --- ROLES & TEAMS ---
 const ROLES = {
   SENCO: 'SENCO',
   TEAM_LEADER: 'Team Leader',
@@ -123,8 +122,7 @@ const INITIAL_ABSENCES = [
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
-// Seed Karen's Monday-Thursday Schedule
-['Monday', 'Tuesday', 'Wednesday', 'Thursday'].forEach(day => {
+['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].forEach(day => {
   const daySessions = [
     { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
     { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
@@ -155,7 +153,7 @@ const TIER_STYLES = {
 };
 
 const Toast = ({ message, type = 'success' }) => (
-  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50
+  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50 animate-fade-in
     ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
     {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
     <p className="font-medium text-sm">{message}</p>
@@ -180,6 +178,7 @@ class ErrorBoundary extends React.Component {
           <div className="bg-white p-8 rounded-3xl shadow-xl border border-red-100 max-w-md w-full text-center">
             <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Something went wrong</h2>
+            <p className="text-xs text-slate-500 mb-6">{this.state.errorInfo}</p>
             <button 
               onClick={() => window.location.reload()} 
               className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm transition-colors"
@@ -295,26 +294,29 @@ function App() {
 
     const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersRef, async (snapshot) => {
-      const fetchedUsers = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-      setUsers(fetchedUsers);
-      
-      if (fetchedUsers.length === 0) {
-        INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
-        INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
-        INITIAL_ABSENCES.forEach(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id), a));
-      }
-
-      if (auth.currentUser && !auth.currentUser.isAnonymous && auth.currentUser.email) {
-        const email = auth.currentUser.email.toLowerCase();
-        const matchedUser = fetchedUsers.find(u => u.email?.toLowerCase() === email);
-        if (matchedUser) {
-          setCurrentUser(matchedUser);
-          setAccessDenied(false);
-        } else {
-          setAccessDenied(true);
+      try {
+        const fetchedUsers = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+        setUsers(fetchedUsers);
+        
+        if (fetchedUsers.length === 0) {
+          INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
+          INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
+          INITIAL_ABSENCES.forEach(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id), a));
         }
+
+        if (auth.currentUser && !auth.currentUser.isAnonymous && auth.currentUser.email) {
+          const email = auth.currentUser.email.toLowerCase();
+          const matchedUser = fetchedUsers.find(u => u.email?.toLowerCase() === email);
+          if (matchedUser) {
+            setCurrentUser(matchedUser);
+            setAccessDenied(false);
+          } else {
+            setAccessDenied(true);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse snapshots gracefully:", err);
       }
-      
       if(!usersLoaded) { usersLoaded = true; checkReady(); }
     }, (error) => {
       console.warn("Database listener warning:", error);
@@ -376,11 +378,11 @@ function App() {
         const result = await signInWithPopup(auth, provider);
         await handlePostSignIn(result.user);
       } catch (popupErr) {
-        console.warn("Popup blocked or failed, falling back to secure Redirect:", popupErr);
+        console.warn("Popup blocked, falling back to secure redirect strategy:", popupErr);
         await signInWithRedirect(auth, provider);
       }
     } catch (e) {
-      console.error("Google Sign-In failed:", e);
+      console.error("Google Sign-In failed completely:", e);
       addToast("Secure verification blocked or failed.", "error");
     } finally {
       setVerifyingGoogle(false);
@@ -391,10 +393,9 @@ function App() {
     const found = users.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id);
     if (found) {
       try {
-        // Automatically save the selected user's profile to the Firestore database
         await addUserToDb(found);
       } catch (err) {
-        console.error("Bypass user write failed:", err);
+        console.error("Bypass profile save skipped:", err);
       }
       setCurrentUser(found);
       addToast(`Entered view for ${found.name}`, 'success');
@@ -522,6 +523,7 @@ function App() {
         </div>
       )}
 
+      {}
       <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 bg-white sticky top-0 z-40 shadow-sm">
         <div className="flex items-center space-x-4">
           <div className="bg-[#f0efff] p-2 rounded-xl text-[#6157e8]">
@@ -551,6 +553,7 @@ function App() {
         </div>
       </header>
 
+      {}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {currentUser.role === ROLES.SENCO && (
           <SencoDashboard 
@@ -602,7 +605,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   const safeAbsencesList = absences || [];
   const mySessions = sessions.filter(s => s.taId === user.id && s.day === selectedDay);
   
-  // Sort and reverse so newest updates are always at the top
   const myAbsences = safeAbsencesList.filter(a => a.taId === user.id).sort((a,b) => b.id.localeCompare(a.id)).slice(0, 5); 
   
   const sortedSessions = TIME_SLOTS.map(slot => ({
@@ -671,6 +673,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         </div>
       )}
 
+      {}
       {myAbsences.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-3 shadow-sm">
           <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
@@ -719,6 +722,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         ))}
       </div>
 
+      {}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-8 space-y-4">
         {sortedSessions.length === 0 ? (
           <div className="text-center p-12 text-slate-400 font-medium">No active support duties allocated for {selectedDay}.</div>
@@ -755,16 +759,11 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
 
 const isSencoSupervisingTa = (senco, ta) => {
   if (!senco || !ta) return false;
-  
-  // 1. Master Admins / Global SENCOs supervise everyone
   if (senco.team === TEAMS.ALL) return true;
   
-  // 2. Direct allocation check with fuzzy name & email matching fallbacks
   if (ta.allocatedSenco) {
-    // Exact match
     if (ta.allocatedSenco === senco.id) return true;
     
-    // Fuzzy match for Tracey
     if (ta.allocatedSenco === 'senco_tracey') {
       const isTracey = senco.id === 'senco_tracey' || 
                        senco.email?.toLowerCase().includes('tracey') || 
@@ -772,7 +771,6 @@ const isSencoSupervisingTa = (senco, ta) => {
       if (isTracey) return true;
     }
     
-    // Fuzzy match for Cathie
     if (ta.allocatedSenco === 'senco_cathie') {
       const isCathie = senco.id === 'senco_cathie' || 
                        senco.email?.toLowerCase().includes('cathie') || 
@@ -781,8 +779,7 @@ const isSencoSupervisingTa = (senco, ta) => {
     }
   }
   
-  // 3. Fallback team matching for unassigned or shared TAs
-  if (ta.team === TEAMS.BOTH) return true; // Shared TAs are monitored by both teams
+  if (ta.team === TEAMS.BOTH) return true;
   if (senco.team === ta.team) return true;
   
   return false;
@@ -800,12 +797,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffSenco, setNewStaffSenco] = useState('');
   const [editingStaff, setEditingStaff] = useState(null);
 
-  /* INTERACTIVE FILTER STATE: Replaces supervision filter static badge */
   const [activeTeamFilter, setActiveTeamFilter] = useState(currentUser.team || TEAMS.ALL);
-
   const [sencoReplies, setSencoReplies] = useState({});
 
-  // Duplication Tool States
   const [showCopyDayModal, setShowCopyDayModal] = useState(false);
   const [copyScope, setCopyScope] = useState('specific-staff'); 
   const [copySelectedTaId, setCopySelectedTaId] = useState('');
@@ -814,7 +808,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   });
   const [copyOverwrite, setCopyOverwrite] = useState(true);
 
-  // Group absences into Direct Team vs Co-SENCO Shared Teams to prevent silent filter blockages
   const directAbsences = absences.filter(a => {
     if (a.status !== 'Pending') return false;
     const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
@@ -827,7 +820,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     return !isSencoSupervisingTa(currentUser, ta);
   });
 
-  // Collect historical absences robustly
   const resolvedAbsences = absences.filter(a => {
     if (a.status === 'Pending') return false;
     const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
@@ -1047,7 +1039,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       </div>
 
-      {/* Robust Global Absences Panel */}
+      {}
       {(directAbsences.length > 0 || coSencoAbsences.length > 0) ? (
         <div className="bg-red-50/60 border border-red-200/80 rounded-2xl p-6 space-y-4">
           <div className="flex justify-between items-center">
@@ -1063,7 +1055,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
           
           <div className="grid grid-cols-1 gap-4">
-            {/* Direct Supervision Alerts */}
             {directAbsences.map(a => {
               const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
               return (
@@ -1117,7 +1108,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               );
             })}
 
-            {/* Cross-School Co-SENCO Shared Alerts */}
             {coSencoAbsences.map(a => {
               const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
               return (
@@ -1173,7 +1163,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
         </div>
       ) : (
-        /* Empty State with Simulated Test Trigger */
         <div className="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-8 text-center space-y-3">
           <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
           <h3 className="font-bold text-slate-800 text-base">All quiet! No pending TA absences</h3>
@@ -1189,6 +1178,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
+      {}
       {resolvingAbsence && (
         <CoverageResolver 
           absence={resolvingAbsence} 
@@ -1208,7 +1198,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         />
       )}
 
-      {/* Cloud-Archived Resolved Absence Feed (History) */}
       {resolvedAbsences.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -1246,7 +1235,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Copy Timetable Day Modal */}
       {showCopyDayModal && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
@@ -1409,7 +1397,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               <button onClick={() => setShowManageStaff(false)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
             </div>
 
-            {/* Left Column: Staff members list inside a dedicated scroll container */}
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
               <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
@@ -1418,7 +1405,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <div>
                       <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
                       <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
-                      {/* Renamed to SENCO and filtered to only show for TAs */}
                       {u.role === ROLES.TA && (
                         <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                           SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span>
@@ -1436,7 +1422,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </div>
             </div>
 
-            {/* Right Column: Interactive Details Edit Form */}
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
@@ -1471,7 +1456,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   </div>
                 </div>
 
-                {/* Only apply the Allocated SENCO selection field to TAs, not teachers or team leaders */}
                 {newStaffRole === ROLES.TA && (
                   <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Allocated SENCO</label>
@@ -1499,7 +1483,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Grid Timetable Card Container */}
+      {}
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -1599,13 +1583,11 @@ function TeacherDashboard({ user, sessions, users }) {
 function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilter }) {
   const [viewMode, setViewMode] = useState('single'); 
   
-  // Sort and filter TAs based on active Team selection filter
   const allTas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
   
   const tas = allTas.filter(ta => {
     if (!teamFilter || teamFilter === TEAMS.ALL) return true;
     if (teamFilter === TEAMS.BOTH) return ta.team === TEAMS.BOTH;
-    // Subset Logic: TAs working on "Both Teams" always match both of the separate Years teams!
     if (teamFilter === TEAMS.Y0_4) return ta.team === TEAMS.Y0_4 || ta.team === TEAMS.BOTH;
     if (teamFilter === TEAMS.Y5_8) return ta.team === TEAMS.Y5_8 || ta.team === TEAMS.BOTH;
     return true;
@@ -1613,7 +1595,6 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
 
   const [activeTaId, setActiveTaId] = useState('');
 
-  // Safeguard: Automatically reset active selection when switching team filters
   useEffect(() => {
     if (tas.length > 0) {
       if (!activeTaId || !tas.some(t => t.id === activeTaId)) {
@@ -1636,9 +1617,9 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
         </div>
       </div>
 
+      {}
       {viewMode === 'single' ? (
         <div className="px-1.5 sm:px-6 py-4 space-y-6 animate-fade-in">
-          {/* Filtered scrollable list of TAs */}
           <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
             {tas.map(ta => (
               <button
