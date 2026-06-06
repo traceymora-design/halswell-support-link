@@ -605,7 +605,11 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   const [absenceReason, setAbsenceReason] = useState('');
   const [absenceType, setAbsenceType] = useState('sick'); // 'sick' or 'advance'
   const [approvedByStuart, setApprovedByStuart] = useState(''); // 'Yes' or 'No'
-  const [selectedDate, setSelectedDate] = useState(() => {
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
@@ -632,18 +636,26 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
 
     let targetDay = selectedDay;
     let formattedDateString = '';
-    if (absenceType === 'advance' && selectedDate) {
-      const dateObj = new Date(selectedDate);
+    if (absenceType === 'advance') {
+      const startObj = new Date(startDate);
+      const endObj = new Date(endDate);
       const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      targetDay = daysOfWeek[dateObj.getDay()];
+      targetDay = daysOfWeek[startObj.getDay()];
       
       const options = { day: 'numeric', month: 'short', year: 'numeric' };
-      formattedDateString = dateObj.toLocaleDateString('en-NZ', options);
+      const startStr = startObj.toLocaleDateString('en-NZ', options);
+      const endStr = endObj.toLocaleDateString('en-NZ', options);
+      
+      if (startDate === endDate) {
+        formattedDateString = startStr;
+      } else {
+        formattedDateString = `${startStr} to ${endStr}`;
+      }
     }
 
     const isPendingExist = safeAbsencesList.some(a => 
       a.taId === user.id && 
-      (absenceType === 'sick' ? a.day === selectedDay : a.date === selectedDate) && 
+      (absenceType === 'sick' ? a.day === selectedDay : (a.startDate === startDate || a.endDate === endDate)) && 
       a.status === 'Pending'
     );
 
@@ -656,7 +668,8 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       id: 'abs_' + Date.now(),
       taId: user.id,
       day: targetDay,
-      date: absenceType === 'advance' ? selectedDate : '',
+      startDate: absenceType === 'advance' ? startDate : '',
+      endDate: absenceType === 'advance' ? endDate : '',
       formattedDate: formattedDateString,
       isAdvance: absenceType === 'advance',
       reason: absenceReason,
@@ -714,21 +727,39 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
           </div>
 
           {absenceType === 'advance' && (
-            <div className="space-y-1.5 animate-fade-in">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                Select Future Date:
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-[#6157e8]/40 focus:outline-none text-slate-700"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  Start Date:
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => {
+                    setStartDate(e.target.value);
+                    if (new Date(e.target.value) > new Date(endDate)) {
+                      setEndDate(e.target.value);
+                    }
+                  }}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-[#6157e8]/40 focus:outline-none text-slate-700"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  End Date:
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  min={startDate}
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-[#6157e8]/40 focus:outline-none text-slate-700"
+                />
+              </div>
             </div>
           )}
 
-          {}
           <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
             <div className="flex items-center space-x-2">
               <ShieldCheck className="w-5 h-5 text-amber-600" />
@@ -1207,18 +1238,24 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                             <Calendar size={10} /> Leave In Advance
                           </span>
                         )}
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase border ${
-                          a.approvedByStuart === 'Yes' 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
-                          Approved by Stuart: {a.approvedByStuart || 'No'}
-                        </span>
                       </div>
-                      <h4 className="font-bold text-slate-800 text-lg mt-1">
+                      <h4 className="font-bold text-slate-800 text-lg mt-1.5">
                         {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
                       </h4>
-                      <p className="text-sm text-slate-500 font-medium mt-1 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
+                      
+                      {/* Highly prominent and separate Approved by Stuart row */}
+                      <div className="mt-2.5">
+                        <span className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-xs ${
+                          a.approvedByStuart === 'Yes' 
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80' 
+                            : 'bg-amber-50 text-amber-800 border-amber-200/80'
+                        }`}>
+                          <ShieldCheck className={`w-4 h-4 ${a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-500'}`} />
+                          <span>Approved by Stuart: <strong className="uppercase">{a.approvedByStuart || 'No'}</strong></span>
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-slate-500 font-medium mt-3.5 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
                     </div>
                   </div>
 
@@ -1282,18 +1319,24 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                             <Calendar size={10} /> Leave In Advance
                           </span>
                         )}
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase border ${
-                          a.approvedByStuart === 'Yes' 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                        }`}>
-                          Approved by Stuart: {a.approvedByStuart || 'No'}
-                        </span>
                       </div>
-                      <h4 className="font-bold text-slate-700 text-lg mt-1">
+                      <h4 className="font-bold text-slate-700 text-lg mt-1.5">
                         {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
                       </h4>
-                      <p className="text-sm text-slate-500 font-medium mt-1 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
+
+                      {/* Separate Stuart approval row */}
+                      <div className="mt-2.5">
+                        <span className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-xs ${
+                          a.approvedByStuart === 'Yes' 
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80' 
+                            : 'bg-amber-50 text-amber-800 border-amber-200/80'
+                        }`}>
+                          <ShieldCheck className={`w-4 h-4 ${a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-500'}`} />
+                          <span>Approved by Stuart: <strong className="uppercase">{a.approvedByStuart || 'No'}</strong></span>
+                        </span>
+                      </div>
+
+                      <p className="text-sm text-slate-500 font-medium mt-3.5 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
                     </div>
                   </div>
 
@@ -1387,23 +1430,29 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             </h3>
             <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">{resolvedAbsences.length} Total</span>
           </div>
-          <div className="max-h-[220px] overflow-y-auto space-y-2 pr-2">
+          <div className="max-h-[240px] overflow-y-auto space-y-2 pr-2">
             {resolvedAbsences.map(a => {
               const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
               return (
-                <div key={a.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 text-xs">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
-                    <span className="text-slate-400 font-semibold">
-                      {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `${a.day} Absence`}
-                    </span>
-                    <span className="text-slate-400">•</span>
-                    <span className="text-slate-500 italic">" {a.reason} "</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      a.approvedByStuart === 'Yes' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      Approved by Stuart: {a.approvedByStuart || 'No'}
-                    </span>
+                <div key={a.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs hover:border-[#6157e8]/20 transition-all">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
+                      <span className="text-slate-400 font-semibold">
+                        {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `${a.day} Absence`}
+                      </span>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-slate-500 italic">" {a.reason} "</span>
+                    </div>
+                    {/* Separate prominent badge in list item */}
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stuart Approved:</span>
+                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                        a.approvedByStuart === 'Yes' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-100'
+                      }`}>
+                        {a.approvedByStuart || 'No'}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {a.reply && (
