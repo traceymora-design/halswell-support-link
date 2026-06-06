@@ -476,6 +476,33 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
+      {/* 🧪 Sandbox Testing Role Switcher Banner */}
+      {isSandbox && (
+        <div className="bg-amber-50 border-b border-amber-200/60 px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-amber-800 select-none shadow-inner">
+          <div className="flex items-center gap-1.5 font-bold">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+            </span>
+            <span>TESTING MODE — Quick Switch Dashboard Roles:</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button onClick={() => handleBypassSignIn('t1')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 't1' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+              Karen Cate (TA)
+            </button>
+            <button onClick={() => handleBypassSignIn('t_ruby')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 't_ruby' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+              Ruby Gray (TA)
+            </button>
+            <button onClick={() => handleBypassSignIn('senco_tracey')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_tracey' ? 'bg-amber-200 text-amber-900 border-amber-300 shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+              Tracey (SENCO Y5-8)
+            </button>
+            <button onClick={() => handleBypassSignIn('senco_cathie')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_cathie' ? 'bg-amber-200 text-amber-900 border-amber-300 shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+              Cathie (SENCO Y0-4)
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 bg-white sticky top-0 z-40 shadow-sm">
         <div className="flex items-center space-x-4">
           <div className="bg-[#f0efff] p-2 rounded-xl text-[#6157e8]">
@@ -555,7 +582,9 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
 
   const safeAbsencesList = absences || [];
   const mySessions = sessions.filter(s => s.taId === user.id && s.day === selectedDay);
-  const myAbsences = safeAbsencesList.filter(a => a.taId === user.id).slice(-5).reverse(); 
+  
+  // Sort and reverse so newest updates are always at the top
+  const myAbsences = safeAbsencesList.filter(a => a.taId === user.id).sort((a,b) => b.id.localeCompare(a.id)).slice(0, 5); 
   
   const sortedSessions = TIME_SLOTS.map(slot => ({
     slot,
@@ -630,22 +659,26 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {myAbsences.map(a => (
-              <div key={a.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col gap-2">
+              <div key={a.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2 transition-all hover:border-[#6157e8]/30">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-slate-700">{a.day} Absence</span>
-                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
+                  <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
                     a.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' : 
-                    a.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+                    a.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
                   }`}>{a.status}</span>
                 </div>
-                <div className="text-slate-500 text-xs italic">Reason: "{a.reason}"</div>
+                <div className="text-slate-500 text-xs italic bg-white border border-slate-100 p-2 rounded-lg mt-1">Reason: "{a.reason}"</div>
                 {a.reply ? (
-                  <div className="bg-violet-50/50 p-2.5 rounded-lg border border-violet-100 text-xs text-slate-700 mt-1 flex flex-col">
-                    <span className="font-bold text-[#6157e8] text-[9px] uppercase tracking-wider block mb-0.5">SENCO Reply:</span>
-                    <span>{a.reply}</span>
+                  <div className="bg-violet-50/70 p-3 rounded-xl border border-violet-100 text-xs text-slate-700 mt-1.5 flex flex-col relative shadow-sm">
+                    <div className="font-bold text-[#6157e8] text-[9px] uppercase tracking-wider block mb-1 flex items-center gap-1">
+                      <Bell size={10} className="text-[#6157e8]" /> SENCO Response Note:
+                    </div>
+                    <span className="font-medium text-slate-800 leading-relaxed italic">"{a.reply}"</span>
                   </div>
                 ) : (
-                  <div className="text-[10px] text-slate-400 italic">No reply message from SENCO yet.</div>
+                  <div className="text-[10px] text-slate-400 italic mt-1.5 flex items-center gap-1 bg-slate-100/50 p-2 rounded-lg">
+                    <Loader2 size={12} className="animate-spin text-slate-300" /> Waiting for SENCO reply note...
+                  </div>
                 )}
               </div>
             ))}
@@ -743,8 +776,21 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     return ta.team === currentUser.team || ta.team === TEAMS.BOTH;
   });
 
+  // Collect historical absences so they aren't lost once replied to!
+  const resolvedAbsences = absences.filter(a => {
+    if (a.status === 'Pending') return false;
+    const ta = users.find(u => u.id === a.taId);
+    if (!ta) return false;
+    
+    if (ta.allocatedSenco) {
+      return ta.allocatedSenco === currentUser.id;
+    }
+    if (currentUser.team === TEAMS.ALL) return true;
+    return ta.team === currentUser.team || ta.team === TEAMS.BOTH;
+  }).sort((a,b) => b.id.localeCompare(a.id));
+
   const handleUpdateAbsenceStatus = async (absence, newStatus) => {
-    const replyText = sencoReplies[absence.id] || "No response comment added.";
+    const replyText = sencoReplies[absence.id] || "Rest up Karen, coverage approved.";
     await saveAbsenceToDb({ ...absence, status: newStatus, reply: replyText });
     addToast(`Absence marked as ${newStatus}`, 'success');
   };
@@ -919,7 +965,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
   return (
     <div className="space-y-8 pb-12">
-      {/* INTERACTIVE TEAM SELECTOR: Matched style to Screenshot 2026-06-06 at 11.54.36 AM.png */}
+      {/* INTERACTIVE TEAM SELECTOR */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser.name}</h2>
@@ -948,7 +994,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       {relevantAbsences.length > 0 && (
         <div className="bg-red-50/60 border border-red-200/80 rounded-2xl p-6 space-y-4">
           <h3 className="text-sm font-bold text-red-800 uppercase tracking-wider flex items-center">
-            <AlertCircle className="w-4 h-4 mr-1.5" /> Direct Team Absence Alerts ({relevantAbsences.length})
+            <AlertCircle className="w-4 h-4 mr-1.5 animate-pulse text-red-600" /> Direct Team Absence Alerts ({relevantAbsences.length})
           </h3>
           <div className="grid grid-cols-1 gap-4">
             {relevantAbsences.map(a => {
@@ -959,17 +1005,17 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <div>
                       <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 uppercase tracking-wide">{ta?.team}</span>
                       <h4 className="font-bold text-slate-800 text-lg mt-1">{ta?.name} reported absent for {a.day}</h4>
-                      <p className="text-xs text-slate-500 font-medium mt-1">Reason: "{a.reason}"</p>
+                      <p className="text-sm text-slate-500 font-medium mt-1 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
-                      <MessageSquare size={12} className="mr-1 text-[#6157e8]" /> Leave a Response Reply Note:
+                      <MessageSquare size={12} className="mr-1 text-[#6157e8]" /> Write a Reply Response Note (This will display live on Karen's dashboard):
                     </label>
                     <input 
                       type="text" 
-                      placeholder="e.g. Thanks for letting me know, rest up! Tracey"
+                      placeholder="e.g. Hope you feel better soon, Karen! Val Murray will cover your morning sessions."
                       value={sencoReplies[a.id] || ''}
                       onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
                       className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
@@ -981,19 +1027,19 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       onClick={() => setResolvingAbsence(a)} 
                       className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
                     >
-                      Approve Coverage
+                      Approve & Reassign Coverage
                     </button>
                     <button 
                       onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Sick Leave)')} 
                       className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
                     >
-                      Mark Sick
+                      Mark Sick Leave
                     </button>
                     <button 
                       onClick={() => handleUpdateAbsenceStatus(a, 'Dismissed')} 
                       className="px-4 py-2 bg-white border text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
                     >
-                      Dismiss
+                      Dismiss Alert
                     </button>
                   </div>
                 </div>
@@ -1014,12 +1060,50 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               const match = sessions.find(s => s.id === sessId);
               if (match && coveringTaId) saveSessionToDb({ ...match, taId: coveringTaId });
             });
-            const replyText = sencoReplies[resolvingAbsence.id] || "Coverage has been approved and organized.";
+            const replyText = sencoReplies[resolvingAbsence.id] || "Rest up Karen, coverage approved and scheduled.";
             saveAbsenceToDb({ ...resolvingAbsence, status: 'Resolved', reply: replyText });
             setResolvingAbsence(null);
             addToast('Coverage applied successfully.');
           }} 
         />
+      )}
+
+      {/* Cloud-Archived Resolved Absence Feed (History) */}
+      {resolvedAbsences.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
+              <CheckCircle className="w-4 h-4 mr-1.5 text-emerald-500" /> Resolved Absences Archive Log
+            </h3>
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">{resolvedAbsences.length} Total</span>
+          </div>
+          <div className="max-h-[220px] overflow-y-auto space-y-2 pr-2">
+            {resolvedAbsences.map(a => {
+              const ta = users.find(u => u.id === a.taId);
+              return (
+                <div key={a.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 text-xs">
+                  <div>
+                    <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
+                    <span className="text-slate-400 mx-2">•</span>
+                    <span className="font-semibold text-slate-500">{a.day} Absence</span>
+                    <span className="mx-2 text-slate-400">•</span>
+                    <span className="text-slate-500 italic">" {a.reason} "</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {a.reply && (
+                      <span className="text-[10px] bg-purple-50 text-[#6157e8] border border-purple-100 font-bold px-2 py-0.5 rounded-md truncate max-w-[200px]" title={a.reply}>
+                        Reply: "{a.reply}"
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold text-[10px] uppercase">
+                      {a.status}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* Copy Timetable Day Modal */}
