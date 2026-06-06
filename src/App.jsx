@@ -57,6 +57,7 @@ const isSandboxEnv = () => {
 };
 const isSandbox = isSandboxEnv();
 
+// --- ROLES & TEAMS ---
 const ROLES = {
   SENCO: 'SENCO',
   TEAM_LEADER: 'Team Leader',
@@ -378,6 +379,7 @@ function App() {
     const found = users.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id);
     if (found) {
       try {
+        // Automatically save the selected user's profile to the Firestore database
         await addUserToDb(found);
       } catch (err) {
         console.error("Bypass user write failed:", err);
