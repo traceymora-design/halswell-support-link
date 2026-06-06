@@ -109,6 +109,17 @@ const INITIAL_USERS = [
   { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
 ];
 
+const INITIAL_ABSENCES = [
+  {
+    id: 'abs_demo_1',
+    taId: 't1',
+    day: 'Monday',
+    reason: 'Woke up with a heavy migraine. Seeking reading support session coverage.',
+    status: 'Pending',
+    reply: ''
+  }
+];
+
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
@@ -290,6 +301,7 @@ function App() {
       if (fetchedUsers.length === 0) {
         INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
         INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
+        INITIAL_ABSENCES.forEach(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id), a));
       }
 
       if (auth.currentUser && !auth.currentUser.isAnonymous && auth.currentUser.email) {
@@ -788,7 +800,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffSenco, setNewStaffSenco] = useState('');
   const [editingStaff, setEditingStaff] = useState(null);
 
-  /* INTERACTIVE FILTER STATE: Replaces supervision filter static badge as per Screenshot 2026-06-06 at 11.54.36 AM.png */
+  /* INTERACTIVE FILTER STATE: Replaces supervision filter static badge */
   const [activeTeamFilter, setActiveTeamFilter] = useState(currentUser.team || TEAMS.ALL);
 
   const [sencoReplies, setSencoReplies] = useState({});
@@ -802,14 +814,20 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   });
   const [copyOverwrite, setCopyOverwrite] = useState(true);
 
-  // Filter absences robustly so Cathie or Tracey see alerts from TAs that they supervise
-  const relevantAbsences = absences.filter(a => {
+  // Group absences into Direct Team vs Co-SENCO Shared Teams to prevent silent filter blockages
+  const directAbsences = absences.filter(a => {
     if (a.status !== 'Pending') return false;
     const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
     return isSencoSupervisingTa(currentUser, ta);
   });
 
-  // Collect historical absences robustly so they are mapped correctly in the logs
+  const coSencoAbsences = absences.filter(a => {
+    if (a.status !== 'Pending') return false;
+    const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
+    return !isSencoSupervisingTa(currentUser, ta);
+  });
+
+  // Collect historical absences robustly
   const resolvedAbsences = absences.filter(a => {
     if (a.status === 'Pending') return false;
     const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
@@ -817,9 +835,21 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   }).sort((a,b) => b.id.localeCompare(a.id));
 
   const handleUpdateAbsenceStatus = async (absence, newStatus) => {
-    const replyText = sencoReplies[absence.id] || "Rest up Karen, coverage approved.";
+    const replyText = sencoReplies[absence.id] || "Rest up, coverage approved.";
     await saveAbsenceToDb({ ...absence, status: newStatus, reply: replyText });
     addToast(`Absence marked as ${newStatus}`, 'success');
+  };
+
+  const handleTriggerTestAlert = () => {
+    saveAbsenceToDb({
+      id: 'abs_test_' + Date.now(),
+      taId: 't1',
+      day: selectedDay,
+      reason: 'Simulated real-time absence: Feeling unwell today and seeking coverage for reading support.',
+      status: 'Pending',
+      reply: ''
+    });
+    addToast('Simulated real-time absence alert triggered!', 'success');
   };
 
   const tas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
@@ -1017,39 +1047,53 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       </div>
 
-      {/* Relevant Absences Alerts Feed */}
-      {relevantAbsences.length > 0 && (
+      {/* Robust Global Absences Panel */}
+      {(directAbsences.length > 0 || coSencoAbsences.length > 0) ? (
         <div className="bg-red-50/60 border border-red-200/80 rounded-2xl p-6 space-y-4">
-          <h3 className="text-sm font-bold text-red-800 uppercase tracking-wider flex items-center">
-            <AlertCircle className="w-4 h-4 mr-1.5 animate-pulse text-red-600" /> Direct Team Absence Alerts ({relevantAbsences.length})
-          </h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-red-800 uppercase tracking-wider flex items-center">
+              <AlertCircle className="w-4 h-4 mr-1.5 animate-pulse text-red-600" /> Live TA Absence Alerts ({(directAbsences.length + coSencoAbsences.length)})
+            </h3>
+            <button 
+              onClick={handleTriggerTestAlert}
+              className="text-[10px] bg-red-100 hover:bg-red-200 text-red-700 font-bold px-3 py-1.5 rounded-lg border border-red-200 transition-colors shadow-sm"
+            >
+              Simulate Test Alert
+            </button>
+          </div>
+          
           <div className="grid grid-cols-1 gap-4">
-            {relevantAbsences.map(a => {
+            {/* Direct Supervision Alerts */}
+            {directAbsences.map(a => {
               const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
               return (
-                <div key={a.id} className="bg-white p-5 rounded-xl border border-red-100 shadow-sm flex flex-col gap-4 animate-fade-in">
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 pb-3 border-b border-slate-100">
+                <div key={a.id} className="bg-white p-5 rounded-xl border border-red-200 shadow-sm flex flex-col gap-4 animate-fade-in relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 pb-3 border-b border-slate-100 pl-2">
                     <div>
-                      <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 uppercase tracking-wide">{ta?.team}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 uppercase tracking-wide">{ta?.team}</span>
+                        <span className="text-[9px] font-bold bg-red-100 text-red-800 px-2 py-0.5 rounded uppercase tracking-wide">Directly Under Your Care</span>
+                      </div>
                       <h4 className="font-bold text-slate-800 text-lg mt-1">{ta?.name} reported absent for {a.day}</h4>
                       <p className="text-sm text-slate-500 font-medium mt-1 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 pl-2">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
-                      <MessageSquare size={12} className="mr-1 text-[#6157e8]" /> Write a Reply Response Note (This will display live on Karen's dashboard):
+                      <MessageSquare size={12} className="mr-1 text-[#6157e8]" /> Write a Reply Response Note:
                     </label>
                     <input 
                       type="text" 
-                      placeholder="e.g. Hope you feel better soon, Karen! Val Murray will cover your morning sessions."
+                      placeholder="e.g. Coverage has been approved and coverage TA has been notified."
                       value={sencoReplies[a.id] || ''}
                       onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
                       className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
                     />
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 self-end">
+                  <div className="flex flex-wrap items-center gap-2 self-end pl-2">
                     <button 
                       onClick={() => setResolvingAbsence(a)} 
                       className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
@@ -1072,7 +1116,76 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 </div>
               );
             })}
+
+            {/* Cross-School Co-SENCO Shared Alerts */}
+            {coSencoAbsences.map(a => {
+              const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
+              return (
+                <div key={a.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-4 animate-fade-in relative overflow-hidden opacity-90 hover:opacity-100 transition-opacity">
+                  <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-400"></div>
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 pb-3 border-b border-slate-100 pl-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase tracking-wide">{ta?.team}</span>
+                        <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wide">Shared View / Other Team</span>
+                      </div>
+                      <h4 className="font-bold text-slate-700 text-lg mt-1">{ta?.name} reported absent for {a.day}</h4>
+                      <p className="text-sm text-slate-500 font-medium mt-1 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pl-2">
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                      <MessageSquare size={12} className="mr-1 text-slate-400" /> Write a Reply Response Note:
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Coverage has been approved and coverage TA has been notified."
+                      value={sencoReplies[a.id] || ''}
+                      onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
+                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 self-end pl-2">
+                    <button 
+                      onClick={() => setResolvingAbsence(a)} 
+                      className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
+                    >
+                      Approve & Reassign Coverage
+                    </button>
+                    <button 
+                      onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Sick Leave)')} 
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
+                    >
+                      Mark Sick Leave
+                    </button>
+                    <button 
+                      onClick={() => handleUpdateAbsenceStatus(a, 'Dismissed')} 
+                      className="px-4 py-2 bg-white border text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
+                    >
+                      Dismiss Alert
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </div>
+      ) : (
+        /* Empty State with Simulated Test Trigger */
+        <div className="bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-8 text-center space-y-3">
+          <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
+          <h3 className="font-bold text-slate-800 text-base">All quiet! No pending TA absences</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Real-time alerts will appear automatically when TAs submit them. You can click below to simulate a live alert instantly for testing!
+          </p>
+          <button 
+            onClick={handleTriggerTestAlert}
+            className="inline-flex items-center px-4 py-2 bg-[#6157e8] hover:bg-[#5249d6] text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm"
+          >
+            <AlertCircle size={14} className="mr-1.5" /> Trigger Live Test Alert
+          </button>
         </div>
       )}
 
