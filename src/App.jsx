@@ -3,7 +3,7 @@ import {
   Calendar, AlertCircle, Users, CheckCircle, 
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
-  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop
+  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop, MessageSquare
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -57,7 +57,6 @@ const isSandboxEnv = () => {
 };
 const isSandbox = isSandboxEnv();
 
-// --- ROLES & TEAMS ---
 const ROLES = {
   SENCO: 'SENCO',
   TEAM_LEADER: 'Team Leader',
@@ -95,7 +94,7 @@ const TIME_SLOTS = [
   { id: 't9', start: '12:30', end: '1:00' },
   { id: 't10', start: '1:00', end: '1:30' },
   { id: 't11', start: '1:30', end: '2:00' },
-  { id: 't12', py: '2:00', start: '2:00', end: '2:30' },
+  { id: 't12', start: '2:00', end: '2:30' },
   { id: 't13', start: '2:30', end: '3:00' }
 ];
 
@@ -595,7 +594,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
             <h2 className="text-2xl font-bold text-slate-800">{user.name} Timetable Portal</h2>
             <span className="text-[10px] font-bold bg-violet-50 text-[#6157e8] border border-violet-100 px-2 py-0.5 rounded uppercase tracking-wider">{user.team || 'No Team Registered'}</span>
           </div>
-          {}
           <p className="text-xs text-slate-400 mt-1 flex items-center">
             <Laptop size={14} className="mr-1 text-slate-500" />
             Allocated SENCO: <strong className="ml-1 text-[#6157e8]">{user.allocatedSenco === 'senco_cathie' ? 'Cathie' : user.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'Shared (None / Both)'}</strong>
@@ -617,8 +615,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
             onChange={e => setAbsenceReason(e.target.value)} 
             className="w-full border p-3 rounded-xl text-sm focus:ring-2 focus:ring-red-400 focus:outline-none" 
             rows={3} 
-            placeholder="Please provide details (e.g. Unwell, medical appointment)..." 
-          />
+            placeholder="Please provide details (e.g. Unwell, medical appointment)..." />
           <div className="flex justify-end space-x-2">
             <button onClick={() => setShowAbsenceForm(false)} className="px-4 py-2 text-xs font-semibold text-slate-500">Cancel</button>
             <button onClick={handleReportAbsence} className="px-5 py-2 bg-red-500 text-white font-bold text-xs uppercase rounded-xl">Submit to SENCO</button>
@@ -715,6 +712,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [newStaffTeam, setNewStaffTeam] = useState(TEAMS.Y5_8);
   const [newStaffSenco, setNewStaffSenco] = useState('');
   const [editingStaff, setEditingStaff] = useState(null);
+
+  /* INTERACTIVE FILTER STATE: Replaces supervision filter static badge as per Screenshot 2026-06-06 at 11.54.36 AM.png */
+  const [activeTeamFilter, setActiveTeamFilter] = useState(currentUser.team || TEAMS.ALL);
 
   const [sencoReplies, setSencoReplies] = useState({});
 
@@ -919,13 +919,22 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
   return (
     <div className="space-y-8 pb-12">
-      {/* CONSOLIDATED Day dropdown removed here -- now exclusively controlled on Master Timetable card below */}
+      {/* INTERACTIVE TEAM SELECTOR: Matched style to Screenshot 2026-06-06 at 11.54.36 AM.png */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser.name}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Supervision filter:</p>
-            <span className="bg-violet-50 text-[#6157e8] px-2 py-0.5 text-xs font-bold rounded border border-violet-100">{currentUser.team || TEAMS.Y5_8}</span>
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">TEAM:</span>
+            <select
+              value={activeTeamFilter}
+              onChange={(e) => setActiveTeamFilter(e.target.value)}
+              className="bg-violet-50 text-[#6157e8] font-bold text-xs rounded-xl border border-violet-100 px-4 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#6157e8] cursor-pointer"
+            >
+              <option value={TEAMS.ALL}>{TEAMS.ALL}</option>
+              <option value={TEAMS.Y0_4}>{TEAMS.Y0_4}</option>
+              <option value={TEAMS.Y5_8}>{TEAMS.Y5_8}</option>
+              <option value={TEAMS.BOTH}>{TEAMS.BOTH}</option>
+            </select>
           </div>
         </div>
         <div className="flex items-center space-x-2 w-full md:w-auto">
@@ -1166,18 +1175,17 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {}
+      {/* Two-Column Staff Management Modal */}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col md:grid md:grid-cols-12 md:gap-8 overflow-hidden">
             
-            {/* Header spans all 12 columns on desktop */}
             <div className="col-span-12 border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
               <h3 className="text-2xl font-bold text-[#1a1f36]">Manage Staff & Teams</h3>
               <button onClick={() => setShowManageStaff(false)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
             </div>
 
-            {/* Left Column (Independent Scroll Container): Current Staff Members List */}
+            {/* Left Column: Staff members list inside a dedicated scroll container */}
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
               <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
@@ -1186,7 +1194,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <div>
                       <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
                       <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
-                      {/* Only apply the SENCO supervisor field to TAs, not teachers or team leaders */}
+                      {/* Renamed to SENCO and filtered to only show for TAs */}
                       {u.role === ROLES.TA && (
                         <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                           SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span>
@@ -1204,8 +1212,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </div>
             </div>
 
-            {}
-            {/* Right Column (Independent Scroll Container): Add/Edit Details Form */}
+            {/* Right Column: Interactive Details Edit Form */}
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
@@ -1268,9 +1275,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Grid Timetable Section */}
+      {/* Grid Timetable Card Container */}
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
-        {/* Single master header day box remains, duplicate day dropdown removed from top card banner */}
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h2 className="text-2xl font-bold text-[#1a1f36]">Master Timetable</h2>
@@ -1301,6 +1307,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             day={selectedDay} 
             users={users} 
             isEditable={true}
+            teamFilter={activeTeamFilter}
             onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} 
           />
         </div>
@@ -1365,22 +1372,33 @@ function TeacherDashboard({ user, sessions, users }) {
   );
 }
 
-function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
+function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilter }) {
   const [viewMode, setViewMode] = useState('single'); 
-  const tas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
+  
+  // Sort and filter TAs based on active Team selection filter
+  const allTas = users.filter(u => u.role === ROLES.TA).sort((a, b) => a.name.localeCompare(b.name));
+  
+  const tas = allTas.filter(ta => {
+    if (!teamFilter || teamFilter === TEAMS.ALL) return true;
+    if (teamFilter === TEAMS.BOTH) return ta.team === TEAMS.BOTH;
+    // Subset Logic: TAs working on "Both Teams" always match both of the separate Years teams!
+    if (teamFilter === TEAMS.Y0_4) return ta.team === TEAMS.Y0_4 || ta.team === TEAMS.BOTH;
+    if (teamFilter === TEAMS.Y5_8) return ta.team === TEAMS.Y5_8 || ta.team === TEAMS.BOTH;
+    return true;
+  });
+
   const [activeTaId, setActiveTaId] = useState('');
 
+  // Safeguard: Automatically reset active selection when switching team filters
   useEffect(() => {
-    if (tas.length > 0 && !activeTaId) {
-      setActiveTaId(tas[0].id);
+    if (tas.length > 0) {
+      if (!activeTaId || !tas.some(t => t.id === activeTaId)) {
+        setActiveTaId(tas[0].id);
+      }
+    } else {
+      setActiveTaId('');
     }
   }, [tas, activeTaId]);
-
-  useEffect(() => {
-    if (activeTaId && !tas.some(t => t.id === activeTaId) && tas.length > 0) {
-      setActiveTaId(tas[0].id);
-    }
-  }, [tas]);
 
   return (
     <div className="space-y-4">
@@ -1396,6 +1414,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
 
       {viewMode === 'single' ? (
         <div className="px-1.5 sm:px-6 py-4 space-y-6 animate-fade-in">
+          {/* Filtered scrollable list of TAs */}
           <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
             {tas.map(ta => (
               <button
@@ -1476,7 +1495,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick }) {
               })}
             </div>
           ) : (
-            <div className="text-center p-12 bg-slate-50 rounded-[32px] border border-dashed text-slate-400 font-medium">Loading staff...</div>
+            <div className="text-center p-12 bg-slate-50 rounded-[32px] border border-dashed text-slate-400 font-medium">No matching TAs under this team filter.</div>
           )}
         </div>
       ) : (
