@@ -377,6 +377,11 @@ function App() {
   const handleBypassSignIn = async (id) => {
     const found = users.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id);
     if (found) {
+      try {
+        await addUserToDb(found);
+      } catch (err) {
+        console.error("Bypass user write failed:", err);
+      }
       setCurrentUser(found);
       addToast(`Entered view for ${found.name}`, 'success');
     }
@@ -763,7 +768,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   // Filter absences so Cathie or Tracey see alerts from TAs that they supervise (or belong to their group)
   const relevantAbsences = absences.filter(a => {
     if (a.status !== 'Pending') return false;
-    const ta = users.find(u => u.id === a.taId);
+    const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
     if (!ta) return false;
     
     // Direct SENCO allocation override
@@ -779,7 +784,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   // Collect historical absences so they aren't lost once replied to!
   const resolvedAbsences = absences.filter(a => {
     if (a.status === 'Pending') return false;
-    const ta = users.find(u => u.id === a.taId);
+    const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
     if (!ta) return false;
     
     if (ta.allocatedSenco) {
@@ -998,7 +1003,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </h3>
           <div className="grid grid-cols-1 gap-4">
             {relevantAbsences.map(a => {
-              const ta = users.find(u => u.id === a.taId);
+              const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
               return (
                 <div key={a.id} className="bg-white p-5 rounded-xl border border-red-100 shadow-sm flex flex-col gap-4 animate-fade-in">
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2 pb-3 border-b border-slate-100">
@@ -1079,7 +1084,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
           <div className="max-h-[220px] overflow-y-auto space-y-2 pr-2">
             {resolvedAbsences.map(a => {
-              const ta = users.find(u => u.id === a.taId);
+              const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
               return (
                 <div key={a.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-2 text-xs">
                   <div>
@@ -1644,7 +1649,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
 }
 
 function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
-  const absentTa = users.find(u => u.id === absence.taId);
+  const absentTa = users.find(u => u.id === absence.taId) || INITIAL_USERS.find(u => u.id === absence.taId);
   const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
   
   const otherTas = users
