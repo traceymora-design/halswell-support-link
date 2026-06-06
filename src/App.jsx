@@ -115,7 +115,10 @@ const INITIAL_ABSENCES = [
     day: 'Monday',
     reason: 'Woke up with a heavy migraine. Seeking reading support session coverage.',
     status: 'Pending',
-    reply: ''
+    reply: '',
+    isAdvance: false,
+    date: '',
+    formattedDate: ''
   }
 ];
 
@@ -601,6 +604,11 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [showAbsenceForm, setShowAbsenceForm] = useState(false);
   const [absenceReason, setAbsenceReason] = useState('');
+  const [absenceType, setAbsenceType] = useState('sick'); // 'sick' or 'advance'
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
 
   const safeAbsencesList = absences || [];
   const mySessions = sessions.filter(s => s.taId === user.id && s.day === selectedDay);
@@ -617,15 +625,36 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       addToast('Please provide a reason.', 'error');
       return;
     }
-    if (safeAbsencesList.some(a => a.taId === user.id && a.day === selectedDay && a.status === 'Pending')) {
-      addToast(`You have a pending absence already submitted for ${selectedDay}`, 'error');
+
+    let targetDay = selectedDay;
+    let formattedDateString = '';
+    if (absenceType === 'advance' && selectedDate) {
+      const dateObj = new Date(selectedDate);
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      targetDay = daysOfWeek[dateObj.getDay()];
+      
+      const options = { day: 'numeric', month: 'short', year: 'numeric' };
+      formattedDateString = dateObj.toLocaleDateString('en-NZ', options);
+    }
+
+    const isPendingExist = safeAbsencesList.some(a => 
+      a.taId === user.id && 
+      (absenceType === 'sick' ? a.day === selectedDay : a.date === selectedDate) && 
+      a.status === 'Pending'
+    );
+
+    if (isPendingExist) {
+      addToast(`You already have a pending submission for this date/day`, 'error');
       return;
     }
     
     saveAbsenceToDb({
       id: 'abs_' + Date.now(),
       taId: user.id,
-      day: selectedDay,
+      day: targetDay,
+      date: absenceType === 'advance' ? selectedDate : '',
+      formattedDate: formattedDateString,
+      isAdvance: absenceType === 'advance',
       reason: absenceReason,
       status: 'Pending',
       reply: '' 
@@ -633,7 +662,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
 
     setShowAbsenceForm(false);
     setAbsenceReason('');
-    addToast(`Absence submitted cleanly to your SENCO.`, 'success');
+    addToast(absenceType === 'advance' ? `Future leave request submitted to SENCO.` : `Absence submitted cleanly to your SENCO.`, 'success');
   };
 
   return (
@@ -653,22 +682,65 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
           onClick={() => setShowAbsenceForm(!showAbsenceForm)} 
           className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all"
         >
-          Report Absence
+          Report Absence / Leave
         </button>
       </div>
 
+      {}
       {showAbsenceForm && (
-        <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm space-y-3">
-          <h4 className="font-bold text-slate-800 text-md">Report Daily Absence ({selectedDay})</h4>
-          <textarea 
-            value={absenceReason} 
-            onChange={e => setAbsenceReason(e.target.value)} 
-            className="w-full border p-3 rounded-xl text-sm focus:ring-2 focus:ring-red-400 focus:outline-none" 
-            rows={3} 
-            placeholder="Please provide details (e.g. Unwell, medical appointment)..." />
-          <div className="flex justify-end space-x-2">
-            <button onClick={() => setShowAbsenceForm(false)} className="px-4 py-2 text-xs font-semibold text-slate-500">Cancel</button>
-            <button onClick={handleReportAbsence} className="px-5 py-2 bg-red-500 text-white font-bold text-xs uppercase rounded-xl">Submit to SENCO</button>
+        <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm space-y-4 animate-fade-in">
+          <h4 className="font-bold text-slate-800 text-md">Report Leave or Absence</h4>
+          
+          {/* Absence Type Selector */}
+          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setAbsenceType('sick')}
+              className={`py-2 px-3 rounded-lg transition-all ${absenceType === 'sick' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+            >
+              Today's Sick Leave ({selectedDay})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAbsenceType('advance')}
+              className={`py-2 px-3 rounded-lg transition-all ${absenceType === 'advance' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+            >
+              Future Leave in Advance (Calendar)
+            </button>
+          </div>
+
+          {/* Date Picker if Leave in Advance */}
+          {absenceType === 'advance' && (
+            <div className="space-y-1.5 animate-fade-in">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Select Future Date:
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-[#6157e8]/40 focus:outline-none text-slate-700"
+              />
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Reason / Details:
+            </label>
+            <textarea 
+              value={absenceReason} 
+              onChange={e => setAbsenceReason(e.target.value)} 
+              className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-[#6157e8]/50 focus:outline-none" 
+              rows={3} 
+              placeholder={absenceType === 'sick' ? "Please provide details (e.g. migraine, stomach bug)..." : "Please specify reason (e.g. dentist appointment, family event)..."} 
+            />
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+            <button onClick={() => setShowAbsenceForm(false)} className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 rounded-lg">Cancel</button>
+            <button onClick={handleReportAbsence} className="px-5 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase rounded-xl shadow-sm transition-colors">Submit to SENCO</button>
           </div>
         </div>
       )}
@@ -683,11 +755,13 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
             {myAbsences.map(a => (
               <div key={a.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2 transition-all hover:border-[#6157e8]/30">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-700">{a.day} Absence</span>
+                  <span className="font-bold text-slate-700">
+                    {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `${a.day} Absence`}
+                  </span>
                   <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
                     a.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' : 
-                    a.status === 'Resolved' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
-                  }`}>{a.status}</span>
+                    a.status.startsWith('Approved') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+                  }`}>{a.status.startsWith('Approved') ? 'Approved' : a.status}</span>
                 </div>
                 <div className="text-slate-500 text-xs italic bg-white border border-slate-100 p-2 rounded-lg mt-1">Reason: "{a.reason}"</div>
                 {a.reply ? (
@@ -722,7 +796,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         ))}
       </div>
 
-      {}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-8 space-y-4">
         {sortedSessions.length === 0 ? (
           <div className="text-center p-12 text-slate-400 font-medium">No active support duties allocated for {selectedDay}.</div>
@@ -827,9 +900,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   }).sort((a,b) => b.id.localeCompare(a.id));
 
   const handleUpdateAbsenceStatus = async (absence, newStatus) => {
-    const replyText = sencoReplies[absence.id] || "Rest up, coverage approved.";
+    const replyText = sencoReplies[absence.id] || (absence.isAdvance ? "Future leave request approved. Thank you!" : "Rest up, coverage approved.");
     await saveAbsenceToDb({ ...absence, status: newStatus, reply: replyText });
-    addToast(`Absence marked as ${newStatus}`, 'success');
+    addToast(`Absence marked as ${newStatus} and archived.`, 'success');
   };
 
   const handleTriggerTestAlert = () => {
@@ -839,7 +912,10 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       day: selectedDay,
       reason: 'Simulated real-time absence: Feeling unwell today and seeking coverage for reading support.',
       status: 'Pending',
-      reply: ''
+      reply: '',
+      isAdvance: false,
+      date: '',
+      formattedDate: ''
     });
     addToast('Simulated real-time absence alert triggered!', 'success');
   };
@@ -1065,23 +1141,39 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-200 uppercase tracking-wide">{ta?.team}</span>
                         <span className="text-[9px] font-bold bg-red-100 text-red-800 px-2 py-0.5 rounded uppercase tracking-wide">Directly Under Your Care</span>
+                        {a.isAdvance && (
+                          <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded uppercase tracking-wide flex items-center gap-1">
+                            <Calendar size={10} /> Leave In Advance
+                          </span>
+                        )}
                       </div>
-                      <h4 className="font-bold text-slate-800 text-lg mt-1">{ta?.name} reported absent for {a.day}</h4>
+                      <h4 className="font-bold text-slate-800 text-lg mt-1">
+                        {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
+                      </h4>
                       <p className="text-sm text-slate-500 font-medium mt-1 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
                     </div>
                   </div>
 
+                  {}
                   <div className="space-y-1.5 pl-2">
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
                       <MessageSquare size={12} className="mr-1 text-[#6157e8]" /> Write a Reply Response Note:
                     </label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Coverage has been approved and coverage TA has been notified."
-                      value={sencoReplies[a.id] || ''}
-                      onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
-                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
-                    />
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Coverage has been approved. Enjoy your time off!"
+                        value={sencoReplies[a.id] || ''}
+                        onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
+                        className="flex-1 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
+                      />
+                      <button
+                        onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')}
+                        className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
+                      >
+                        Send Reply & Archive
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 self-end pl-2">
@@ -1092,10 +1184,10 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       Approve & Reassign Coverage
                     </button>
                     <button 
-                      onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Sick Leave)')} 
+                      onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')} 
                       className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
                     >
-                      Mark Sick Leave
+                      {a.isAdvance ? 'Approve Advance Leave' : 'Mark Sick Leave'}
                     </button>
                     <button 
                       onClick={() => handleUpdateAbsenceStatus(a, 'Dismissed')} 
@@ -1118,8 +1210,15 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200 uppercase tracking-wide">{ta?.team}</span>
                         <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wide">Shared View / Other Team</span>
+                        {a.isAdvance && (
+                          <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded uppercase tracking-wide flex items-center gap-1">
+                            <Calendar size={10} /> Leave In Advance
+                          </span>
+                        )}
                       </div>
-                      <h4 className="font-bold text-slate-700 text-lg mt-1">{ta?.name} reported absent for {a.day}</h4>
+                      <h4 className="font-bold text-slate-700 text-lg mt-1">
+                        {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
+                      </h4>
                       <p className="text-sm text-slate-500 font-medium mt-1 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
                     </div>
                   </div>
@@ -1128,13 +1227,21 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
                       <MessageSquare size={12} className="mr-1 text-slate-400" /> Write a Reply Response Note:
                     </label>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. Coverage has been approved and coverage TA has been notified."
-                      value={sencoReplies[a.id] || ''}
-                      onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
-                      className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
-                    />
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Coverage has been approved. Enjoy your time off!"
+                        value={sencoReplies[a.id] || ''}
+                        onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
+                        className="flex-1 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
+                      />
+                      <button
+                        onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')}
+                        className="px-4 py-2.5 bg-slate-750 hover:bg-slate-800 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
+                      >
+                        Send Reply & Archive
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 self-end pl-2">
@@ -1145,10 +1252,10 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       Approve & Reassign Coverage
                     </button>
                     <button 
-                      onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Sick Leave)')} 
+                      onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')} 
                       className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
                     >
-                      Mark Sick Leave
+                      {a.isAdvance ? 'Approve Advance Leave' : 'Mark Sick Leave'}
                     </button>
                     <button 
                       onClick={() => handleUpdateAbsenceStatus(a, 'Dismissed')} 
@@ -1190,14 +1297,15 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               const match = sessions.find(s => s.id === sessId);
               if (match && coveringTaId) saveSessionToDb({ ...match, taId: coveringTaId });
             });
-            const replyText = sencoReplies[resolvingAbsence.id] || "Rest up Karen, coverage approved and scheduled.";
-            saveAbsenceToDb({ ...resolvingAbsence, status: 'Resolved', reply: replyText });
+            const replyText = sencoReplies[resolvingAbsence.id] || "Rest up, coverage approved and scheduled.";
+            saveAbsenceToDb({ ...resolvingAbsence, status: resolvingAbsence.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)', reply: replyText });
             setResolvingAbsence(null);
             addToast('Coverage applied successfully.');
           }} 
         />
       )}
 
+      {}
       {resolvedAbsences.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -1214,7 +1322,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   <div>
                     <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
                     <span className="text-slate-400 mx-2">•</span>
-                    <span className="font-semibold text-slate-500">{a.day} Absence</span>
+                    <span className="font-semibold text-slate-500">
+                      {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `${a.day} Absence`}
+                    </span>
                     <span className="mx-2 text-slate-400">•</span>
                     <span className="text-slate-500 italic">" {a.reason} "</span>
                   </div>
