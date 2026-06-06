@@ -629,7 +629,8 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       addToast('Please provide a reason.', 'error');
       return;
     }
-    if (!approvedByStuart) {
+    // Only require Stuart checklist validation if requesting leave in advance
+    if (absenceType === 'advance' && !approvedByStuart) {
       addToast('Please complete the Stuart leave approval checklist.', 'error');
       return;
     }
@@ -675,7 +676,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       reason: absenceReason,
       status: 'Pending',
       reply: '',
-      approvedByStuart: approvedByStuart // Save the status securely in db
+      approvedByStuart: absenceType === 'advance' ? approvedByStuart : 'N/A' // Automatically N/A for sick leave since SENCO approves it
     });
 
     setShowAbsenceForm(false);
@@ -760,43 +761,44 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
             </div>
           )}
 
-          <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
-            <div className="flex items-center space-x-2">
-              <ShieldCheck className="w-5 h-5 text-amber-600" />
-              <span className="block text-xs font-bold text-amber-900 uppercase tracking-wide">
-                * Stuart Leave Authorization Checklist
-              </span>
+          {}
+          {absenceType === 'advance' && (
+            <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3 animate-fade-in">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-5 h-5 text-amber-600" />
+                <span className="block text-xs font-bold text-amber-900 uppercase tracking-wide">
+                  * Stuart Leave Authorization Checklist
+                </span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Has this future leave request already been discussed and approved by Stuart?
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
+                  <input 
+                    type="radio" 
+                    name="stuartApproval" 
+                    value="Yes" 
+                    checked={approvedByStuart === 'Yes'}
+                    onChange={(e) => setApprovedByStuart(e.target.value)}
+                    className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
+                  />
+                  <span>Yes, authorized / notified</span>
+                </label>
+                <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
+                  <input 
+                    type="radio" 
+                    name="stuartApproval" 
+                    value="No" 
+                    checked={approvedByStuart === 'No'}
+                    onChange={(e) => setApprovedByStuart(e.target.value)}
+                    className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
+                  />
+                  <span>No, pending authorization</span>
+                </label>
+              </div>
             </div>
-            <p className="text-xs text-amber-800 leading-relaxed">
-              {absenceType === 'advance' 
-                ? "Has this future leave request already been discussed and approved by Stuart?" 
-                : "For unexpected sick leave, have you notified Stuart or submitted standard medical leave reports?"}
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 pt-1">
-              <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
-                <input 
-                  type="radio" 
-                  name="stuartApproval" 
-                  value="Yes" 
-                  checked={approvedByStuart === 'Yes'}
-                  onChange={(e) => setApprovedByStuart(e.target.value)}
-                  className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
-                />
-                <span>Yes, authorized / notified</span>
-              </label>
-              <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
-                <input 
-                  type="radio" 
-                  name="stuartApproval" 
-                  value="No" 
-                  checked={approvedByStuart === 'No'}
-                  onChange={(e) => setApprovedByStuart(e.target.value)}
-                  className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
-                />
-                <span>No, pending authorization / notification</span>
-              </label>
-            </div>
-          </div>
+          )}
 
           <div className="space-y-1.5">
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -836,13 +838,15 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                   }`}>{a.status.startsWith('Approved') ? 'Approved' : a.status}</span>
                 </div>
                 
-                {/* Display Stuart approval value on TA Recent Absences card */}
-                <div className="flex items-center gap-1.5 text-[10px] font-bold mt-0.5">
-                  <span className="text-slate-400">Stuart Approved:</span>
-                  <span className={a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-600'}>
-                    {a.approvedByStuart || 'No'}
-                  </span>
-                </div>
+                {/* Only render Stuart Checklist status for leave requested in advance */}
+                {a.isAdvance && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold mt-0.5">
+                    <span className="text-slate-400">Stuart Approved:</span>
+                    <span className={a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-600'}>
+                      {a.approvedByStuart || 'No'}
+                    </span>
+                  </div>
+                )}
 
                 <div className="text-slate-500 text-xs italic bg-white border border-slate-100 p-2 rounded-lg mt-1">Reason: "{a.reason}"</div>
                 {a.reply ? (
@@ -998,7 +1002,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       isAdvance: false,
       date: '',
       formattedDate: '',
-      approvedByStuart: 'Yes'
+      approvedByStuart: 'N/A'
     });
     addToast('Simulated real-time absence alert triggered!', 'success');
   };
@@ -1243,17 +1247,19 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                         {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
                       </h4>
                       
-                      {/* Highly prominent and separate Approved by Stuart row */}
-                      <div className="mt-2.5">
-                        <span className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-xs ${
-                          a.approvedByStuart === 'Yes' 
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80' 
-                            : 'bg-amber-50 text-amber-800 border-amber-200/80'
-                        }`}>
-                          <ShieldCheck className={`w-4 h-4 ${a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-500'}`} />
-                          <span>Approved by Stuart: <strong className="uppercase">{a.approvedByStuart || 'No'}</strong></span>
-                        </span>
-                      </div>
+                      {/* Highly prominent Approved by Stuart row - ONLY render for Leave requested in advance */}
+                      {a.isAdvance && (
+                        <div className="mt-2.5">
+                          <span className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-xs ${
+                            a.approvedByStuart === 'Yes' 
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80' 
+                              : 'bg-amber-50 text-amber-800 border-amber-200/80'
+                          }`}>
+                            <ShieldCheck className={`w-4 h-4 ${a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-500'}`} />
+                            <span>Approved by Stuart: <strong className="uppercase">{a.approvedByStuart || 'No'}</strong></span>
+                          </span>
+                        </div>
+                      )}
 
                       <p className="text-sm text-slate-500 font-medium mt-3.5 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
                     </div>
@@ -1266,7 +1272,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <div className="flex flex-col sm:flex-row gap-2">
                       <input 
                         type="text" 
-                        placeholder="e.g. Coverage has been approved. Enjoy your time off!"
+                        placeholder={a.isAdvance ? "e.g. Leave approved. We will schedule coverage closer to the date." : "e.g. Coverage has been approved. Rest up!"}
                         value={sencoReplies[a.id] || ''}
                         onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
                         className="flex-1 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
@@ -1280,19 +1286,36 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     </div>
                   </div>
 
+                  {}
                   <div className="flex flex-wrap items-center gap-2 self-end pl-2">
-                    <button 
-                      onClick={() => setResolvingAbsence(a)} 
-                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
-                    >
-                      Approve & Reassign Coverage
-                    </button>
-                    <button 
-                      onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')} 
-                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
-                    >
-                      {a.isAdvance ? 'Approve Advance Leave' : 'Mark Sick Leave'}
-                    </button>
+                    {!a.isAdvance ? (
+                      <>
+                        <button 
+                          onClick={() => setResolvingAbsence(a)} 
+                          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
+                        >
+                          Approve & Reassign Coverage
+                        </button>
+                        <button 
+                          onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Sick Leave)')} 
+                          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
+                        >
+                          Mark Sick Leave
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button 
+                          onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Leave in Advance)')} 
+                          className="px-4 py-2 bg-[#6157e8] hover:bg-[#5249d6] text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
+                        >
+                          Approve Advance Leave (Coverage Deferred)
+                        </button>
+                        <span className="text-[11px] text-slate-400 italic font-medium">
+                          * Coverage will be resolved on the day of the leave
+                        </span>
+                      </div>
+                    )}
                     <button 
                       onClick={() => handleUpdateAbsenceStatus(a, 'Dismissed')} 
                       className="px-4 py-2 bg-white border text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
@@ -1324,17 +1347,19 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                         {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
                       </h4>
 
-                      {/* Separate Stuart approval row */}
-                      <div className="mt-2.5">
-                        <span className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-xs ${
-                          a.approvedByStuart === 'Yes' 
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80' 
-                            : 'bg-amber-50 text-amber-800 border-amber-200/80'
-                        }`}>
-                          <ShieldCheck className={`w-4 h-4 ${a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-500'}`} />
-                          <span>Approved by Stuart: <strong className="uppercase">{a.approvedByStuart || 'No'}</strong></span>
-                        </span>
-                      </div>
+                      {/* Prominent Stuart row - ONLY render for Leave requested in advance */}
+                      {a.isAdvance && (
+                        <div className="mt-2.5">
+                          <span className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-xs ${
+                            a.approvedByStuart === 'Yes' 
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80' 
+                              : 'bg-amber-50 text-amber-800 border-amber-200/80'
+                          }`}>
+                            <ShieldCheck className={`w-4 h-4 ${a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-500'}`} />
+                            <span>Approved by Stuart: <strong className="uppercase">{a.approvedByStuart || 'No'}</strong></span>
+                          </span>
+                        </div>
+                      )}
 
                       <p className="text-sm text-slate-500 font-medium mt-3.5 bg-slate-50 p-3 rounded-lg border border-slate-100 italic">" {a.reason} "</p>
                     </div>
@@ -1347,7 +1372,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <div className="flex flex-col sm:flex-row gap-2">
                       <input 
                         type="text" 
-                        placeholder="e.g. Coverage has been approved. Enjoy your time off!"
+                        placeholder={a.isAdvance ? "e.g. Leave approved. We will schedule coverage closer to the date." : "e.g. Coverage has been approved. Rest up!"}
                         value={sencoReplies[a.id] || ''}
                         onChange={e => setSencoReplies({...sencoReplies, [a.id]: e.target.value})}
                         className="flex-1 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs focus:ring-1 focus:ring-[#6157e8] focus:border-[#6157e8] outline-none font-medium text-slate-700"
@@ -1361,19 +1386,36 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     </div>
                   </div>
 
+                  {}
                   <div className="flex flex-wrap items-center gap-2 self-end pl-2">
-                    <button 
-                      onClick={() => setResolvingAbsence(a)} 
-                      className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
-                    >
-                      Approve & Reassign Coverage
-                    </button>
-                    <button 
-                      onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')} 
-                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
-                    >
-                      {a.isAdvance ? 'Approve Advance Leave' : 'Mark Sick Leave'}
-                    </button>
+                    {!a.isAdvance ? (
+                      <>
+                        <button 
+                          onClick={() => setResolvingAbsence(a)} 
+                          className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
+                        >
+                          Approve & Reassign Coverage
+                        </button>
+                        <button 
+                          onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Sick Leave)')} 
+                          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
+                        >
+                          Mark Sick Leave
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <button 
+                          onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Leave in Advance)')} 
+                          className="px-4 py-2 bg-[#6157e8] hover:bg-[#5249d6] text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
+                        >
+                          Approve Advance Leave (Coverage Deferred)
+                        </button>
+                        <span className="text-[11px] text-slate-400 italic font-medium">
+                          * Coverage will be resolved on the day of the leave
+                        </span>
+                      </div>
+                    )}
                     <button 
                       onClick={() => handleUpdateAbsenceStatus(a, 'Dismissed')} 
                       className="px-4 py-2 bg-white border text-slate-400 hover:text-slate-600 font-bold text-xs uppercase tracking-wide rounded-lg transition-all"
@@ -1421,7 +1463,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         />
       )}
 
-      {}
       {resolvedAbsences.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -1444,15 +1485,17 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       <span className="text-slate-400">•</span>
                       <span className="text-slate-500 italic">" {a.reason} "</span>
                     </div>
-                    {/* Separate prominent badge in list item */}
-                    <div className="mt-1.5 flex items-center gap-1.5">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stuart Approved:</span>
-                      <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
-                        a.approvedByStuart === 'Yes' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-100'
-                      }`}>
-                        {a.approvedByStuart || 'No'}
-                      </span>
-                    </div>
+                    {/* Only render Stuart approved indicator if it's actually an advance leave */}
+                    {a.isAdvance && (
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stuart Approved:</span>
+                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                          a.approvedByStuart === 'Yes' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-100'
+                        }`}>
+                          {a.approvedByStuart || 'No'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {a.reply && (
