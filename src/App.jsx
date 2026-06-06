@@ -57,6 +57,7 @@ const isSandboxEnv = () => {
 };
 const isSandbox = isSandboxEnv();
 
+// --- ROLES, TEAMS & TIERS ---
 const ROLES = {
   SENCO: 'SENCO',
   TEAM_LEADER: 'Team Leader',
@@ -119,7 +120,7 @@ const INITIAL_ABSENCES = [
     isAdvance: false,
     date: '',
     formattedDate: '',
-    approvedByStuart: 'Yes'
+    approvedByStuart: 'N/A'
   }
 ];
 
@@ -637,26 +638,24 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
 
     let targetDay = selectedDay;
     let formattedDateString = '';
-    if (absenceType === 'advance') {
-      const startObj = new Date(startDate);
-      const endObj = new Date(endDate);
-      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      targetDay = daysOfWeek[startObj.getDay()];
-      
-      const options = { day: 'numeric', month: 'short', year: 'numeric' };
-      const startStr = startObj.toLocaleDateString('en-NZ', options);
-      const endStr = endObj.toLocaleDateString('en-NZ', options);
-      
-      if (startDate === endDate) {
-        formattedDateString = startStr;
-      } else {
-        formattedDateString = `${startStr} to ${endStr}`;
-      }
+    const startObj = new Date(startDate);
+    const endObj = new Date(endDate);
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    targetDay = daysOfWeek[startObj.getDay()];
+    
+    const options = { day: 'numeric', month: 'short', year: 'numeric' };
+    const startStr = startObj.toLocaleDateString('en-NZ', options);
+    const endStr = endObj.toLocaleDateString('en-NZ', options);
+    
+    if (startDate === endDate) {
+      formattedDateString = startStr;
+    } else {
+      formattedDateString = `${startStr} to ${endStr}`;
     }
 
     const isPendingExist = safeAbsencesList.some(a => 
       a.taId === user.id && 
-      (absenceType === 'sick' ? a.day === selectedDay : (a.startDate === startDate || a.endDate === endDate)) && 
+      (absenceType === 'sick' ? (a.startDate === startDate || a.endDate === endDate) : (a.startDate === startDate || a.endDate === endDate)) && 
       a.status === 'Pending'
     );
 
@@ -669,8 +668,8 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       id: 'abs_' + Date.now(),
       taId: user.id,
       day: targetDay,
-      startDate: absenceType === 'advance' ? startDate : '',
-      endDate: absenceType === 'advance' ? endDate : '',
+      startDate,
+      endDate,
       formattedDate: formattedDateString,
       isAdvance: absenceType === 'advance',
       reason: absenceReason,
@@ -699,35 +698,47 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
           </p>
         </div>
         <button 
-          onClick={() => setShowAbsenceForm(!showAbsenceForm)} 
-          className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all animate-pulse"
+          onClick={() => setShowAbsenceForm(true)} 
+          className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all shadow-sm"
         >
           Report Absence / Leave
         </button>
       </div>
 
       {showAbsenceForm && (
-        <div className="bg-white p-6 rounded-2xl border border-red-200 shadow-sm space-y-4 animate-fade-in">
-          <h4 className="font-bold text-slate-800 text-md">Report Leave or Absence</h4>
-          
-          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => setAbsenceType('sick')}
-              className={`py-2 px-3 rounded-lg transition-all ${absenceType === 'sick' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
-            >
-              Today's Sick Leave ({selectedDay})
-            </button>
-            <button
-              type="button"
-              onClick={() => setAbsenceType('advance')}
-              className={`py-2 px-3 rounded-lg transition-all ${absenceType === 'advance' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
-            >
-              Future Leave in Advance (Calendar)
-            </button>
-          </div>
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white p-6 rounded-3xl border border-red-200 shadow-2xl space-y-4 animate-fade-in max-w-lg w-full max-h-[95vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h4 className="font-bold text-slate-800 text-md flex items-center gap-2">
+                <AlertCircle className="text-red-500 w-5 h-5" />
+                Report Leave or Absence
+              </h4>
+              <button 
+                onClick={() => setShowAbsenceForm(false)} 
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl transition-colors"
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setAbsenceType('sick')}
+                className={`py-2 px-3 rounded-lg transition-all ${absenceType === 'sick' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+              >
+                Today's Sick Leave ({selectedDay})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAbsenceType('advance')}
+                className={`py-2 px-3 rounded-lg transition-all ${absenceType === 'advance' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+              >
+                Future Leave in Advance
+              </button>
+            </div>
 
-          {absenceType === 'advance' && (
+            {/* Unified Date Pickers (Shown for both sick days and advance leave) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -742,7 +753,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                       setEndDate(e.target.value);
                     }
                   }}
-                  min={new Date().toISOString().split('T')[0]}
                   className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-[#6157e8]/40 focus:outline-none text-slate-700"
                 />
               </div>
@@ -759,114 +769,78 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                 />
               </div>
             </div>
-          )}
 
-          {}
-          {absenceType === 'advance' && (
-            <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3 animate-fade-in">
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-5 h-5 text-amber-600" />
-                <span className="block text-xs font-bold text-amber-900 uppercase tracking-wide">
-                  * Stuart Leave Authorization Checklist
-                </span>
-              </div>
-              <p className="text-xs text-amber-800 leading-relaxed">
-                Has this future leave request already been discussed and approved by Stuart?
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 pt-1">
-                <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
-                  <input 
-                    type="radio" 
-                    name="stuartApproval" 
-                    value="Yes" 
-                    checked={approvedByStuart === 'Yes'}
-                    onChange={(e) => setApprovedByStuart(e.target.value)}
-                    className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
-                  />
-                  <span>Yes, authorized / notified</span>
-                </label>
-                <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
-                  <input 
-                    type="radio" 
-                    name="stuartApproval" 
-                    value="No" 
-                    checked={approvedByStuart === 'No'}
-                    onChange={(e) => setApprovedByStuart(e.target.value)}
-                    className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
-                  />
-                  <span>No, pending authorization</span>
-                </label>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              Reason / Details:
-            </label>
-            <textarea 
-              value={absenceReason} 
-              onChange={e => setAbsenceReason(e.target.value)} 
-              className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-[#6157e8]/50 focus:outline-none" 
-              rows={3} 
-              placeholder={absenceType === 'sick' ? "Please provide details (e.g. migraine, stomach bug)..." : "Please specify reason (e.g. dentist appointment, family event)..."} 
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
-            <button onClick={() => setShowAbsenceForm(false)} className="px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 rounded-lg">Cancel</button>
-            <button onClick={handleReportAbsence} className="px-5 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase rounded-xl shadow-sm transition-colors">Submit to SENCO</button>
-          </div>
-        </div>
-      )}
-
-      {myAbsences.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-3 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
-            <MessageSquare size={16} className="text-[#6157e8] mr-2" /> Recent Absences & SENCO Feedback Replies
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {myAbsences.map(a => (
-              <div key={a.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2 transition-all hover:border-[#6157e8]/30">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-slate-700">
-                    {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `${a.day} Absence`}
+            {/* Stuart Checklist displays ONLY for Future Leave in Advance */}
+            {absenceType === 'advance' && (
+              <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3 animate-fade-in">
+                <div className="flex items-center space-x-2">
+                  <ShieldCheck className="w-5 h-5 text-amber-600" />
+                  <span className="block text-xs font-bold text-amber-900 uppercase tracking-wide">
+                    * Stuart Leave Authorization Checklist
                   </span>
-                  <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
-                    a.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' : 
-                    a.status.startsWith('Approved') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
-                  }`}>{a.status.startsWith('Approved') ? 'Approved' : a.status}</span>
                 </div>
-                
-                {/* Only render Stuart Checklist status for leave requested in advance */}
-                {a.isAdvance && (
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold mt-0.5">
-                    <span className="text-slate-400">Stuart Approved:</span>
-                    <span className={a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-600'}>
-                      {a.approvedByStuart || 'No'}
-                    </span>
-                  </div>
-                )}
-
-                <div className="text-slate-500 text-xs italic bg-white border border-slate-100 p-2 rounded-lg mt-1">Reason: "{a.reason}"</div>
-                {a.reply ? (
-                  <div className="bg-violet-50/70 p-3 rounded-xl border border-violet-100 text-xs text-slate-700 mt-1.5 flex flex-col relative shadow-sm">
-                    <div className="font-bold text-[#6157e8] text-[9px] uppercase tracking-wider block mb-1 flex items-center gap-1">
-                      <Bell size={10} className="text-[#6157e8]" /> SENCO Response Note:
-                    </div>
-                    <span className="font-medium text-slate-800 leading-relaxed italic">"{a.reply}"</span>
-                  </div>
-                ) : (
-                  <div className="text-[10px] text-slate-400 italic mt-1.5 flex items-center gap-1 bg-slate-100/50 p-2 rounded-lg">
-                    <Loader2 size={12} className="animate-spin text-slate-300" /> Waiting for SENCO reply note...
-                  </div>
-                )}
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Has this future leave request already been discussed and approved by Stuart?
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                  <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
+                    <input 
+                      type="radio" 
+                      name="stuartApproval" 
+                      value="Yes" 
+                      checked={approvedByStuart === 'Yes'}
+                      onChange={(e) => setApprovedByStuart(e.target.value)}
+                      className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
+                    />
+                    <span>Yes, authorized / notified</span>
+                  </label>
+                  <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
+                    <input 
+                      type="radio" 
+                      name="stuartApproval" 
+                      value="No" 
+                      checked={approvedByStuart === 'No'}
+                      onChange={(e) => setApprovedByStuart(e.target.value)}
+                      className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
+                    />
+                    <span>No, pending authorization</span>
+                  </label>
+                </div>
               </div>
-            ))}
+            )}
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Reason / Details:
+              </label>
+              <textarea 
+                value={absenceReason} 
+                onChange={e => setAbsenceReason(e.target.value)} 
+                className="w-full border border-slate-200 p-3 rounded-xl text-sm focus:ring-2 focus:ring-[#6157e8]/50 focus:outline-none" 
+                rows={3} 
+                placeholder={absenceType === 'sick' ? "Please provide details (e.g. flu, migraine, family bug)..." : "Please specify reason (e.g. dentist appointment, scheduled workshop)..."} 
+              />
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+              <button 
+                onClick={() => setShowAbsenceForm(false)} 
+                className="px-4 py-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleReportAbsence} 
+                className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase rounded-xl shadow-sm transition-colors"
+              >
+                Submit to SENCO
+              </button>
+            </div>
           </div>
         </div>
       )}
 
+      {/* --- DAYS NAVIGATION --- */}
       <div className="flex space-x-1 overflow-x-auto bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm scrollbar-hide">
         {DAYS.map(d => (
           <button 
@@ -911,6 +885,53 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
           })
         )}
       </div>
+
+      {myAbsences.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-3 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
+            <MessageSquare size={16} className="text-[#6157e8] mr-2" /> Recent Absences & SENCO Feedback Replies
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {myAbsences.map(a => (
+              <div key={a.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2 transition-all hover:border-[#6157e8]/30">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-slate-700">
+                    {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `Sick Leave (${a.formattedDate || a.day})`}
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
+                    a.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' : 
+                    a.status.startsWith('Approved') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+                  }`}>{a.status.startsWith('Approved') ? 'Approved' : a.status}</span>
+                </div>
+                
+                {/* Stuart Checklist indicator displays ONLY for Advance Leaves */}
+                {a.isAdvance && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold mt-0.5">
+                    <span className="text-slate-400">Stuart Approved:</span>
+                    <span className={a.approvedByStuart === 'Yes' ? 'text-emerald-600' : 'text-amber-600'}>
+                      {a.approvedByStuart || 'No'}
+                    </span>
+                  </div>
+                )}
+
+                <div className="text-slate-500 text-xs italic bg-white border border-slate-100 p-2 rounded-lg mt-1">Reason: "{a.reason}"</div>
+                {a.reply ? (
+                  <div className="bg-violet-50/70 p-3 rounded-xl border border-violet-100 text-xs text-slate-700 mt-1.5 flex flex-col relative shadow-sm">
+                    <div className="font-bold text-[#6157e8] text-[9px] uppercase tracking-wider block mb-1 flex items-center gap-1">
+                      <Bell size={10} className="text-[#6157e8]" /> SENCO Response Note:
+                    </div>
+                    <span className="font-medium text-slate-800 leading-relaxed italic">"{a.reply}"</span>
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-slate-400 italic mt-1.5 flex items-center gap-1 bg-slate-100/50 p-2 rounded-lg">
+                    <Loader2 size={12} className="animate-spin text-slate-300" /> Waiting for SENCO reply note...
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -948,7 +969,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [resolvingAbsence, setResolvingAbsence] = useState(null);
   const [editingCell, setEditingCell] = useState(null); 
   const [showManageStaff, setShowManageStaff] = useState(false);
-  const [showCriticalCoverBoard, setShowCriticalCoverBoard] = useState(false); // Standalone critical coverage manager
+  const [showCriticalCoverBoard, setShowCriticalCoverBoard] = useState(false); 
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
@@ -996,7 +1017,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       id: 'abs_test_' + Date.now(),
       taId: 't1',
       day: selectedDay,
-      reason: 'Simulated real-time absence: Feeling unwell today and seeking coverage for reading support.',
+      reason: 'Simulated sick leave: Woke up feeling unwell today and seeking coverage.',
       status: 'Pending',
       reply: '',
       isAdvance: false,
@@ -1177,7 +1198,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Senco Interactive Header with Critical student coverage board option */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser.name}</h2>
@@ -1196,7 +1216,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
-          {/* STANDALONE SEPARATE BUTTON TO ASSIGN CRITICAL COVERAGE */}
           <button 
             onClick={() => setShowCriticalCoverBoard(true)} 
             className="w-full sm:w-auto py-2.5 px-4 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl uppercase tracking-wider shadow-md flex items-center justify-center space-x-2 transition-all border border-amber-600"
@@ -1211,7 +1230,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       </div>
 
-      {}
+      {/* Senco Live Absence Stream cards */}
       {(directAbsences.length > 0 || coSencoAbsences.length > 0) ? (
         <div className="bg-red-50/60 border border-red-200/80 rounded-2xl p-6 space-y-4">
           <div className="flex justify-between items-center">
@@ -1244,7 +1263,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                         )}
                       </div>
                       <h4 className="font-bold text-slate-800 text-lg mt-1.5">
-                        {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
+                        {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'sick'} for {a.formattedDate || a.day}
                       </h4>
                       
                       {/* Highly prominent Approved by Stuart row - ONLY render for Leave requested in advance */}
@@ -1286,7 +1305,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     </div>
                   </div>
 
-                  {}
                   <div className="flex flex-wrap items-center gap-2 self-end pl-2">
                     {!a.isAdvance ? (
                       <>
@@ -1344,7 +1362,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                         )}
                       </div>
                       <h4 className="font-bold text-slate-700 text-lg mt-1.5">
-                        {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'absent'} for {a.isAdvance ? (a.formattedDate || a.day) : a.day}
+                        {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'sick'} for {a.formattedDate || a.day}
                       </h4>
 
                       {/* Prominent Stuart row - ONLY render for Leave requested in advance */}
@@ -1386,7 +1404,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     </div>
                   </div>
 
-                  {}
                   <div className="flex flex-wrap items-center gap-2 self-end pl-2">
                     {!a.isAdvance ? (
                       <>
@@ -1480,12 +1497,11 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
                       <span className="text-slate-400 font-semibold">
-                        {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `${a.day} Absence`}
+                        {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `Sick Leave (${a.formattedDate || a.day})`}
                       </span>
                       <span className="text-slate-400">•</span>
                       <span className="text-slate-500 italic">" {a.reason} "</span>
                     </div>
-                    {/* Only render Stuart approved indicator if it's actually an advance leave */}
                     {a.isAdvance && (
                       <div className="mt-1.5 flex items-center gap-1.5">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stuart Approved:</span>
@@ -1514,7 +1530,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {}
       {showCriticalCoverBoard && (
         <CriticalCoverageBoard 
           day={selectedDay}
@@ -1671,7 +1686,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   </button>
                 )}
                 <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Cancel</button>
-                <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm font-sans">Save Changes</button>
+                <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">Save Changes</button>
               </div>
             </form>
           </div>
