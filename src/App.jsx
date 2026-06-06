@@ -626,7 +626,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       return;
     }
     if (!approvedByStuart) {
-      addToast('Please confirm if Stuart has approved your leave.', 'error');
+      addToast('Please complete the Stuart leave approval checklist.', 'error');
       return;
     }
 
@@ -729,33 +729,40 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
           )}
 
           {}
-          <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
-            <span className="block text-xs font-bold text-amber-900 uppercase tracking-wide">
-              * Stuart Leave Authorization Checklist
-            </span>
-            <p className="text-[11px] text-amber-800">Has your leave been approved by Stuart?</p>
-            <div className="flex gap-4 pt-1">
-              <label className="flex items-center space-x-2 text-xs font-bold text-slate-700 cursor-pointer">
+          <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
+            <div className="flex items-center space-x-2">
+              <ShieldCheck className="w-5 h-5 text-amber-600" />
+              <span className="block text-xs font-bold text-amber-900 uppercase tracking-wide">
+                * Stuart Leave Authorization Checklist
+              </span>
+            </div>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              {absenceType === 'advance' 
+                ? "Has this future leave request already been discussed and approved by Stuart?" 
+                : "For unexpected sick leave, have you notified Stuart or submitted standard medical leave reports?"}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 pt-1">
+              <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
                 <input 
                   type="radio" 
                   name="stuartApproval" 
                   value="Yes" 
                   checked={approvedByStuart === 'Yes'}
                   onChange={(e) => setApprovedByStuart(e.target.value)}
-                  className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8]" 
+                  className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
                 />
-                <span>Yes, approved by Stuart</span>
+                <span>Yes, authorized / notified</span>
               </label>
-              <label className="flex items-center space-x-2 text-xs font-bold text-slate-700 cursor-pointer">
+              <label className="flex items-center p-3 bg-white hover:bg-amber-100/30 border border-amber-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer transition-colors flex-1">
                 <input 
                   type="radio" 
                   name="stuartApproval" 
                   value="No" 
                   checked={approvedByStuart === 'No'}
                   onChange={(e) => setApprovedByStuart(e.target.value)}
-                  className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8]" 
+                  className="w-4 h-4 text-[#6157e8] border-slate-300 focus:ring-[#6157e8] mr-2" 
                 />
-                <span>No, not yet approved / pending</span>
+                <span>No, pending authorization / notification</span>
               </label>
             </div>
           </div>
@@ -1722,6 +1729,34 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
 
   const tas = users.filter(u => u.role === ROLES.TA);
 
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
   return (
     <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
       <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col overflow-hidden border border-amber-200">
@@ -1748,6 +1783,13 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
               const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
               const assignedTa = tas.find(t => t.id === session.taId);
               
+              const sortedTasForSlot = [...tas].sort((a, b) => {
+                const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+                const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+                if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+                return a.name.localeCompare(b.name);
+              });
+
               return (
                 <div key={session.id} className="border border-slate-100 bg-slate-50 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-amber-300 transition-colors">
                   <div className="flex-1">
@@ -1766,7 +1808,7 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
                   </div>
 
                   <div className="w-full md:w-auto">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Reassign Cover:</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Reassign Cover (Best Matches First):</label>
                     <select
                       value={session.taId || ''}
                       onChange={(e) => {
@@ -1777,25 +1819,14 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
                           addToast(`Reassigned "${session.subject}" to ${targetTaName}`, 'success');
                         }
                       }}
-                      className="w-full md:w-64 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-1 focus:ring-[#6157e8] outline-none cursor-pointer"
+                      className="w-full md:w-72 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-1 focus:ring-[#6157e8] outline-none cursor-pointer"
                     >
                       <option value="">-- Select cover TA --</option>
-                      {tas.map(ta => {
-                        const otherSession = sessions.find(s => 
-                          s.day === day && 
-                          s.timeSlotId === session.timeSlotId && 
-                          s.taId === ta.id && 
-                          s.id !== session.id
-                        );
-                        
-                        let currentDutyText = "Available";
-                        if (otherSession) {
-                          currentDutyText = `${otherSession.tier}: ${otherSession.subject}`;
-                        }
-
+                      {sortedTasForSlot.map(ta => {
+                        const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
                         return (
-                          <option key={ta.id} value={ta.id}>
-                            {ta.name} ({currentDutyText})
+                          <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-500"}>
+                            {ta.name} ({availabilityInfo.label})
                           </option>
                         );
                       })}
@@ -2074,6 +2105,34 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
     setAssignments(initial);
   }, [sessions, absence]);
 
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === absence.day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in">
@@ -2083,6 +2142,14 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
           {absentSessions.map(session => {
             const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+
+            const sortedOtherTas = [...otherTas].sort((a, b) => {
+              const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+              const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+              if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+              return a.name.localeCompare(b.name);
+            });
+
             return (
               <div key={session.id} className="border border-slate-100 bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div className="flex-1">
@@ -2096,14 +2163,14 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
                 <select
                   value={assignments[session.id] || ''}
                   onChange={(e) => setAssignments(prev => ({ ...prev, [session.id]: e.target.value }))}
-                  className="w-full sm:w-44 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-medium focus:ring-[#6157e8] outline-none"
+                  className="w-full sm:w-56 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-[#6157e8] outline-none cursor-pointer"
                 >
                   <option value="">Leave Uncovered</option>
-                  {otherTas.map(ta => {
-                    const isBusy = sessions.some(s => s.day === absence.day && s.timeSlotId === session.timeSlotId && s.taId === ta.id);
+                  {sortedOtherTas.map(ta => {
+                    const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
                     return (
-                      <option key={ta.id} value={ta.id}>
-                        {ta.name} {isBusy ? '(Has Duty)' : '(Available)'}
+                      <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-500"}>
+                        {ta.name} ({availabilityInfo.label})
                       </option>
                     );
                   })}
