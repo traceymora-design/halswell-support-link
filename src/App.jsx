@@ -16,7 +16,6 @@ import {
   Smartphone, QrCode, Settings, Link, LogOut, Send, HelpCircle, ShieldCheck
 } from 'lucide-react';
 
-// --- Firebase Configuration ---
 const firebaseConfig = JSON.parse(__firebase_config);
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -24,7 +23,7 @@ const db = getFirestore(app);
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'halswell-primary-ta-hub-v1';
 const MASTER_ADMINS = ['tracey.mora@halswell.school.nz'];
-const ROLES = { ADMIN: 'admin', TEACHER: 'teacher', TA: 'ta' }; // ADMIN mapped visually to SENCO
+const ROLES = { ADMIN: 'admin', TEACHER: 'teacher', TA: 'ta' };
 
 // Production Vercel URL locked in as baseline fallback
 const PRODUCTION_URL = 'https://halswell-support-link.vercel.app/';
@@ -57,7 +56,6 @@ const PriorityIcon = ({ iconName, className = "w-4 h-4" }) => {
   }
 };
 
-// Generates baseline placeholder empty schedules with original breaks
 const generateEmptySchedule = () => {
   const fullSched = {};
   DAYS.forEach(day => {
@@ -73,7 +71,6 @@ const generateEmptySchedule = () => {
   return fullSched;
 };
 
-// Generates Karen Cate's schedule mapped to the original time slot structure
 const generateKarenDefaultSchedule = () => {
   const sched = {};
   DAYS.forEach(day => {
@@ -84,16 +81,16 @@ const generateKarenDefaultSchedule = () => {
 
       if (time === "9:00 - 9:30" || time === "9:30 - 10:00" || time === "10:00 - 10:30") {
         task = "Ōtawhito/Check Karlee";
-        priority = 1; // Critical
+        priority = 1;
       } else if (time === "10:30 - 10:50") {
         task = "Morning Tea";
-        priority = 4; // Break
+        priority = 4;
       } else if (time === "10:50 - 11:10") {
         task = "Casey";
-        priority = 3; // Enrichment
+        priority = 3;
       } else if (time === "11:10 - 11:30" || time === "11:30 - 12:00") {
         task = "Ōtawhito - Sam C/Check Karlee";
-        priority = 1; // Critical
+        priority = 1;
       } else if (time === "12:00 - 12:30") {
         if (day === "Friday") {
           task = "Harry";
@@ -104,7 +101,7 @@ const generateKarenDefaultSchedule = () => {
         }
       } else if (time === "12:30 - 1:00" || time === "1:00 - 1:30") {
         task = "Lunch";
-        priority = 5; // Break
+        priority = 5;
       } else if (time === "1:30 - 2:00") {
         task = "Casey";
         priority = 3;
@@ -138,7 +135,7 @@ export default function App() {
   const [view, setView] = useState('login');
   const [tas, setTas] = useState([]);
   const [directory, setDirectory] = useState([]);
-  const [resolvedAbsences, setResolvedAbsences] = useState([]); // Persistent Absence Archive Log
+  const [resolvedAbsences, setResolvedAbsences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDay, setCurrentDay] = useState("Monday");
   const [selectedTAId, setSelectedTAId] = useState(null);
@@ -156,18 +153,15 @@ export default function App() {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [customLink, setCustomLink] = useState('');
   
-  // Custom interactive Mock Google Sign-In Selector
   const [showGoogleMockSelector, setShowGoogleMockSelector] = useState(false);
   const [manualGoogleEmail, setManualGoogleEmail] = useState('');
 
-  // Duplicating / Copying Schedules
   const [showCopyDayModal, setShowCopyDayModal] = useState(false);
   const [copyTargetDays, setCopyTargetDays] = useState([]);
 
-  // Live Coverage Coordination states
   const [showCoverageModal, setShowCoverageModal] = useState(false);
   const [selectedAbsentTA, setSelectedAbsentTA] = useState(null);
-  const [coveragePlan, setCoveragePlan] = useState({}); // { [timeSlot]: coveringTAId }
+  const [coveragePlan, setCoveragePlan] = useState({});
   
   const blockUpdates = useRef(false);
   const isInitializing = useRef(false);
@@ -181,7 +175,6 @@ export default function App() {
     return `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodedUrl}&ecc=H&margin=2`;
   }, [hubUrl]);
 
-  // Handle baseline Firebase Authentication initialization first (RULE 3)
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -198,7 +191,6 @@ export default function App() {
     };
     initAuth();
 
-    // Custom simulated state monitor
     const unsubscribe = onAuthStateChanged(auth, (userCred) => {
       if (!userCred) {
         setGoogleUser(null);
@@ -209,14 +201,12 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Monitor directory updates and match against authenticated Google email
   useEffect(() => {
     if (!dataReady || !googleUser) return;
     
     const email = googleUser.email.toLowerCase();
     let staff = directory.find(s => s.email.toLowerCase() === email);
 
-    // Auto-register Tracey if not found
     if (!staff && MASTER_ADMINS.includes(email)) {
       staff = { email, role: ROLES.ADMIN, name: googleUser.displayName || 'Tracey Mora' };
       syncToFirebase([...directory, staff], tas, customLink, resolvedAbsences);
@@ -236,12 +226,10 @@ export default function App() {
         setView('dashboard');
       }
     } else {
-      // Authenticated Google user, but not in directory list
       setSaveStatus('error-unauthorized');
     }
   }, [googleUser, directory, dataReady]);
 
-  // Baseline data fetching (Only executed AFTER Authentication is complete to prevent security errors)
   useEffect(() => {
     if (!authInitialized) return;
 
@@ -275,7 +263,6 @@ export default function App() {
     return () => unsubscribe();
   }, [authInitialized, isEditingSchedule]);
 
-  // STRICT GUARANTEE: Force TAs back to their personal schedule view if they attempt to view dashboard
   useEffect(() => {
     if (appUser && appUser.role === ROLES.TA && dataReady) {
       const taMatch = tas.find(t => t.email.toLowerCase() === appUser.email.toLowerCase());
@@ -294,7 +281,6 @@ export default function App() {
     }
 
     const initialData = { 
-      // Pre-populating Karen with her schedule mapped to original slot system
       tas: [
         { id: 'ta-karen-cate', name: 'Karen Cate', email: 'karen.cate@halswell.school.nz', status: 'active', schedule: generateKarenDefaultSchedule() }
       ], 
@@ -351,7 +337,6 @@ export default function App() {
     }
   };
 
-  // Safe client-side Google sign-in proxy simulation to solve domain authorization popup issue
   const handleGoogleSignIn = () => {
     setShowGoogleMockSelector(true);
   };
@@ -486,7 +471,6 @@ export default function App() {
     await syncToFirebase(directory, updatedTas, customLink, resolvedAbsences);
   };
 
-  // --- Absentee & Coverage Coordinator Logic ---
   const absentTAs = useMemo(() => {
     return tas.filter(t => t.status === 'absent');
   }, [tas]);
@@ -516,11 +500,9 @@ export default function App() {
     });
   };
 
-  // Apply coordinator changes and write resolved absence to archive log (including current timestamp)
   const handlePublishCoverage = async () => {
     if (!selectedAbsentTA) return;
 
-    // Create a detailed record in the resolved absences archive log
     const resolutionTimestamp = new Date().toLocaleString('en-NZ', {
       day: 'numeric',
       month: 'short',
@@ -549,7 +531,6 @@ export default function App() {
             priority: 6 
           };
         });
-        // Clear active absent status and reason to wipe the coordinator warning banner
         return { ...t, status: 'active', absenceReason: '', schedule: newSched };
       }
 
@@ -613,7 +594,6 @@ export default function App() {
     </div>
   );
 
-  // --- NATIVE GOOGLE LOGIN VIEW ---
   if (view === 'login') return (
     <div className="min-h-screen flex items-center justify-center p-6 font-sans bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-50 via-[#fcfbf9] to-slate-100 overflow-hidden relative">
       <div className="w-full max-sm:max-w-xs max-w-sm relative z-10">
@@ -645,7 +625,6 @@ export default function App() {
             {saveStatus === 'signing-in' ? 'Connecting...' : 'Sign in with Google'}
           </button>
 
-          {/* Feedback/Error triggers */}
           {saveStatus === 'error-unauthorized' && (
             <div className="p-4 bg-rose-50/50 border border-rose-100 rounded-2xl text-center space-y-3 animate-in zoom-in-95">
               <p className="text-rose-500 text-xs font-semibold leading-relaxed">
@@ -656,12 +635,6 @@ export default function App() {
                 Switch Google Account
               </button>
             </div>
-          )}
-          {saveStatus === 'error-popup' && (
-            <p className="text-rose-500 text-xs text-center font-medium animate-pulse leading-relaxed">
-              Connection lost.<br/>
-              <span className="text-slate-400 text-[10px] font-normal">Ensure your internet is active and try signing in again.</span>
-            </p>
           )}
         </div>
         
@@ -675,7 +648,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* --- Safe OAuth Google Mock popup simulation --- */}
       {showGoogleMockSelector && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 border border-slate-100 animate-in zoom-in-95 duration-200">
@@ -694,7 +666,6 @@ export default function App() {
 
             <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-4">Select or type your Halswell email</p>
             <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              {/* Load matching school domain staff registered in directory */}
               {directory.map(staff => (
                 <button
                   key={staff.email}
@@ -1019,7 +990,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* Admin/SENCO Alerts & Coordinator Banner (Hidden for Teachers) */}
+        {/* Admin/SENCO Alerts & Coordinator Banner */}
         {appUser?.role === ROLES.ADMIN && absentTAs.length > 0 && (
           <div className="p-5 bg-amber-50/50 border border-amber-100 rounded-3xl animate-in slide-in-from-top-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex gap-4 items-start md:items-center">
@@ -1045,7 +1016,6 @@ export default function App() {
               </button>
               <button 
                 onClick={async () => {
-                  // Resolve and archive direct activation
                   const resolutionTimestamp = new Date().toLocaleString('en-NZ', {
                     day: 'numeric',
                     month: 'short',
@@ -1078,103 +1048,109 @@ export default function App() {
           </div>
         )}
 
+        {}
         {view === 'dashboard' ? (
-          <div className="space-y-12 animate-in fade-in duration-300">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Active Support Log</h2>
-                <div className="flex gap-1 bg-slate-50 p-1 rounded-lg">
-                  {DAYS.map(d => (
-                    <button key={d} onClick={() => setCurrentDay(d)} className={`px-3 py-1 rounded-md text-[9px] font-bold uppercase transition-all ${currentDay === d ? 'bg-white text-indigo-500 shadow-sm' : 'text-slate-300'}`}>{d.slice(0, 3)}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {tas.map(ta => (
-                  <div 
-                    key={ta.id} 
-                    onClick={() => {setSelectedTAId(ta.id); setView('schedule');}} 
-                    className={`group p-6 rounded-2xl border transition-all relative cursor-pointer ${
-                      ta.status === 'absent' 
-                        ? 'bg-rose-50/20 border-rose-100/50 hover:border-rose-200' 
-                        : 'bg-white border-slate-100 hover:border-indigo-100'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-4 ${
-                      ta.status === 'absent' ? 'bg-rose-50 text-rose-500' : 'bg-slate-50 text-slate-200 group-hover:bg-indigo-50 group-hover:text-indigo-400'
-                    }`}>
-                      {ta.status === 'absent' ? <CalendarX className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+          <div className="animate-in fade-in duration-300">
+            {/* UPDATED: Adaptive side-by-side split screen layout for Wide Screens, stacked under for Mobile */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+              
+              {/* Left Side: Timetables & Staff Directory */}
+              <div className="lg:col-span-2 space-y-12">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Active Support Log</h2>
+                    <div className="flex gap-1 bg-slate-50 p-1 rounded-lg">
+                      {DAYS.map(d => (
+                        <button key={d} onClick={() => setCurrentDay(d)} className={`px-3 py-1 rounded-md text-[9px] font-bold uppercase transition-all ${currentDay === d ? 'bg-white text-indigo-500 shadow-sm' : 'text-slate-300'}`}>{d.slice(0, 3)}</button>
+                      ))}
                     </div>
-                    <h3 className="font-medium text-sm text-slate-800 mb-0.5">{ta.name}</h3>
-                    <p className={`text-[8px] font-bold uppercase tracking-widest ${ta.status === 'absent' ? 'text-rose-400' : 'text-slate-300'}`}>
-                      {ta.status === 'absent' ? 'Absent' : 'Log Sheet'}
-                    </p>
                   </div>
-                ))}
-                {appUser?.role === ROLES.ADMIN && (
-                  <button onClick={() => setShowAddStaffModal(true)} className="p-6 bg-white rounded-2xl border border-dashed border-slate-100 flex flex-col items-center justify-center gap-2 text-slate-300 hover:border-indigo-100 hover:text-indigo-400 transition-all">
-                    <UserPlus className="w-5 h-5" />
-                    <span className="font-bold text-[8px] uppercase tracking-widest">Register</span>
-                  </button>
-                )}
-              </div>
-            </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {tas.map(ta => (
+                      <div 
+                        key={ta.id} 
+                        onClick={() => {setSelectedTAId(ta.id); setView('schedule');}} 
+                        className={`group p-6 rounded-2xl border transition-all relative cursor-pointer ${
+                          ta.status === 'absent' 
+                            ? 'bg-rose-50/20 border-rose-100/50 hover:border-rose-200' 
+                            : 'bg-white border-slate-100 hover:border-indigo-100'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-4 ${
+                          ta.status === 'absent' ? 'bg-rose-50 text-rose-500' : 'bg-slate-50 text-slate-200 group-hover:bg-indigo-50 group-hover:text-indigo-400'
+                        }`}>
+                          {ta.status === 'absent' ? <CalendarX className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                        </div>
+                        <h3 className="font-medium text-sm text-slate-800 mb-0.5">{ta.name}</h3>
+                        <p className={`text-[8px] font-bold uppercase tracking-widest ${ta.status === 'absent' ? 'text-rose-400' : 'text-slate-300'}`}>
+                          {ta.status === 'absent' ? 'Absent' : 'Log Sheet'}
+                        </p>
+                      </div>
+                    ))}
+                    {appUser?.role === ROLES.ADMIN && (
+                      <button onClick={() => setShowAddStaffModal(true)} className="p-6 bg-white rounded-2xl border border-dashed border-slate-100 flex flex-col items-center justify-center gap-2 text-slate-300 hover:border-indigo-100 hover:text-indigo-400 transition-all min-h-[142px]">
+                        <UserPlus className="w-5 h-5" />
+                        <span className="font-bold text-[8px] uppercase tracking-widest">Register</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-            {/* Directory access restricted strictly to Admin/SENCO users */}
-            {appUser?.role === ROLES.ADMIN && (
-              <div className="space-y-6">
-                <h2 className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Staff Directory</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {directory.map(staff => (
-                    <div key={staff.email} className="flex items-center justify-between p-4 bg-slate-50/30 rounded-xl border border-slate-50 hover:border-indigo-50 transition-all">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-8 h-8 bg-white border border-slate-100 rounded-lg flex items-center justify-center text-slate-200 shrink-0"><User className="w-4 h-4" /></div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-slate-700 text-xs truncate">{staff.name}</p>
-                          <p className="text-[9px] text-slate-300 truncate tracking-wide mb-1">{staff.email}</p>
-                          <div className="flex items-center gap-1 text-[9px] text-indigo-500 font-bold uppercase tracking-wider">
-                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            <span>Verified Google Account</span>
+                {appUser?.role === ROLES.ADMIN && (
+                  <div className="space-y-6">
+                    <h2 className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Staff Directory</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {directory.map(staff => (
+                        <div key={staff.email} className="flex items-center justify-between p-4 bg-slate-50/30 rounded-xl border border-slate-50 hover:border-indigo-50 transition-all">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="w-8 h-8 bg-white border border-slate-100 rounded-lg flex items-center justify-center text-slate-200 shrink-0"><User className="w-4 h-4" /></div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-slate-700 text-xs truncate">{staff.name}</p>
+                              <p className="text-[9px] text-slate-300 truncate tracking-wide mb-1">{staff.email}</p>
+                              <div className="flex items-center gap-1 text-[9px] text-indigo-500 font-bold uppercase tracking-wider">
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                <span>Verified Account</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <select value={staff.role} disabled={isSyncing} onChange={(e) => handleUpdateRole(staff.email, e.target.value)} className="bg-white text-[8px] font-bold uppercase px-2 py-1.5 rounded border border-slate-100 outline-none cursor-pointer tracking-widest text-slate-400">
+                              <option value={ROLES.ADMIN}>SENCO</option>
+                              <option value={ROLES.TEACHER}>Teacher</option>
+                              <option value={ROLES.TA}>TA</option>
+                            </select>
+                            {!MASTER_ADMINS.includes(staff.email.toLowerCase()) && (
+                              <button onClick={() => setStaffToDelete(staff)} disabled={isSyncing} className="p-1.5 text-slate-200 hover:text-rose-400 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                            )}
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <select value={staff.role} disabled={isSyncing} onChange={(e) => handleUpdateRole(staff.email, e.target.value)} className="bg-white text-[8px] font-bold uppercase px-2 py-1.5 rounded border border-slate-100 outline-none cursor-pointer tracking-widest text-slate-400">
-                          <option value={ROLES.ADMIN}>SENCO</option>
-                          <option value={ROLES.TEACHER}>Teacher</option>
-                          <option value={ROLES.TA}>TA</option>
-                        </select>
-                        {!MASTER_ADMINS.includes(staff.email.toLowerCase()) && (
-                          <button onClick={() => setStaffToDelete(staff)} disabled={isSyncing} className="p-1.5 text-slate-200 hover:text-rose-400 transition-colors"><Trash2 className="w-3 h-3" /></button>
-                        )}
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* NEW: Persistent Resolved Absences Archive Log Panel */}
-            {appUser?.role === ROLES.ADMIN && resolvedAbsences.length > 0 && (
-              <div className="space-y-6 pt-6 border-t border-slate-100 animate-in fade-in duration-500">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Resolved Absences Archive Log</h2>
-                  <span className="px-2 py-1 rounded-full bg-slate-50 text-[9px] font-bold text-slate-400 border border-slate-100 uppercase tracking-wider">{resolvedAbsences.length} Total</span>
-                </div>
-                <div className="bg-slate-50/30 rounded-3xl border border-slate-50 p-6 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Right Side / Sidebar: Resolved Absences Archive Log Panel (Under on mobile, Beside on desktop) */}
+              {appUser?.role === ROLES.ADMIN && resolvedAbsences.length > 0 && (
+                <div className="space-y-6 lg:border-l lg:border-slate-100 lg:pl-8">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Absence Archive Log</h2>
+                    <span className="px-2 py-1 rounded-full bg-slate-50 text-[9px] font-bold text-slate-400 border border-slate-100 uppercase tracking-wider">{resolvedAbsences.length} Total</span>
+                  </div>
+                  
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 no-scrollbar">
                     {resolvedAbsences.map(log => (
-                      <div key={log.id} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-start gap-4 shadow-sm hover:shadow transition-shadow">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-500 shrink-0">
+                      <div key={log.id} className="p-4 bg-slate-50/50 border border-slate-100 rounded-2xl flex items-start gap-3 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-500 shrink-0 mt-0.5">
                           <CheckCircle2 className="w-4 h-4" />
                         </div>
                         <div className="min-w-0 flex-1 space-y-1">
-                          <p className="text-xs font-semibold text-slate-700">{log.name}</p>
-                          <p className="text-[10px] text-slate-400 truncate">{log.email}</p>
-                          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100/50 text-[10px] text-slate-500 mt-2 italic">
+                          <p className="text-xs font-semibold text-slate-700 leading-none">{log.name}</p>
+                          <p className="text-[10px] text-slate-400 truncate leading-none">{log.email}</p>
+                          <div className="bg-white p-2 rounded-lg border border-slate-100 text-[10px] text-slate-500 mt-2 italic">
                             "{log.reason}"
                           </div>
-                          <div className="pt-2 flex flex-col gap-1 text-[9px] text-slate-400 uppercase font-bold tracking-wider">
+                          <div className="pt-2 space-y-0.5 text-[8px] text-slate-400 uppercase font-bold tracking-wider">
                             <div>Resolved: <span className="text-[#5c5cd6] font-normal lowercase tracking-normal">{log.resolvedAt}</span></div>
                             <div>Status: <span className="text-emerald-500">{log.resolutionType}</span></div>
                           </div>
@@ -1183,14 +1159,14 @@ export default function App() {
                     ))}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+
+            </div>
           </div>
         ) : (
           <div className="space-y-8 animate-in fade-in duration-300">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-center gap-4">
-                {/* Back navigation hidden only for Teaching Assistants */}
                 {appUser?.role !== ROLES.TA && (
                   <button onClick={() => {setView('dashboard'); setSelectedTAId(null);}} className="p-2 text-slate-300 hover:text-[#5c5cd6] transition-all">
                     <ChevronRight className="rotate-180 w-5 h-5" />
@@ -1229,7 +1205,7 @@ export default function App() {
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-[11px] text-slate-400 leading-relaxed flex items-start gap-2 animate-in fade-in">
                   <HelpCircle className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                   <p>
-                    <strong>Tip:</strong> Breaks (Morning Tea & Lunch) can be placed at any time slot. Use the <strong>Preset Buttons</strong> next to each slot to instantly schedule breaks, or click them to re-assign Enrichment slots as break slots when needed.
+                    <strong>Tip:</strong> Breaks can be placed at any time slot. Use the <strong>Preset Buttons</strong> next to each slot to instantly schedule breaks, or click them to re-assign Enrichment slots as break slots when needed.
                   </p>
                 </div>
               )}
@@ -1376,69 +1352,6 @@ export default function App() {
           </div>
         )}
       </div>
-
-      {/* --- Safe OAuth Google Mock popup simulation --- */}
-      {showGoogleMockSelector && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 border border-slate-100 animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                </svg>
-                <span className="font-semibold text-xs uppercase tracking-wider text-slate-500">Choose Google Account</span>
-              </div>
-              <button onClick={() => setShowGoogleMockSelector(false)} className="text-slate-300 hover:text-slate-500 p-1"><X className="w-4 h-4" /></button>
-            </div>
-
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-4">Select or type your Halswell email</p>
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              {/* Load matching school domain staff registered in directory */}
-              {directory.map(staff => (
-                <button
-                  key={staff.email}
-                  onClick={() => handleSimulateGoogleSuccess(staff.email, staff.name)}
-                  className="w-full text-left p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-100 rounded-xl transition-all flex items-center gap-3 group"
-                >
-                  <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 font-bold text-xs group-hover:bg-[#5c5cd6] group-hover:text-white transition-colors">
-                    {staff.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-slate-700 text-xs truncate leading-none">{staff.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5 leading-none">{staff.email}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="pt-4 border-t border-slate-100 mt-4 space-y-2">
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block ml-1">Use another school account</label>
-              <div className="flex gap-2">
-                <input 
-                  type="email"
-                  placeholder="name@halswell.school.nz"
-                  value={manualGoogleEmail}
-                  onChange={(e) => setManualGoogleEmail(e.target.value)}
-                  className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-xs"
-                />
-                <button 
-                  onClick={() => {
-                    if (manualGoogleEmail.trim()) {
-                      handleSimulateGoogleSuccess(manualGoogleEmail, manualGoogleEmail.split('@')[0]);
-                    }
-                  }}
-                  className="px-4 py-2 bg-slate-800 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider"
-                >
-                  Sign In
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
