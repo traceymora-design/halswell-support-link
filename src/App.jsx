@@ -31,7 +31,6 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'halswell-primary-ta-
 const MASTER_ADMINS = ['tracey.mora@halswell.school.nz'];
 const ROLES = { ADMIN: 'admin', TEACHER: 'teacher', TA: 'ta' }; // ADMIN mapped visually to SENCO
 
-// Production Vercel URL locked in as baseline fallback
 const PRODUCTION_URL = 'https://halswell-support-link.vercel.app/';
 
 const TIME_SLOTS = [
@@ -62,7 +61,6 @@ const PriorityIcon = ({ iconName, className = "w-4 h-4" }) => {
   }
 };
 
-// Generates baseline placeholder empty schedules with original breaks
 const generateEmptySchedule = () => {
   const fullSched = {};
   DAYS.forEach(day => {
@@ -78,7 +76,6 @@ const generateEmptySchedule = () => {
   return fullSched;
 };
 
-// Generates Karen Cate's schedule mapped to the original time slot structure
 const generateKarenDefaultSchedule = () => {
   const sched = {};
   DAYS.forEach(day => {
@@ -161,18 +158,15 @@ export default function App() {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [customLink, setCustomLink] = useState('');
   
-  // Custom interactive Mock Google Sign-In Selector
   const [showGoogleMockSelector, setShowGoogleMockSelector] = useState(false);
   const [manualGoogleEmail, setManualGoogleEmail] = useState('');
 
-  // Duplicating / Copying Schedules
   const [showCopyDayModal, setShowCopyDayModal] = useState(false);
   const [copyTargetDays, setCopyTargetDays] = useState([]);
 
-  // Live Coverage Coordination states
   const [showCoverageModal, setShowCoverageModal] = useState(false);
   const [selectedAbsentTA, setSelectedAbsentTA] = useState(null);
-  const [coveragePlan, setCoveragePlan] = useState({}); // { [timeSlot]: coveringTAId }
+  const [coveragePlan, setCoveragePlan] = useState({}); 
   
   const blockUpdates = useRef(false);
   const isInitializing = useRef(false);
@@ -189,7 +183,6 @@ export default function App() {
     return `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodedUrl}&ecc=H&margin=2`;
   }, [hubUrl]);
 
-  // Handle baseline Firebase Authentication initialization first (RULE 3)
   useEffect(() => {
     if (!auth) {
       setAuthInitialized(true);
@@ -210,7 +203,6 @@ export default function App() {
     };
     initAuth();
 
-    // Custom simulated state monitor
     const unsubscribe = onAuthStateChanged(auth, (userCred) => {
       if (!userCred) {
         setGoogleUser(null);
@@ -221,14 +213,12 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Monitor directory updates and match against authenticated Google email
   useEffect(() => {
     if (!dataReady || !googleUser) return;
     
     const email = googleUser.email.toLowerCase();
     let staff = directory.find(s => s.email.toLowerCase() === email);
 
-    // Auto-register Tracey if not found
     if (!staff && MASTER_ADMINS.includes(email)) {
       staff = { email, role: ROLES.ADMIN, name: googleUser.displayName || 'Tracey Mora' };
       syncToFirebase([...directory, staff], tas, customLink, resolvedAbsences);
@@ -248,12 +238,10 @@ export default function App() {
         setView('dashboard');
       }
     } else {
-      // Authenticated Google user, but not in directory list
       setSaveStatus('error-unauthorized');
     }
   }, [googleUser, directory, dataReady]);
 
-  // Baseline data fetching (Only executed AFTER Authentication is complete to prevent security errors)
   useEffect(() => {
     if (!authInitialized) return;
 
@@ -294,7 +282,6 @@ export default function App() {
     return () => unsubscribe();
   }, [authInitialized, isEditingSchedule]);
 
-  // STRICT GUARANTEE: Force TAs back to their personal schedule view if they attempt to view dashboard
   useEffect(() => {
     if (appUser && appUser.role === ROLES.TA && dataReady) {
       const taMatch = tas.find(t => t.email.toLowerCase() === appUser.email.toLowerCase());
@@ -318,7 +305,6 @@ export default function App() {
     }
 
     const initialData = { 
-      // Pre-populating Karen with her schedule mapped to original slot system
       tas: [
         { id: 'ta-karen-cate', name: 'Karen Cate', email: 'karen.cate@halswell.school.nz', status: 'active', schedule: generateKarenDefaultSchedule() }
       ], 
@@ -376,7 +362,6 @@ export default function App() {
     }
   };
 
-  // Safe client-side Google sign-in proxy simulation to solve domain authorization popup issue
   const handleGoogleSignIn = () => {
     setShowGoogleMockSelector(true);
   };
@@ -511,13 +496,10 @@ export default function App() {
     await syncToFirebase(directory, updatedTas, customLink, resolvedAbsences);
   };
 
-  // --- Absentee & Coverage Coordinator Logic ---
   const absentTAs = useMemo(() => {
     return tas.filter(t => t.status === 'absent');
   }, [tas]);
 
-  // Identify slots where absent TA has priority 1 or 2 (Critical or High Needs)
-  // Sorted to ensure Critical slots (priority 1) are reallocated first
   const criticalSlotsToCover = useMemo(() => {
     if (!selectedAbsentTA) return [];
     const schedule = selectedAbsentTA.schedule?.[currentDay] || {};
@@ -528,10 +510,9 @@ export default function App() {
       time: slot,
       task: schedule[slot]?.task || 'General Support',
       priority: schedule[slot]?.priority || 3
-    })).sort((a, b) => a.priority - b.priority); // Priority 1 (Critical) sorted first, Priority 2 second
+    })).sort((a, b) => a.priority - b.priority); 
   }, [selectedAbsentTA, currentDay]);
 
-  // Dynamic coverage checker that honors custom/moved breaks and only suggests TAs currently on Enrichment or General Support
   const getAvailableCoversForSlot = (timeSlot, excludeAssignedId = null) => {
     return tas.filter(t => {
       if (t.id === selectedAbsentTA?.id) return false;
@@ -541,25 +522,20 @@ export default function App() {
       const currentTask = t.schedule?.[currentDay]?.[timeSlot];
       if (!currentTask) return true;
       
-      // EXCLUDE BREAKS (Priority 4/5) OR NOT WORKING (Priority 6)
-      // Only staff whose current slot is Priority 3 (Enrichment) or is "General Support" are marked available.
       return currentTask.priority === 3 || currentTask.task === "General Support";
     });
   };
 
-  // NEW: Suggests a cover plan automatically based on priority (Critical first, then High Needs)
   const handleAutoSuggestAll = () => {
     if (!selectedAbsentTA) return;
     
     const suggestedPlan = {};
-    const assignedThisRound = []; // Prevent a single TA from being double-booked in the same timeslot
+    const assignedThisRound = []; 
     
     criticalSlotsToCover.forEach(slot => {
-      // Find all available covers for this timeslot who haven't been assigned yet during this round
       const available = getAvailableCoversForSlot(slot.time).filter(t => !assignedThisRound.includes(`${slot.time}-${t.id}`));
       
       if (available.length > 0) {
-        // Automatically assign the first available eligible TA
         const match = available[0];
         suggestedPlan[slot.time] = match.id;
         assignedThisRound.push(`${slot.time}-${match.id}`);
@@ -569,7 +545,6 @@ export default function App() {
     setCoveragePlan(suggestedPlan);
   };
 
-  // Helper to fetch live breakdown of other TAs' assignments for transparent coordination
   const getOtherTAStatusesForSlot = (timeSlot) => {
     return tas
       .filter(t => t.id !== selectedAbsentTA?.id && t.status !== 'absent')
@@ -583,11 +558,9 @@ export default function App() {
       });
   };
 
-  // Apply coordinator changes and write resolved absence to archive log (including current timestamp)
   const handlePublishCoverage = async () => {
     if (!selectedAbsentTA) return;
 
-    // Create a detailed record in the resolved absences archive log
     const resolutionTimestamp = new Date().toLocaleString('en-NZ', {
       day: 'numeric',
       month: 'short',
@@ -617,7 +590,6 @@ export default function App() {
             priority: 6 
           };
         });
-        // Clear active absent status and reason to wipe the coordinator warning banner
         return { ...t, status: 'active', absenceReason: '', schedule: newSched };
       }
 
@@ -682,7 +654,6 @@ export default function App() {
     </div>
   );
 
-  // --- NATIVE GOOGLE LOGIN VIEW ---
   if (view === 'login') return (
     <div className="min-h-screen flex items-center justify-center p-6 font-sans bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-50 via-[#fcfbf9] to-slate-100 overflow-hidden relative">
       <div className="w-full max-sm:max-w-xs max-w-sm relative z-10">
@@ -714,7 +685,6 @@ export default function App() {
             {saveStatus === 'signing-in' ? 'Connecting...' : 'Sign in with Google'}
           </button>
 
-          {/* Feedback/Error triggers */}
           {saveStatus === 'error-unauthorized' && (
             <div className="p-4 bg-rose-50/50 border border-rose-100 rounded-2xl text-center space-y-3 animate-in zoom-in-95">
               <p className="text-rose-500 text-xs font-semibold leading-relaxed">
@@ -744,7 +714,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mock login dialog inside login screen */}
       {showGoogleMockSelector && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 border border-slate-100 animate-in zoom-in-95 duration-200">
@@ -886,7 +855,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Other TA schedules breakdown for maximum visibility */}
                       <div className="pt-2 border-t border-slate-100/50 flex flex-wrap gap-x-4 gap-y-1">
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Live TA Standby:</span>
                         {otherTAStatuses.map(status => {
@@ -1096,7 +1064,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Workspace Frame */}
+      {/* --- Main Workspace Frame --- */}
       <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-50">
           <div className="flex items-center gap-4">
@@ -1182,9 +1150,9 @@ export default function App() {
           </div>
         )}
 
+        {/* --- Primary Dashboard Render States --- */}
         {view === 'dashboard' ? (
           <div className="animate-in fade-in duration-300">
-            {/* Adaptive side-by-side split screen layout for Wide Screens, stacked under for Mobile */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
               
               {/* Left Side: Timetables & Staff Directory */}
@@ -1263,7 +1231,7 @@ export default function App() {
                 )}
               </div>
 
-              {/* Right Side / Sidebar: Resolved Absences Archive Log Panel (Under on mobile, Beside on desktop) */}
+              {/* Right Side / Sidebar: Resolved Absences Archive Log Panel */}
               {appUser?.role === ROLES.ADMIN && resolvedAbsences.length > 0 && (
                 <div className="space-y-6 lg:border-l lg:border-slate-100 lg:pl-8">
                   <div className="flex items-center justify-between">
@@ -1297,10 +1265,10 @@ export default function App() {
             </div>
           </div>
         ) : (
+          /* --- Timeline View Render Stage --- */
           <div className="space-y-8 animate-in fade-in duration-300">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex items-center gap-4">
-                {/* Back navigation hidden only for Teaching Assistants */}
                 {appUser?.role !== ROLES.TA && (
                   <button onClick={() => {setView('dashboard'); setSelectedTAId(null);}} className="p-2 text-slate-300 hover:text-[#5c5cd6] transition-all">
                     <ChevronRight className="rotate-180 w-5 h-5" />
