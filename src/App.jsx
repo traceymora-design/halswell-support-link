@@ -16,11 +16,16 @@ import {
   Smartphone, QrCode, Settings, Link, LogOut, Send, HelpCircle, ShieldCheck, Award
 } from 'lucide-react';
 
-// --- Firebase Configuration ---
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+let app, auth, db;
+try {
+  const configSource = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+  const firebaseConfig = JSON.parse(configSource);
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (e) {
+  console.warn("Firebase configuration not fully initialized yet:", e.message);
+}
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'halswell-primary-ta-hub-v1';
 const MASTER_ADMINS = ['tracey.mora@halswell.school.nz'];
@@ -172,7 +177,10 @@ export default function App() {
   const blockUpdates = useRef(false);
   const isInitializing = useRef(false);
   
-  const getMasterDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'collections', 'master_record');
+  const getMasterDocRef = () => {
+    if (!db) return null;
+    return doc(db, 'artifacts', appId, 'public', 'data', 'collections', 'master_record');
+  };
 
   const hubUrl = useMemo(() => customLink || PRODUCTION_URL, [customLink]);
 
@@ -183,6 +191,10 @@ export default function App() {
 
   // Handle baseline Firebase Authentication initialization first (RULE 3)
   useEffect(() => {
+    if (!auth) {
+      setAuthInitialized(true);
+      return;
+    }
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -246,6 +258,13 @@ export default function App() {
     if (!authInitialized) return;
 
     const docRef = getMasterDocRef();
+    if (!docRef) {
+      setIsOnline(false);
+      setLoading(false);
+      setDataReady(true);
+      return;
+    }
+
     const unsubscribe = onSnapshot(docRef, (snapshot) => {
       if (blockUpdates.current || isEditingSchedule) return;
       
@@ -287,10 +306,15 @@ export default function App() {
   }, [appUser, tas, dataReady]);
 
   const initializeMasterRecord = async (docRef) => {
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      isInitializing.current = false;
-      return;
+    if (!docRef) return;
+    try {
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        isInitializing.current = false;
+        return;
+      }
+    } catch (e) {
+      console.error("Master check error:", e);
     }
 
     const initialData = { 
@@ -325,6 +349,7 @@ export default function App() {
   const syncToFirebase = async (currentDirectory, currentTas, link = customLink, currentArchive = resolvedAbsences) => {
     if (!dataReady) return;
     const docRef = getMasterDocRef();
+    if (!docRef) return;
     blockUpdates.current = true;
     setIsSyncing(true);
     setSaveStatus('saving');
@@ -371,7 +396,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      if (auth) await signOut(auth);
       setGoogleUser(null);
       setAppUser(null);
       setView('login');
@@ -585,6 +610,7 @@ export default function App() {
     const updatedTas = tas.map(t => {
       if (t.id === selectedAbsentTA.id) {
         const newSched = { ...t.schedule };
+        if (!newSched[currentDay]) newSched[currentDay] = {};
         Object.keys(coveragePlan).forEach(slot => {
           newSched[currentDay][slot] = { 
             task: `Covered by ${tas.find(x => x.id === coveragePlan[slot])?.name || 'Staff'}`, 
@@ -598,8 +624,9 @@ export default function App() {
       const coveredSlots = Object.keys(coveragePlan).filter(slot => coveragePlan[slot] === t.id);
       if (coveredSlots.length > 0) {
         const newSched = { ...t.schedule };
+        if (!newSched[currentDay]) newSched[currentDay] = {};
         coveredSlots.forEach(slot => {
-          const originalCriticalTask = selectedAbsentTA.schedule[currentDay][slot];
+          const originalCriticalTask = selectedAbsentTA.schedule?.[currentDay]?.[slot];
           newSched[currentDay][slot] = {
             task: `[COVER] ${originalCriticalTask?.task || 'Support'}`,
             priority: originalCriticalTask?.priority || 1
@@ -616,7 +643,7 @@ export default function App() {
 
     const notifications = Object.keys(coveragePlan).map(slot => {
       const coveringTA = tas.find(x => x.id === coveragePlan[slot]);
-      const task = selectedAbsentTA.schedule[currentDay][slot]?.task || 'Support';
+      const task = selectedAbsentTA.schedule?.[currentDay]?.[slot]?.task || 'Support';
       return `${coveringTA?.name || 'Staff'}: ${slot} -> ${task}`;
     }).join('\n');
 
@@ -717,7 +744,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* --- Safe OAuth Google Mock popup simulation --- */}
+      {/* Mock login dialog inside login screen */}
       {showGoogleMockSelector && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 border border-slate-100 animate-in zoom-in-95 duration-200">
@@ -852,7 +879,7 @@ export default function App() {
                             <option value="">-- Select Available Cover --</option>
                             {availableTAs.map(t => (
                               <option key={t.id} value={t.id}>
-                                {t.name} (Currently: {t.schedule[currentDay]?.[slot.time]?.task || 'Enrichment'})
+                                {t.name} (Currently: {t.schedule?.[currentDay]?.[slot.time]?.task || 'Enrichment'})
                               </option>
                             ))}
                           </select>
@@ -1069,6 +1096,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Main Workspace Frame */}
       <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-50">
           <div className="flex items-center gap-4">
@@ -1458,69 +1486,6 @@ export default function App() {
           </div>
         )}
       </div>
-
-      {/* --- Safe OAuth Google Mock popup simulation --- */}
-      {showGoogleMockSelector && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6 border border-slate-100 animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                </svg>
-                <span className="font-semibold text-xs uppercase tracking-wider text-slate-500">Choose Google Account</span>
-              </div>
-              <button onClick={() => setShowGoogleMockSelector(false)} className="text-slate-300 hover:text-slate-500 p-1"><X className="w-4 h-4" /></button>
-            </div>
-
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-4">Select or type your Halswell email</p>
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              {/* Load matching school domain staff registered in directory */}
-              {directory.map(staff => (
-                <button
-                  key={staff.email}
-                  onClick={() => handleSimulateGoogleSuccess(staff.email, staff.name)}
-                  className="w-full text-left p-3.5 bg-slate-50 hover:bg-indigo-50 border border-slate-100 rounded-xl transition-all flex items-center gap-3 group"
-                >
-                  <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 font-bold text-xs group-hover:bg-[#5c5cd6] group-hover:text-white transition-colors">
-                    {staff.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-slate-700 text-xs truncate leading-none">{staff.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5 leading-none">{staff.email}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="pt-4 border-t border-slate-100 mt-4 space-y-2">
-              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block ml-1">Use another school account</label>
-              <div className="flex gap-2">
-                <input 
-                  type="email"
-                  placeholder="name@halswell.school.nz"
-                  value={manualGoogleEmail}
-                  onChange={(e) => setManualGoogleEmail(e.target.value)}
-                  className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-xs"
-                />
-                <button 
-                  onClick={() => {
-                    if (manualGoogleEmail.trim()) {
-                      handleSimulateGoogleSuccess(manualGoogleEmail, manualGoogleEmail.split('@')[0]);
-                    }
-                  }}
-                  className="px-4 py-2 bg-slate-800 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider"
-                >
-                  Sign In
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
