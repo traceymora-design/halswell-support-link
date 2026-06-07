@@ -138,8 +138,19 @@ export default function App() {
   const [authInitialized, setAuthInitialized] = useState(false);
   const [appUser, setAppUser] = useState(null); 
   const [view, setView] = useState('login');
-  const [tas, setTas] = useState([]);
-  const [directory, setDirectory] = useState([]);
+  
+  // SEEDED: Pre-populated with Karen Cate's timeline so the app is never empty on Vercel
+  const [tas, setTas] = useState([
+    { id: 'ta-karen-cate', name: 'Karen Cate', email: 'karen.cate@halswell.school.nz', status: 'active', schedule: generateKarenDefaultSchedule() }
+  ]);
+  
+  // SEEDED: Pre-populated staff directory for clean login fallback
+  const [directory, setDirectory] = useState([
+    { email: 'tracey.mora@halswell.school.nz', role: ROLES.ADMIN, name: 'Tracey Mora' },
+    { email: 'karen.cate@halswell.school.nz', role: ROLES.TA, name: 'Karen Cate' },
+    { email: 'melissa.botha@halswell.school.nz', role: ROLES.TEACHER, name: 'Melissa Botha' }
+  ]);
+  
   const [resolvedAbsences, setResolvedAbsences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDay, setCurrentDay] = useState("Monday");
@@ -247,6 +258,7 @@ export default function App() {
 
     const docRef = getMasterDocRef();
     if (!docRef) {
+      // Offline/Vercel state fallback (Seeded state remains fully alive)
       setIsOnline(false);
       setLoading(false);
       setDataReady(true);
@@ -335,7 +347,7 @@ export default function App() {
   const syncToFirebase = async (currentDirectory, currentTas, link = customLink, currentArchive = resolvedAbsences) => {
     if (!dataReady) return;
     const docRef = getMasterDocRef();
-    if (!docRef) return;
+    if (!docRef) return; // Silent return for local offline environments (Vercel)
     blockUpdates.current = true;
     setIsSyncing(true);
     setSaveStatus('saving');
