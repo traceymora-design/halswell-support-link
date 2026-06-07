@@ -501,8 +501,8 @@ export default function App() {
       return priority === 1 || priority === 2; 
     }).map(slot => ({
       time: slot,
-      task: schedule[slot].task,
-      priority: schedule[slot].priority
+      task: schedule[slot]?.task || 'General Support',
+      priority: schedule[slot]?.priority || 3
     })).sort((a, b) => a.priority - b.priority); // Priority 1 (Critical) sorted first, Priority 2 second
   }, [selectedAbsentTA, currentDay]);
 
@@ -601,8 +601,8 @@ export default function App() {
         coveredSlots.forEach(slot => {
           const originalCriticalTask = selectedAbsentTA.schedule[currentDay][slot];
           newSched[currentDay][slot] = {
-            task: `[COVER] ${originalCriticalTask.task}`,
-            priority: originalCriticalTask.priority
+            task: `[COVER] ${originalCriticalTask?.task || 'Support'}`,
+            priority: originalCriticalTask?.priority || 1
           };
         });
         return { ...t, schedule: newSched };
@@ -616,7 +616,7 @@ export default function App() {
 
     const notifications = Object.keys(coveragePlan).map(slot => {
       const coveringTA = tas.find(x => x.id === coveragePlan[slot]);
-      const task = selectedAbsentTA.schedule[currentDay][slot].task;
+      const task = selectedAbsentTA.schedule[currentDay][slot]?.task || 'Support';
       return `${coveringTA?.name || 'Staff'}: ${slot} -> ${task}`;
     }).join('\n');
 
@@ -852,7 +852,7 @@ export default function App() {
                             <option value="">-- Select Available Cover --</option>
                             {availableTAs.map(t => (
                               <option key={t.id} value={t.id}>
-                                {t.name} (Currently: {t.schedule[currentDay][slot.time]?.task || 'Enrichment'})
+                                {t.name} (Currently: {t.schedule[currentDay]?.[slot.time]?.task || 'Enrichment'})
                               </option>
                             ))}
                           </select>
