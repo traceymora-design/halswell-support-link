@@ -1989,7 +1989,7 @@ function TeacherDashboard({ user, sessions, users }) {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
-      <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
+      <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-[#f1f5f9]">
         <div>
           <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
           <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Teacher View</p>
@@ -1999,7 +1999,7 @@ function TeacherDashboard({ user, sessions, users }) {
         </select>
       </div>
 
-      <div className="bg-white rounded-[28px] border border-slate-200 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-[28px] border border-[#f1f5f9] overflow-hidden shadow-sm">
         <div className="p-6 border-b border-slate-100 bg-slate-50/50">
           <h3 className="font-bold text-slate-800 text-md">Your Supporting TAs</h3>
         </div>
