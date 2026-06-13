@@ -925,6 +925,34 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   );
 }
 
+const isSencoSupervisingTa = (senco, ta) => {
+  if (!senco || !ta) return false;
+  if (senco.team === TEAMS.ALL) return true;
+  
+  if (ta.allocatedSenco) {
+    if (ta.allocatedSenco === senco.id) return true;
+    
+    if (ta.allocatedSenco === 'senco_tracey') {
+      const isTracey = senco.id === 'senco_tracey' || 
+                       senco.email?.toLowerCase().includes('tracey') || 
+                       senco.name?.toLowerCase().includes('tracey');
+      if (isTracey) return true;
+    }
+    
+    if (ta.allocatedSenco === 'senco_cathie') {
+      const isCathie = senco.id === 'senco_cathie' || 
+                       senco.email?.toLowerCase().includes('cathie') || 
+                       senco.name?.toLowerCase().includes('cathie');
+      if (isCathie) return true;
+    }
+  }
+  
+  if (ta.team === TEAMS.BOTH) return true;
+  if (senco.team === ta.team) return true;
+  
+  return false;
+};
+
 function SencoDashboard({ currentUser, users, absences, sessions, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [resolvingAbsence, setResolvingAbsence] = useState(null);
