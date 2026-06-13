@@ -1480,56 +1480,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         />
       )}
 
-      {resolvedAbsences.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
-              <CheckCircle className="w-4 h-4 mr-1.5 text-emerald-500" /> Resolved Absences Archive Log
-            </h3>
-            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">{resolvedAbsences.length} Total</span>
-          </div>
-          <div className="max-h-[240px] overflow-y-auto space-y-2 pr-2">
-            {resolvedAbsences.map(a => {
-              const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
-              return (
-                <div key={a.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs hover:border-[#6157e8]/20 transition-all">
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
-                      <span className="text-slate-400 font-semibold">
-                        {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `Sick Leave (${a.formattedDate || a.day})`}
-                      </span>
-                      <span className="text-slate-400">•</span>
-                      <span className="text-slate-500 italic">" {a.reason} "</span>
-                    </div>
-                    {a.isAdvance && (
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stuart Approved:</span>
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
-                          a.approvedByStuart === 'Yes' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-100'
-                        }`}>
-                          {a.approvedByStuart || 'No'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {a.reply && (
-                      <span className="text-[10px] bg-purple-50 text-[#6157e8] border border-purple-100 font-bold px-2 py-0.5 rounded-md truncate max-w-[200px]" title={a.reply}>
-                        Reply: "{a.reply}"
-                      </span>
-                    )}
-                    <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold text-[10px] uppercase">
-                      {a.status}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {showCriticalCoverBoard && (
         <CriticalCoverageBoard 
           day={selectedDay}
@@ -1788,6 +1738,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
+      {/* Master Timetable Container */}
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -1824,6 +1775,57 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           />
         </div>
       </div>
+
+      {/* Resolved Absences Archive Log — Relocated clean below the Master Timetable */}
+      {resolvedAbsences.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4 animate-fade-in">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
+              <CheckCircle className="w-4 h-4 mr-1.5 text-emerald-500" /> Resolved Absences Archive Log
+            </h3>
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">{resolvedAbsences.length} Total</span>
+          </div>
+          <div className="max-h-[240px] overflow-y-auto space-y-2 pr-2">
+            {resolvedAbsences.map(a => {
+              const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
+              return (
+                <div key={a.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs hover:border-[#6157e8]/20 transition-all">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
+                      <span className="text-slate-400 font-semibold">
+                        {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `Sick Leave (${a.formattedDate || a.day})`}
+                      </span>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-slate-500 italic">" {a.reason} "</span>
+                    </div>
+                    {a.isAdvance && (
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stuart Approved:</span>
+                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                          a.approvedByStuart === 'Yes' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-100'
+                        }`}>
+                          {a.approvedByStuart || 'No'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {a.reply && (
+                      <span className="text-[10px] bg-purple-50 text-[#6157e8] border border-purple-100 font-bold px-2 py-0.5 rounded-md truncate max-w-[200px]" title={a.reply}>
+                        Reply: "{a.reply}"
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold text-[10px] uppercase">
+                      {a.status}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
