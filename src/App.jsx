@@ -161,6 +161,14 @@ const TIER_STYLES = {
   [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
 };
 
+const Toast = ({ message, type = 'success' }) => (
+  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50 animate-fade-in
+    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
+    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
+    <p className="font-medium text-sm">{message}</p>
+  </div>
+);
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
