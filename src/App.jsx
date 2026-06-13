@@ -7,9 +7,9 @@ import {
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, 
+  getAuth, signInAnonymously, onAuthStateChanged, 
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
-  setPersistence, browserLocalPersistence, browserSessionPersistence 
+  setPersistence, browserLocalPersistence 
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs } from 'firebase/firestore';
 
@@ -57,7 +57,6 @@ const isSandboxEnv = () => {
 };
 const isSandbox = isSandboxEnv();
 
-// --- ROLES, TEAMS & TIERS ---
 const ROLES = {
   SENCO: 'SENCO',
   TEAM_LEADER: 'Team Leader',
@@ -100,13 +99,17 @@ const TIME_SLOTS = [
 ];
 
 const INITIAL_USERS = [
-  { id: 'senco_cathie', name: 'Cathie', role: ROLES.SENCO, email: 'cathie@halswell.school.nz', team: TEAMS.Y0_4 },
-  { id: 'senco_tracey', name: 'Tracey', role: ROLES.SENCO, email: 'tracey@halswell.school.nz', team: TEAMS.Y5_8 },
-  { id: 'u2', name: 'Mr. Smith', role: ROLES.TEACHER, email: 'smith@school.edu', team: TEAMS.Y5_8 },
-  { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey' },
-  { id: 'tl1', name: 'Mrs. Davis', role: ROLES.TEAM_LEADER, email: 'davis@school.edu', team: TEAMS.Y5_8 },
-  { id: 't_val', name: 'Val Murray', role: ROLES.TA, email: 'val.murray@school.nz', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey' },
-  { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
+  { id: 'senco_cathie', name: 'Cathie Zelas', role: ROLES.SENCO, email: 'cathie@halswell.school.nz', team: TEAMS.Y0_4 },
+  { id: 'senco_tracey', name: 'Tracey Mora', role: ROLES.SENCO, email: 'tracey@halswell.school.nz', team: TEAMS.Y5_8 },
+  { id: 'u2', name: 'Ben Seek', role: ROLES.TEACHER, email: 'smith@school.edu', team: TEAMS.Y5_8 },
+  { id: 'u3', name: 'Ally van Rossem', role: ROLES.TEACHER, email: 'ally@school.edu', team: TEAMS.Y0_4 },
+  { id: 'u4', name: 'Bryony Astall', role: ROLES.TEACHER, email: 'bryony@school.edu', team: TEAMS.Y5_8 },
+  { id: 'u5', name: 'Cameron Eaves', role: ROLES.TEACHER, email: 'cameron@school.edu', team: TEAMS.Y5_8 },
+  { id: 'u6', name: 'Cindy Stanford', role: ROLES.TEACHER, email: 'cindy@school.edu', team: TEAMS.Y5_8 },
+  { id: 't1', name: 'Karen Cate', role: ROLES.TA, email: 'karen@school.edu', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey', allocatedTeacher: 'u2', allocatedTeamLeader: 'tl1' },
+  { id: 'tl1', name: 'Greta Parkes-Dolan', role: ROLES.TEAM_LEADER, email: 'davis@school.edu', team: TEAMS.Y5_8 },
+  { id: 't_val', name: 'Val Murray', role: ROLES.TA, email: 'val.murray@school.nz', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey', allocatedTeacher: 'u4', allocatedTeamLeader: 'tl1' },
+  { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey', allocatedTeacher: 'u3', allocatedTeamLeader: 'tl1' }
 ];
 
 const INITIAL_ABSENCES = [
@@ -118,8 +121,9 @@ const INITIAL_ABSENCES = [
     status: 'Pending',
     reply: '',
     isAdvance: false,
-    date: '',
-    formattedDate: '',
+    startDate: '2026-06-15',
+    endDate: '2026-06-15',
+    formattedDate: '15 Jun 2026',
     approvedByStuart: 'N/A'
   }
 ];
@@ -127,7 +131,7 @@ const INITIAL_ABSENCES = [
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
-['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].forEach(day => {
+DAYS.forEach(day => {
   const daySessions = [
     { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
     { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
@@ -156,14 +160,6 @@ const TIER_STYLES = {
   [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
   [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
 };
-
-const Toast = ({ message, type = 'success' }) => (
-  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50 animate-fade-in
-    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
-    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
-    <p className="font-medium text-sm">{message}</p>
-  </div>
-);
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -371,7 +367,7 @@ function App() {
       if (isSandbox) {
         handleSimpleSignIn({
           id: 'senco_tracey',
-          name: 'Tracey Mora (SENCO Preview)',
+          name: 'Tracey Mora',
           role: ROLES.SENCO,
           email: 'tracey@halswell.school.nz',
           team: TEAMS.Y5_8
@@ -512,16 +508,16 @@ function App() {
             <span>TESTING MODE — Quick Switch Dashboard Roles:</span>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <button onClick={() => handleBypassSignIn('t1')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 't1' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+            <button onClick={() => handleBypassSignIn('t1')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser?.id === 't1' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Karen Cate (TA)
             </button>
-            <button onClick={() => handleBypassSignIn('t_ruby')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 't_ruby' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+            <button onClick={() => handleBypassSignIn('t_ruby')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser?.id === 't_ruby' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Ruby Gray (TA)
             </button>
-            <button onClick={() => handleBypassSignIn('senco_tracey')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_tracey' ? 'bg-amber-200 text-amber-900 border-amber-300 shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+            <button onClick={() => handleBypassSignIn('senco_tracey')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser?.id === 'senco_tracey' ? 'bg-amber-200 text-amber-900 border-amber-300 shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Tracey (SENCO Y5-8)
             </button>
-            <button onClick={() => handleBypassSignIn('senco_cathie')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_cathie' ? 'bg-amber-200 text-amber-900 border-amber-300 shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+            <button onClick={() => handleBypassSignIn('senco_cathie')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser?.id === 'senco_cathie' ? 'bg-amber-200 text-amber-900 border-amber-300 shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Cathie (SENCO Y0-4)
             </button>
           </div>
@@ -558,19 +554,19 @@ function App() {
       </header>
 
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
-        {currentUser.role === ROLES.SENCO && (
+        {currentUser?.role === ROLES.SENCO && (
           <SencoDashboard 
             currentUser={currentUser} users={safeUsers} sessions={safeSessions} absences={safeAbsences} addToast={addToast} 
             addUserToDb={addUserToDb} deleteUserFromDb={deleteUserFromDb} saveSessionToDb={saveSessionToDb} deleteSessionFromDb={deleteSessionFromDb} saveAbsenceToDb={saveAbsenceToDb}
           />
         )}
-        {currentUser.role === ROLES.TEAM_LEADER && (
+        {currentUser?.role === ROLES.TEAM_LEADER && (
           <TeamLeaderDashboard user={currentUser} sessions={safeSessions} users={safeUsers} />
         )}
-        {currentUser.role === ROLES.TEACHER && (
+        {currentUser?.role === ROLES.TEACHER && (
           <TeacherDashboard user={currentUser} sessions={safeSessions} users={safeUsers} />
         )}
-        {currentUser.role === ROLES.TA && (
+        {currentUser?.role === ROLES.TA && (
           <TADashboard 
             user={currentUser} sessions={safeSessions} absences={safeAbsences} addToast={addToast} saveAbsenceToDb={saveAbsenceToDb} users={safeUsers}
           />
@@ -604,8 +600,8 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [showAbsenceForm, setShowAbsenceForm] = useState(false);
   const [absenceReason, setAbsenceReason] = useState('');
-  const [absenceType, setAbsenceType] = useState('sick'); // 'sick' or 'advance'
-  const [approvedByStuart, setApprovedByStuart] = useState(''); // 'Yes' or 'No'
+  const [absenceType, setAbsenceType] = useState('sick'); 
+  const [approvedByStuart, setApprovedByStuart] = useState(''); 
   const [startDate, setStartDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -616,10 +612,8 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   });
 
   const safeAbsencesList = absences || [];
-  const mySessions = sessions.filter(s => s.taId === user.id && s.day === selectedDay);
-  
-  const myAbsences = safeAbsencesList.filter(a => a.taId === user.id).sort((a,b) => b.id.localeCompare(a.id)).slice(0, 5); 
-  
+  const mySessions = sessions.filter(s => s.taId === user?.id && s.day === selectedDay);
+  const myAbsences = safeAbsencesList.filter(a => a.taId === user?.id).sort((a,b) => b.id.localeCompare(a.id)).slice(0, 5); 
   const sortedSessions = TIME_SLOTS.map(slot => ({
     slot,
     session: mySessions.find(s => s.timeSlotId === slot.id)
@@ -630,7 +624,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       addToast('Please provide a reason.', 'error');
       return;
     }
-    // Only require Stuart checklist validation if requesting leave in advance
     if (absenceType === 'advance' && !approvedByStuart) {
       addToast('Please complete the Stuart leave approval checklist.', 'error');
       return;
@@ -654,7 +647,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
     }
 
     const isPendingExist = safeAbsencesList.some(a => 
-      a.taId === user.id && 
+      a.taId === user?.id && 
       (absenceType === 'sick' ? (a.startDate === startDate || a.endDate === endDate) : (a.startDate === startDate || a.endDate === endDate)) && 
       a.status === 'Pending'
     );
@@ -666,7 +659,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
     
     saveAbsenceToDb({
       id: 'abs_' + Date.now(),
-      taId: user.id,
+      taId: user?.id,
       day: targetDay,
       startDate,
       endDate,
@@ -675,7 +668,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       reason: absenceReason,
       status: 'Pending',
       reply: '',
-      approvedByStuart: absenceType === 'advance' ? approvedByStuart : 'N/A' // Automatically N/A for sick leave since SENCO approves it
+      approvedByStuart: absenceType === 'advance' ? approvedByStuart : 'N/A'
     });
 
     setShowAbsenceForm(false);
@@ -689,12 +682,12 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <h2 className="text-2xl font-bold text-slate-800">{user.name} Timetable Portal</h2>
-            <span className="text-[10px] font-bold bg-violet-50 text-[#6157e8] border border-violet-100 px-2 py-0.5 rounded uppercase tracking-wider">{user.team || 'No Team Registered'}</span>
+            <h2 className="text-2xl font-bold text-slate-800">{user?.name} Timetable Portal</h2>
+            <span className="text-[10px] font-bold bg-violet-50 text-[#6157e8] border border-violet-100 px-2 py-0.5 rounded uppercase tracking-wider">{user?.team || 'No Team Registered'}</span>
           </div>
           <p className="text-xs text-slate-400 mt-1 flex items-center">
             <Laptop size={14} className="mr-1 text-slate-500" />
-            Allocated SENCO: <strong className="ml-1 text-[#6157e8]">{user.allocatedSenco === 'senco_cathie' ? 'Cathie' : user.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'Shared (None / Both)'}</strong>
+            Allocated SENCO: <strong className="ml-1 text-[#6157e8]">{user?.allocatedSenco === 'senco_cathie' ? 'Cathie' : user?.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'Shared (None / Both)'}</strong>
           </p>
         </div>
         <button 
@@ -738,7 +731,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
               </button>
             </div>
 
-            {/* Unified Date Pickers (Shown for both sick days and advance leave) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -770,7 +762,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
               </div>
             </div>
 
-            {/* Stuart Checklist displays ONLY for Future Leave in Advance */}
             {absenceType === 'advance' && (
               <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3 animate-fade-in">
                 <div className="flex items-center space-x-2">
@@ -840,7 +831,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         </div>
       )}
 
-      {/* --- DAYS NAVIGATION --- */}
       <div className="flex space-x-1 overflow-x-auto bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm scrollbar-hide">
         {DAYS.map(d => (
           <button 
@@ -904,7 +894,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                   }`}>{a.status.startsWith('Approved') ? 'Approved' : a.status}</span>
                 </div>
                 
-                {/* Stuart Checklist indicator displays ONLY for Advance Leaves */}
                 {a.isAdvance && (
                   <div className="flex items-center gap-1.5 text-[10px] font-bold mt-0.5">
                     <span className="text-slate-400">Stuart Approved:</span>
@@ -936,48 +925,23 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   );
 }
 
-const isSencoSupervisingTa = (senco, ta) => {
-  if (!senco || !ta) return false;
-  if (senco.team === TEAMS.ALL) return true;
-  
-  if (ta.allocatedSenco) {
-    if (ta.allocatedSenco === senco.id) return true;
-    
-    if (ta.allocatedSenco === 'senco_tracey') {
-      const isTracey = senco.id === 'senco_tracey' || 
-                       senco.email?.toLowerCase().includes('tracey') || 
-                       senco.name?.toLowerCase().includes('tracey');
-      if (isTracey) return true;
-    }
-    
-    if (ta.allocatedSenco === 'senco_cathie') {
-      const isCathie = senco.id === 'senco_cathie' || 
-                       senco.email?.toLowerCase().includes('cathie') || 
-                       senco.name?.toLowerCase().includes('cathie');
-      if (isCathie) return true;
-    }
-  }
-  
-  if (ta.team === TEAMS.BOTH) return true;
-  if (senco.team === ta.team) return true;
-  
-  return false;
-};
-
-function SencoDashboard({ currentUser, users, sessions, absences, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb }) {
+function SencoDashboard({ currentUser, users, absences, sessions, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [resolvingAbsence, setResolvingAbsence] = useState(null);
   const [editingCell, setEditingCell] = useState(null); 
   const [showManageStaff, setShowManageStaff] = useState(false);
   const [showCriticalCoverBoard, setShowCriticalCoverBoard] = useState(false); 
+  
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRole, setNewStaffRole] = useState(ROLES.TA);
   const [newStaffTeam, setNewStaffTeam] = useState(TEAMS.Y5_8);
   const [newStaffSenco, setNewStaffSenco] = useState('');
+  const [newStaffTeacher, setNewStaffTeacher] = useState('');
+  const [newStaffTeamLeader, setNewStaffTeamLeader] = useState('');
   const [editingStaff, setEditingStaff] = useState(null);
 
-  const [activeTeamFilter, setActiveTeamFilter] = useState(currentUser.team || TEAMS.ALL);
+  const [activeTeamFilter, setActiveTeamFilter] = useState(currentUser?.team || TEAMS.ALL);
   const [sencoReplies, setSencoReplies] = useState({});
 
   const [showCopyDayModal, setShowCopyDayModal] = useState(false);
@@ -1021,8 +985,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       status: 'Pending',
       reply: '',
       isAdvance: false,
-      date: '',
-      formattedDate: '',
+      startDate: '2026-06-15',
+      endDate: '2026-06-15',
+      formattedDate: '15 Jun 2026',
       approvedByStuart: 'N/A'
     });
     addToast('Simulated real-time absence alert triggered!', 'success');
@@ -1043,6 +1008,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setNewStaffRole(staff.role);
     setNewStaffTeam(staff.team || TEAMS.Y5_8);
     setNewStaffSenco(staff.allocatedSenco || '');
+    setNewStaffTeacher(staff.allocatedTeacher || '');
+    setNewStaffTeamLeader(staff.allocatedTeamLeader || '');
   };
 
   const handleCancelEditStaff = () => {
@@ -1052,6 +1019,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setNewStaffRole(ROLES.TA);
     setNewStaffTeam(TEAMS.Y5_8);
     setNewStaffSenco('');
+    setNewStaffTeacher('');
+    setNewStaffTeamLeader('');
   };
 
   const handleAddOrUpdateStaff = () => {
@@ -1067,7 +1036,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         email: newStaffEmail.toLowerCase().trim(),
         role: newStaffRole,
         team: newStaffTeam,
-        allocatedSenco: newStaffRole === ROLES.TA ? newStaffSenco : ''
+        allocatedSenco: newStaffRole === ROLES.TA ? newStaffSenco : '',
+        allocatedTeacher: newStaffRole === ROLES.TA ? newStaffTeacher : '',
+        allocatedTeamLeader: newStaffRole === ROLES.TA ? newStaffTeamLeader : ''
       };
       addUserToDb(updatedStaff);
       addToast(`${newStaffName} updated successfully.`, 'success');
@@ -1079,7 +1050,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         role: newStaffRole,
         email: newStaffEmail.toLowerCase().trim(),
         team: newStaffTeam,
-        allocatedSenco: newStaffRole === ROLES.TA ? newStaffSenco : ''
+        allocatedSenco: newStaffRole === ROLES.TA ? newStaffSenco : '',
+        allocatedTeacher: newStaffRole === ROLES.TA ? newStaffTeacher : '',
+        allocatedTeamLeader: newStaffRole === ROLES.TA ? newStaffTeamLeader : ''
       };
       addUserToDb(newStaff);
       addToast(`${newStaffName} added successfully.`, 'success');
@@ -1090,6 +1063,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     setNewStaffRole(ROLES.TA);
     setNewStaffTeam(TEAMS.Y5_8);
     setNewStaffSenco('');
+    setNewStaffTeacher('');
+    setNewStaffTeamLeader('');
   };
 
   const handleDeleteStaff = (userId, name) => {
@@ -1200,7 +1175,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     <div className="space-y-8 pb-12">
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser.name}</h2>
+          <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser?.name}</h2>
           <div className="flex items-center gap-3 mt-2">
             <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">TEAM:</span>
             <select
@@ -1230,7 +1205,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       </div>
 
-      {/* Senco Live Absence Stream cards */}
+      {/* Live TA Absence Alert Streams */}
       {(directAbsences.length > 0 || coSencoAbsences.length > 0) ? (
         <div className="bg-red-50/60 border border-red-200/80 rounded-2xl p-6 space-y-4">
           <div className="flex justify-between items-center">
@@ -1266,7 +1241,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                         {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'sick'} for {a.formattedDate || a.day}
                       </h4>
                       
-                      {/* Highly prominent Approved by Stuart row - ONLY render for Leave requested in advance */}
                       {a.isAdvance && (
                         <div className="mt-2.5">
                           <span className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-xs ${
@@ -1365,7 +1339,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                         {ta?.name} reported {a.isAdvance ? 'leave in advance' : 'sick'} for {a.formattedDate || a.day}
                       </h4>
 
-                      {/* Prominent Stuart row - ONLY render for Leave requested in advance */}
                       {a.isAdvance && (
                         <div className="mt-2.5">
                           <span className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold shadow-xs ${
@@ -1649,11 +1622,11 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             
             <div className="col-span-12 border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
               <h3 className="text-2xl font-bold text-[#1a1f36]">Manage Staff & Teams</h3>
-              <button onClick={() => setShowManageStaff(false)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
+              <button onClick={() => { setShowManageStaff(false); handleCancelEditStaff(); }} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
             </div>
 
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
-              <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
+              <h4 className="font-bold text-slate-400 text-xs uppercase tracking-wider mb-3">Current Staff Members</h4>
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
                 {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
                   <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
@@ -1661,14 +1634,20 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
                       <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{u.role}</div>
                       {u.role === ROLES.TA && (
-                        <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                          SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span>
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider space-y-0.5 mt-1">
+                          <div>SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span></div>
+                          {u.allocatedTeacher && (
+                            <div>Teacher: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeacher)?.name || 'Assigned'}</span></div>
+                          )}
+                          {u.allocatedTeamLeader && (
+                            <div>Team Leader: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeamLeader)?.name || 'Assigned'}</span></div>
+                          )}
                         </div>
                       )}
                     </div>
                     <div className="flex items-center space-x-1">
                       <button onClick={() => handleStartEditStaff(u)} className="p-2 text-[#6157e8] hover:bg-violet-100 rounded-lg transition-colors"><Edit3 className="w-4 h-4" /></button>
-                      {u.id !== currentUser.id && (
+                      {u.id !== currentUser?.id && (
                         <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                       )}
                     </div>
@@ -1677,23 +1656,24 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </div>
             </div>
 
+            {/* Dynamic Staff Add & Edit Subform matches Screenshot 2026-06-13 at 1.42.14 PM */}
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
               </h4>
               <div className="space-y-4 text-xs">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
-                  <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Ruby Gray" />
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">STAFF FULL NAME</label>
+                  <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-slate-700 text-sm font-medium" placeholder="e.g. Ruby Gray" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Email Address</label>
-                  <input type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. ruby.gray@halswell.school.nz" />
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">GOOGLE EMAIL ADDRESS</label>
+                  <input type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-slate-700 text-sm font-medium" placeholder="e.g. ruby.gray@halswell.school.nz" />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Access Role</label>
-                    <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ACCESS ROLE</label>
+                    <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-slate-700 text-sm font-semibold">
                       <option value={ROLES.TA}>Teacher Aide (TA)</option>
                       <option value={ROLES.TEACHER}>Teacher</option>
                       <option value={ROLES.TEAM_LEADER}>Team Leader</option>
@@ -1701,8 +1681,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Team Group</label>
-                    <select value={newStaffTeam} onChange={(e) => setNewStaffTeam(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ASSIGNED TEAM GROUP</label>
+                    <select value={newStaffTeam} onChange={(e) => setNewStaffTeam(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-slate-700 text-sm font-semibold">
                       <option value={TEAMS.Y0_4}>{TEAMS.Y0_4}</option>
                       <option value={TEAMS.Y5_8}>{TEAMS.Y5_8}</option>
                       <option value={TEAMS.BOTH}>{TEAMS.BOTH}</option>
@@ -1712,23 +1692,55 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 </div>
 
                 {newStaffRole === ROLES.TA && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Allocated SENCO</label>
-                    <select 
-                      value={newStaffSenco} 
-                      onChange={(e) => setNewStaffSenco(e.target.value)} 
-                      className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                    >
-                      <option value="">None / Both (Shared)</option>
-                      <option value="senco_cathie">Cathie (SENCO Y0-4)</option>
-                      <option value="senco_tracey">Tracey (SENCO Y5-8)</option>
-                    </select>
+                  <div className="space-y-4 animate-fade-in">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ALLOCATED SENCO</label>
+                      <select 
+                        value={newStaffSenco} 
+                        onChange={(e) => setNewStaffSenco(e.target.value)} 
+                        className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-slate-700 text-sm font-semibold"
+                      >
+                        <option value="">None / Both (Shared)</option>
+                        <option value="senco_cathie">Cathie (SENCO Y0-4)</option>
+                        <option value="senco_tracey">Tracey (SENCO Y5-8)</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PRIMARY TEACHER</label>
+                        <select 
+                          value={newStaffTeacher} 
+                          onChange={(e) => setNewStaffTeacher(e.target.value)} 
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-slate-700 text-sm font-semibold"
+                        >
+                          <option value="">None / Select Teacher</option>
+                          {users.filter(u => u.role === ROLES.TEACHER).map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">PRIMARY TEAM LEADER</label>
+                        <select 
+                          value={newStaffTeamLeader} 
+                          onChange={(e) => setNewStaffTeamLeader(e.target.value)} 
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-slate-700 text-sm font-semibold"
+                        >
+                          <option value="">None / Select Team Leader</option>
+                          {users.filter(u => u.role === ROLES.TEAM_LEADER).map(tl => (
+                            <option key={tl.id} value={tl.id}>{tl.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
                   {editingStaff && <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">Cancel Edit</button>}
-                  <button onClick={() => setShowManageStaff(false)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Done</button>
+                  <button onClick={() => { setShowManageStaff(false); handleCancelEditStaff(); }} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Done</button>
                   <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">Save Staff</button>
                 </div>
               </div>
@@ -1738,7 +1750,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Master Timetable Container */}
+      {/* --- MASTER TIMETABLE --- */}
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -1776,7 +1788,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       </div>
 
-      {/* Resolved Absences Archive Log — Relocated clean below the Master Timetable */}
+      {/* --- RESOLVED ABSENCES HISTORY SIT BELOW THE TIMETABLE --- */}
       {resolvedAbsences.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4 animate-fade-in">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -1959,13 +1971,13 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
 
 function TeamLeaderDashboard({ user, sessions, users }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
-  const teamSessions = sessions.filter(s => s.day === selectedDay && s.teamLeaderId === user.id);
+  const teamSessions = sessions.filter(s => s.day === selectedDay && s.teamLeaderId === user?.id);
 
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
       <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
         <div>
-          <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
+          <h2 className="text-2xl font-bold text-[#1a1f36]">{user?.name} Dashboard</h2>
           <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Team Leader View</p>
         </div>
         <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none">
@@ -1987,13 +1999,13 @@ function TeamLeaderDashboard({ user, sessions, users }) {
 
 function TeacherDashboard({ user, sessions, users }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
-  const teacherSessions = sessions.filter(s => s.day === selectedDay && s.teacherId === user.id);
+  const teacherSessions = sessions.filter(s => s.day === selectedDay && s.teacherId === user?.id);
 
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
       <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-[#f1f5f9]">
         <div>
-          <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
+          <h2 className="text-2xl font-bold text-[#1a1f36]">{user?.name} Dashboard</h2>
           <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Teacher View</p>
         </div>
         <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5">
