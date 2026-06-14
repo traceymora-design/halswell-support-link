@@ -1965,7 +1965,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       ) : (
         <StudentTimetablesView 
           sessions={sessions}
-          users={users}
+          users={safeUsers}
           addToast={addToast}
         />
       )}
@@ -2138,7 +2138,8 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     const ignoredKeywords = [
       'lunch', 'morning tea', 'tea', 'no cover', 'break', 'not working', 
       'interval', 'meeting', 'duty', 'admin', 'planning', 'free session', 
-      'Ōtawhito', 'otawhito', 'esol', 'office', 'classroom', 'check-in'
+      'Ōtawhito', 'otawhito', 'esol', 'office', 'classroom', 'check-in',
+      'monitor', 'support', 'supervise', 'check', 'supervision'
     ];
     // Defaulting only to initial known Critical & High Needs student categories
     const found = new Set(['H.W', 'Jess', 'Sam C', 'E.S']);
@@ -2153,9 +2154,11 @@ function StudentTimetablesView({ sessions, users, addToast }) {
         let cleaned = part.replace(/\s*\(.*?\)\s*/g, ' ').trim();
         if (!cleaned) return;
         // Clean prefixes like "Support ", "Check " to isolate true initials
-        cleaned = cleaned.replace(/^(support|check|check-in|supervise)\s+/i, '').trim();
+        cleaned = cleaned.replace(/^(support|check|check-in|supervise|monitor)\s+/i, '').trim();
         const lower = cleaned.toLowerCase();
         const isTimeFormat = /\b\d{1,2}(:\d{2})?\s*(am|pm)?\b/i.test(lower);
+        
+        // Ignore if it matches any generic system words or contains task substrings (like "monitor", "support")
         const isIgnored = isTimeFormat || ignoredKeywords.some(keyword => lower === keyword || lower.includes(keyword));
         
         if (!isIgnored && cleaned.length > 0 && cleaned.length <= 15) {
@@ -2181,7 +2184,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       const cleanSubject = s.subject?.toLowerCase() || '';
       const cleanStudent = activeStudent.toLowerCase();
       
-      const strippedSubject = cleanSubject.replace(/^(support|check|check-in|supervise)\s+/i, '').trim();
+      const strippedSubject = cleanSubject.replace(/^(support|check|check-in|supervise|monitor)\s+/i, '').trim();
 
       return (
         strippedSubject === cleanStudent ||
@@ -2195,23 +2198,9 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     });
 
     if (!matchingSession) return null;
-    const ta = users.find(u => u.id === matchingSession.taId);
+    // Query both live users state and initial bypass data to prevent blank/Assigned names
+    const ta = users.find(u => u.id === matchingSession.taId) || INITIAL_USERS.find(u => u.id === matchingSession.taId);
     return ta ? ta.name.split(' ')[0] : 'Assigned'; 
-  };
-
-  const handleCreateStudent = (e) => {
-    e.preventDefault();
-    if (!newStudentName.trim()) return;
-    const name = newStudentName.trim();
-    if (allTrackedStudents.includes(name)) {
-      addToast('Student is already registered or auto-detected.', 'error');
-      return;
-    }
-    setManualStudents(prev => [...prev, name]);
-    setActiveStudent(name);
-    setNewStudentName('');
-    setShowAddStudentForm(false);
-    addToast(`Added ${name} to manual student tracking lists.`, 'success');
   };
 
   const totalWeeklySlots = TIME_SLOTS.length * DAYS.length;
