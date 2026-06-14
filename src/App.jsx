@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Calendar, AlertCircle, Users, CheckCircle, 
-  Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
+  Copy, LogOut, Bell, HeartHandshake,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
-  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop, MessageSquare, CloudLightning, FileText, Search, TrendingUp
+  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ShieldCheck, Laptop, MessageSquare, TrendingUp
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -90,20 +90,8 @@ const isSencoSupervisingTa = (senco, ta) => {
   
   if (ta.allocatedSenco) {
     if (ta.allocatedSenco === senco.id) return true;
-    
-    if (ta.allocatedSenco === 'senco_tracey') {
-      const isTracey = senco.id === 'senco_tracey' || 
-                       senco.email?.toLowerCase().includes('tracey') || 
-                       senco.name?.toLowerCase().includes('tracey');
-      if (isTracey) return true;
-    }
-    
-    if (ta.allocatedSenco === 'senco_cathie') {
-      const isCathie = senco.id === 'senco_cathie' || 
-                       senco.email?.toLowerCase().includes('cathie') || 
-                       senco.name?.toLowerCase().includes('cathie');
-      if (isCathie) return true;
-    }
+    if (ta.allocatedSenco === 'senco_tracey' && (senco.id === 'senco_tracey' || senco.name?.toLowerCase().includes('tracey'))) return true;
+    if (ta.allocatedSenco === 'senco_cathie' && (senco.id === 'senco_cathie' || senco.name?.toLowerCase().includes('cathie'))) return true;
   }
   
   if (ta.team === TEAMS.BOTH) return true;
@@ -268,7 +256,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-6 font-sans">
+        <div className="min-h-screen bg-slate-50/50 flex flex-col justify-center items-center p-6 font-sans">
           <div className="bg-white p-8 rounded-3xl shadow-xl border border-red-100 max-w-md w-full text-center">
             <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Something went wrong</h2>
@@ -591,7 +579,7 @@ function App() {
                 <div className="text-[9px] font-bold text-slate-400 uppercase text-left">SENCO Admins:</div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button onClick={() => handleBypassSignIn('senco_cathie')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-700 font-semibold border rounded text-[11px] transition-colors">Cathie (SENCO Y0-4)</button>
-                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
+                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
                 </div>
               </div>
               
@@ -645,7 +633,6 @@ function App() {
         </div>
       )}
 
-      {/* Header section... */}
       <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 bg-white sticky top-0 z-40 shadow-sm flex-wrap gap-3">
         <div className="flex items-center space-x-4">
           <div className="bg-[#f0efff] p-2 rounded-xl text-[#6157e8]">
@@ -724,7 +711,6 @@ function App() {
         </div>
       </header>
 
-      {/* Main Container */}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {activeRole === ROLES.SENCO && (
           <SencoDashboard 
@@ -745,10 +731,9 @@ function App() {
         )}
       </main>
 
-      {/* Mobile Sync Modals and connection integrity checks */}
       {showMobileSync && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 text-center animate-fade-in">
+          <div className="bg-white rounded-[32px] shadow-2xl max-sm w-full p-8 text-center animate-fade-in">
             <Smartphone className="w-8 h-8 text-[#6157e8] mx-auto mb-3" />
             <h3 className="text-xl font-bold mb-2">Sync with Your Phone</h3>
             <p className="text-slate-500 text-sm mb-6">Scan QR code to synchronize live schedules on your mobile.</p>
@@ -760,7 +745,6 @@ function App() {
         </div>
       )}
 
-      {}
       {showSaveVerificationModal && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 text-center animate-fade-in border border-slate-100">
@@ -1235,8 +1219,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const handleTriggerTestAlert = async () => {
     const targetTa = tas[Math.floor(Math.random() * tas.length)] || { id: 't1', name: 'Karen Cate', team: TEAMS.Y5_8 };
     const reasons = [
-      "Woke up with high fever symptoms.",
-      "Sudden domestic burst pipe emergency.",
+      "Woke up with high symptoms of cold/flu.",
+      "Sudden domestic pipe burst emergency.",
       "Migraine headache block - seeking emergency cover."
     ];
     const reasonText = reasons[Math.floor(Math.random() * reasons.length)];
@@ -1428,9 +1412,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
       await Promise.all(writePromises);
       setShowCopyDayModal(false);
-      setCopyTargetDays({
-        Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
-      });
+      setCopyTargetDays({ Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false });
       
       const scopeMessage = copyScope === 'specific-staff'
         ? `${users.find(u => u.id === copySelectedTaId)?.name || 'Staff'}'s schedule`
@@ -1446,7 +1428,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     <div className="space-y-8 pb-12">
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser?.name}</h2>
+          <h2 className="text-xl font-bold text-slate-800">Welcome back, {currentUser.name}</h2>
           <div className="flex items-center gap-3 mt-2">
             <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">TEAM:</span>
             <select
@@ -1461,7 +1443,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             </select>
           </div>
         </div>
-        
+
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
           <button 
             onClick={() => setActiveDashboardTab('timetable')}
@@ -1481,7 +1463,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             <TrendingUp size={14} className={activeDashboardTab === 'students' ? 'text-[#6157e8]' : 'text-slate-400'} />
             <span className="flex items-center">
               Student Week View
-              <span className="ml-1.5 bg-yellow-400 text-black px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase">NEW</span>
+              <span className="ml-1.5 bg-yellow-400 text-black px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase">LIVE</span>
             </span>
           </button>
         </div>
@@ -1579,7 +1561,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       <>
                         <button 
                           onClick={() => setResolvingAbsence(a)} 
-                          className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
+                          className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
                         >
                           Approve & Reassign Coverage
                         </button>
@@ -1759,267 +1741,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         />
       )}
 
-      {showManageStaff && (
-        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col md:grid md:grid-cols-12 md:gap-8 overflow-hidden">
-            
-            <div className="col-span-12 border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
-              <h3 className="text-2xl font-bold text-[#1a1f36]">Manage Staff & Teams</h3>
-              <button onClick={() => { setShowManageStaff(false); handleCancelEditStaff(); }} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
-            </div>
-
-            <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
-              <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
-              <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
-                {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
-                  <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-xs hover:border-[#6157e8]/25 transition-all">
-                    <div>
-                      <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
-                      
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        {(u.roles || [u.role]).filter(Boolean).map(role => (
-                          <span key={role} className="text-[9px] font-bold bg-[#f0efff] text-[#6157e8] px-2 py-0.5 rounded border border-violet-100 uppercase tracking-wider">
-                            {role}
-                          </span>
-                        ))}
-                      </div>
-
-                      {(u.roles || [u.role]).includes(ROLES.TA) && (
-                        <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider space-y-0.5 mt-2">
-                          <div>SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span></div>
-                          {u.allocatedTeacher && (
-                            <div>Teacher: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeacher)?.name || 'Assigned'}</span></div>
-                          )}
-                          {u.allocatedTeamLeader && (
-                            <div>Team Leader: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeamLeader)?.name || 'Assigned'}</span></div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-1 flex-shrink-0">
-                      <button onClick={() => handleStartEditStaff(u)} className="p-2 text-[#6157e8] hover:bg-violet-100 rounded-lg transition-colors"><Edit3 className="w-4 h-4" /></button>
-                      {u.id !== currentUser?.id && (
-                        <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
-              <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
-                {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
-              </h4>
-              <div className="space-y-4 text-xs">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
-                  <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Ruby Gray" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Email Address</label>
-                  <input type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. ruby.gray@halswell.school.nz" />
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ACCESS ROLES (Select all that apply)</label>
-                  <div className="grid grid-cols-2 gap-2 p-3.5 bg-slate-50 rounded-xl border border-slate-200/60 shadow-xs">
-                    {Object.values(ROLES).map(role => {
-                      const isChecked = newStaffRoles.includes(role);
-                      return (
-                        <label key={role} className={`flex items-center space-x-2.5 p-2 bg-white rounded-lg border cursor-pointer hover:border-[#6157e8]/40 transition-all shadow-xs ${
-                          isChecked ? 'border-[#6157e8] ring-1 ring-[#6157e8]/20 bg-violet-50/10' : 'border-slate-150'
-                        }`}>
-                          <input 
-                            type="checkbox" 
-                            checked={isChecked}
-                            onChange={() => {
-                              if (isChecked) {
-                                if (newStaffRoles.length > 1) {
-                                  setNewStaffRoles(newStaffRoles.filter(r => r !== role));
-                                }
-                              } else {
-                                setNewStaffRoles([...newStaffRoles, role]);
-                              }
-                            }}
-                            className="w-4 h-4 text-[#6157e8] border-slate-300 rounded focus:ring-[#6157e8]" 
-                          />
-                          <span className="text-xs font-bold text-slate-700">{role}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Team Group</label>
-                    <select value={newStaffTeam} onChange={(e) => setNewStaffTeam(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
-                      <option value={TEAMS.Y0_4}>{TEAMS.Y0_4}</option>
-                      <option value={TEAMS.Y5_8}>{TEAMS.Y5_8}</option>
-                      <option value={TEAMS.BOTH}>{TEAMS.BOTH}</option>
-                      <option value={TEAMS.ALL}>{TEAMS.ALL}</option>
-                    </select>
-                  </div>
-
-                  {(newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Allocated SENCO</label>
-                        <select 
-                          value={newStaffSenco} 
-                          onChange={(e) => setNewStaffSenco(e.target.value)} 
-                          className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                        >
-                          <option value="">None / Both (Shared)</option>
-                          <option value="senco_cathie">Cathie (SENCO Y0-4)</option>
-                          <option value="senco_tracey">Tracey (SENCO Y5-8)</option>
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Teacher</label>
-                          <select 
-                            value={newStaffTeacher} 
-                            onChange={(e) => setNewStaffTeacher(e.target.value)} 
-                            className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                          >
-                            <option value="">None / Select Teacher</option>
-                            {users.filter(u => {
-                              const roles = u.roles || [u.role];
-                              return roles.includes(ROLES.TEACHER) || roles.includes(ROLES.ORS_TEACHER) || roles.includes(ROLES.LSC);
-                            }).sort((a, b) => a.name.localeCompare(b.name)).map(t => (
-                              <option key={t.id} value={t.id}>{t.name}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Team Leader</label>
-                          <select 
-                            value={newStaffTeamLeader} 
-                            onChange={(e) => setNewStaffTeamLeader(e.target.value)} 
-                            className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                          >
-                            <option value="">None / Select Team Leader</option>
-                            {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEAM_LEADER)).sort((a, b) => a.name.localeCompare(b.name)).map(tl => (
-                              <option key={tl.id} value={tl.id}>{tl.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
-                    {editingStaff && <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">Cancel Edit</button>}
-                    <button onClick={() => { setShowManageStaff(false); handleCancelEditStaff(); }} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Done</button>
-                    <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">Save Staff</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {activeDashboardTab === 'timetable' ? (
-        <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
-          <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-[#1a1f36]">Master Timetable</h2>
-              <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-1">Live Database Connected</p>
-            </div>
-            
-            <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
-              <button 
-                onClick={() => setShowCopyDayModal(true)}
-                className="flex items-center px-4 py-2.5 bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] font-medium text-sm rounded-xl transition-colors shadow-sm border border-[#a7f3d0]"
-              >
-                <Copy className="w-4 h-4 mr-1.5" /> 
-                <span>Copy Schedule</span>
-              </button>
-              <select 
-                value={selectedDay}
-                onChange={(e) => setSelectedDay(e.target.value)}
-                className="bg-slate-50 border border-slate-200 text-[#1a1f36] font-semibold rounded-xl focus:ring-[#6157e8] focus:border-[#6157e8] block px-4 py-2.5 outline-none flex-1 sm:flex-none cursor-pointer"
-              >
-                {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="p-0">
-            <TimetableGrid 
-              sessions={sessions} 
-              day={selectedDay} 
-              users={users} 
-              isEditable={true}
-              teamFilter={activeTeamFilter}
-              onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} 
-            />
-          </div>
-        </div>
-      ) : (
-        <StudentTimetablesView 
-          sessions={sessions}
-          users={safeUsers}
-          addToast={addToast}
-        />
-      )}
-
-      {resolvedAbsences.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4 animate-fade-in">
-          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
-              <CheckCircle className="w-4 h-4 mr-1.5 text-emerald-500" /> Resolved Absences Archive Log
-            </h3>
-            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">{resolvedAbsences.length} Total</span>
-          </div>
-          <div className="max-h-[240px] overflow-y-auto space-y-2 pr-2">
-            {resolvedAbsences.map(a => {
-              const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
-              return (
-                <div key={a.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs hover:border-[#6157e8]/20 transition-all">
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
-                      <span className="text-slate-400 font-semibold">
-                        {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `Sick Leave (${a.formattedDate || a.day})`}
-                      </span>
-                      <span className="text-slate-400">•</span>
-                      <span className="text-slate-500 italic">" {a.reason} "</span>
-                    </div>
-                    {a.isAdvance && (
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stuart Approved:</span>
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
-                          a.approvedByStuart === 'Yes' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-100'
-                        }`}>
-                          {a.approvedByStuart || 'No'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {a.reply && (
-                      <span className="text-[10px] bg-purple-50 text-[#6157e8] border border-purple-100 font-bold px-2 py-0.5 rounded-md truncate max-w-[200px]" title={a.reply}>
-                        Reply: "{a.reply}"
-                      </span>
-                    )}
-                    <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold text-[10px] uppercase">
-                      {a.status}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {showCopyDayModal && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
@@ -2121,46 +1842,346 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       )}
 
       {editingCell && (
-        <EditDutyModal 
-          editingCell={editingCell} 
-          users={users} 
-          onClose={() => setEditingCell(null)} 
-          onSave={handleSaveSession} 
-          onDelete={handleDeleteSession} 
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in">
+            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">{editingCell.session ? 'Edit Duty' : 'Assign Duty'}</h3>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              handleSaveSession({
+                subject: formData.get('subject'),
+                tier: formData.get('tier'),
+                teacherId: formData.get('teacherId') || null,
+                teamLeaderId: formData.get('teamLeaderId') || null
+              });
+            }} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Subject / Task Name</label>
+                <input type="text" name="subject" required defaultValue={editingCell.session?.subject} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Reading Support..." />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Priority Tier</label>
+                <select name="tier" defaultValue={editingCell.session?.tier || TIERS.ENRICHMENT} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                  {Object.values(TIERS).map(tier => <option key={tier} value={tier}>{tier}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Teacher</label>
+                <select name="teacherId" defaultValue={editingCell.session?.teacherId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                  <option value="">None / Self-Directed</option>
+                  {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Team Leader</label>
+                <select name="teamLeaderId" defaultValue={editingCell.session?.teamLeaderId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                  <option value="">None / No Team Leader</option>
+                  {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEAM_LEADER)).sort((a, b) => a.name.localeCompare(b.name)).map(tl => <option key={tl.id} value={tl.id}>{tl.name}</option>)}
+                </select>
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                {editingCell.session && (
+                  <button type="button" onClick={handleDeleteSession} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm transition-colors mr-auto flex items-center">
+                    <Trash2 className="w-4 h-4 mr-2" /> Remove
+                  </button>
+                )}
+                <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Cancel</button>
+                <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showManageStaff && (
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col md:grid md:grid-cols-12 md:gap-8 overflow-hidden">
+            
+            <div className="col-span-12 border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
+              <h3 className="text-2xl font-bold text-[#1a1f36]">Manage Staff & Teams</h3>
+              <button onClick={() => { setShowManageStaff(false); handleCancelEditStaff(); }} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
+            </div>
+
+            <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
+              <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
+                {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
+                  <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-xs hover:border-[#6157e8]/25 transition-all">
+                    <div>
+                      <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
+                      
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(u.roles || [u.role]).filter(Boolean).map(role => (
+                          <span key={role} className="text-[9px] font-bold bg-[#f0efff] text-[#6157e8] px-2 py-0.5 rounded border border-violet-100 uppercase tracking-wider">
+                            {role}
+                          </span>
+                        ))}
+                      </div>
+
+                      {(u.roles || [u.role]).includes(ROLES.TA) && (
+                        <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider space-y-0.5 mt-2">
+                          <div>SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span></div>
+                          {u.allocatedTeacher && (
+                            <div>Teacher: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeacher)?.name || 'Assigned'}</span></div>
+                          )}
+                          {u.allocatedTeamLeader && (
+                            <div>Team Leader: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeamLeader)?.name || 'Assigned'}</span></div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-1 flex-shrink-0">
+                      <button onClick={() => handleStartEditStaff(u)} className="p-2 text-[#6157e8] hover:bg-violet-100 rounded-lg transition-colors"><Edit3 className="w-4 h-4" /></button>
+                      {u.id !== currentUser.id && (
+                        <button onClick={() => handleDeleteStaff(u.id, u.name)} className="p-2 text-red-500 hover:bg-red-100 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
+              <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
+                {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
+              </h4>
+              <div className="space-y-4 text-xs font-medium">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
+                  <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Ruby Gray" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Email Address</label>
+                  <input type="email" value={newStaffEmail} onChange={(e) => setNewStaffEmail(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. ruby.gray@halswell.school.nz" />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ACCESS ROLES (Select all that apply)</label>
+                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+                    {Object.values(ROLES).map(role => {
+                      const isChecked = newStaffRoles.includes(role);
+                      return (
+                        <label key={role} className={`flex items-center space-x-2 p-2 bg-white rounded-lg border cursor-pointer hover:border-[#6157e8]/40 transition-all ${
+                          isChecked ? 'border-[#6157e8] ring-1 ring-[#6157e8]/20 bg-violet-50/10' : 'border-slate-200'
+                        }`}>
+                          <input 
+                            type="checkbox" 
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                if (newStaffRoles.length > 1) {
+                                  setNewStaffRoles(newStaffRoles.filter(r => r !== role));
+                                }
+                              } else {
+                                setNewStaffRoles([...newStaffRoles, role]);
+                              }
+                            }}
+                            className="w-4 h-4 text-[#6157e8] border-slate-300 rounded focus:ring-[#6157e8]" 
+                          />
+                          <span className="text-xs font-bold text-slate-700">{role}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Assigned Team Group</label>
+                  <select value={newStaffTeam} onChange={(e) => setNewStaffTeam(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                    <option value={TEAMS.Y0_4}>{TEAMS.Y0_4}</option>
+                    <option value={TEAMS.Y5_8}>{TEAMS.Y5_8}</option>
+                    <option value={TEAMS.BOTH}>{TEAMS.BOTH}</option>
+                    <option value={TEAMS.ALL}>{TEAMS.ALL}</option>
+                  </select>
+                </div>
+
+                {(newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) && (
+                  <div className="space-y-4 pt-1 border-t border-slate-100/60">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Allocated SENCO</label>
+                      <select 
+                        value={newStaffSenco} 
+                        onChange={(e) => setNewStaffSenco(e.target.value)} 
+                        className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
+                      >
+                        <option value="">None / Both (Shared)</option>
+                        <option value="senco_cathie">Cathie (SENCO Y0-4)</option>
+                        <option value="senco_tracey">Tracey (SENCO Y5-8)</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Teacher</label>
+                        <select 
+                          value={newStaffTeacher} 
+                          onChange={(e) => setNewStaffTeacher(e.target.value)} 
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
+                        >
+                          <option value="">None / Select Teacher</option>
+                          {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Team Leader</label>
+                        <select 
+                          value={newStaffTeamLeader} 
+                          onChange={(e) => setNewStaffTeamLeader(e.target.value)} 
+                          className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
+                        >
+                          <option value="">None / Select Team Leader</option>
+                          {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEAM_LEADER)).sort((a, b) => a.name.localeCompare(b.name)).map(tl => (
+                            <option key={tl.id} value={tl.id}>{tl.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                  {editingStaff && (
+                    <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">
+                      Cancel Edit
+                    </button>
+                  )}
+                  <button onClick={() => { setShowManageStaff(false); handleCancelEditStaff(); }} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">
+                    Done
+                  </button>
+                  <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">
+                    Save Staff
+                  </button>
+                </div>
+
+              </div> 
+            </div>
+
+          </div> 
+        </div> 
+      )}
+
+      {activeDashboardTab === 'timetable' ? (
+        <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-[#1a1f36]">Master Timetable</h2>
+              <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-1">Live Database Connected</p>
+            </div>
+            
+            <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
+              <button 
+                onClick={() => setShowCopyDayModal(true)}
+                className="flex items-center px-4 py-2.5 bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] font-medium text-sm rounded-xl transition-colors shadow-sm border border-[#a7f3d0]"
+              >
+                <Copy className="w-4 h-4 mr-1.5" /> 
+                <span>Copy Schedule</span>
+              </button>
+              <select 
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                className="bg-slate-50 border border-slate-200 text-[#1a1f36] font-semibold rounded-xl focus:ring-[#6157e8] focus:border-[#6157e8] block px-4 py-2.5 outline-none flex-1 sm:flex-none cursor-pointer"
+              >
+                {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="p-0">
+            <TimetableGrid 
+              sessions={sessions} 
+              day={selectedDay} 
+              users={users} 
+              isEditable={true}
+              teamFilter={activeTeamFilter}
+              onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} 
+            />
+          </div>
+        </div>
+      ) : (
+        <StudentTimetablesView 
+          sessions={sessions}
+          users={users}
+          addToast={addToast}
         />
+      )}
+
+      {resolvedAbsences.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4 animate-fade-in">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center">
+              <CheckCircle className="w-4 h-4 mr-1.5 text-emerald-500" /> Resolved Absences Archive Log
+            </h3>
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">{resolvedAbsences.length} Total</span>
+          </div>
+          <div className="max-h-[240px] overflow-y-auto space-y-2 pr-2">
+            {resolvedAbsences.map(a => {
+              const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
+              return (
+                <div key={a.id} className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 text-xs hover:border-[#6157e8]/20 transition-all">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-bold text-[#1a1f36]">{ta?.name}</span>
+                      <span className="text-slate-400 font-semibold">
+                        {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `Sick Leave (${a.formattedDate || a.day})`}
+                      </span>
+                      <span className="text-slate-400">•</span>
+                      <span className="text-slate-500 italic">" {a.reason} "</span>
+                    </div>
+                    {a.isAdvance && (
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stuart Approved:</span>
+                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${
+                          a.approvedByStuart === 'Yes' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-100'
+                        }`}>
+                          {a.approvedByStuart || 'No'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {a.reply && (
+                      <span className="text-[10px] bg-purple-50 text-[#6157e8] border border-purple-100 font-bold px-2 py-0.5 rounded-md truncate max-w-[200px]" title={a.reply}>
+                        Reply: "{a.reply}"
+                      </span>
+                    )}
+                    <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 font-bold text-[10px] uppercase">
+                      {a.status}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
 function StudentTimetablesView({ sessions, users, addToast }) {
-  const autoTrackedStudents = React.useMemo(() => {
+  const autoTrackedStudents = useMemo(() => {
     const ignoredKeywords = [
       'lunch', 'morning tea', 'tea', 'no cover', 'break', 'not working', 
       'interval', 'meeting', 'duty', 'admin', 'planning', 'free session', 
       'Ōtawhito', 'otawhito', 'esol', 'office', 'classroom', 'check-in',
       'monitor', 'support', 'supervise', 'check', 'supervision'
     ];
-    // Defaulting only to initial known Critical & High Needs student categories
-    const found = new Set(['H.W', 'Jess', 'Sam C', 'E.S']);
+    const found = new Set(['H.W', 'E.S', 'Sam C']);
     
     sessions.forEach(s => {
-      // ONLY pull student profiles if the session tier is Critical or High Needs
       if (s.tier !== TIERS.CRITICAL && s.tier !== TIERS.HIGH_NEEDS) return;
-
       if (!s.subject) return;
       const parts = s.subject.split(/[-\/&+]|\band\b/i);
       parts.forEach(part => {
         let cleaned = part.replace(/\s*\(.*?\)\s*/g, ' ').trim();
         if (!cleaned) return;
-        // Clean prefixes like "Support ", "Check " to isolate true initials
-        cleaned = cleaned.replace(/^(support|check|check-in|supervise|monitor)\s+/i, '').trim();
+        cleaned = cleaned.replace(/^(support|check|check-in|supervise|monitor|check)\s+/i, '').trim();
         const lower = cleaned.toLowerCase();
         const isTimeFormat = /\b\d{1,2}(:\d{2})?\s*(am|pm)?\b/i.test(lower);
-        
-        // Ignore if it matches any generic system words or contains task substrings (like "monitor", "support")
-        const isIgnored = isTimeFormat || ignoredKeywords.some(keyword => lower === keyword || lower.includes(keyword));
-        
+        const isIgnored = isTimeFormat || ignoredKeywords.some(keyword => lower === keyword || lower.includes(keyword) || lower.startsWith(keyword) || lower.endsWith(keyword));
         if (!isIgnored && cleaned.length > 0 && cleaned.length <= 15) {
           found.add(cleaned);
         }
@@ -2170,7 +2191,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
   }, [sessions]);
 
   const [manualStudents, setManualStudents] = useState([]);
-  const allTrackedStudents = React.useMemo(() => {
+  const allTrackedStudents = useMemo(() => {
     return Array.from(new Set([...autoTrackedStudents, ...manualStudents])).sort();
   }, [autoTrackedStudents, manualStudents]);
 
@@ -2178,13 +2199,23 @@ function StudentTimetablesView({ sessions, users, addToast }) {
   const [newStudentName, setNewStudentName] = useState('');
   const [showAddStudentForm, setShowAddStudentForm] = useState(false);
 
+  const handleCreateStudent = (e) => {
+    e.preventDefault();
+    if (newStudentName.trim()) {
+      setManualStudents(prev => [...prev, newStudentName.trim()]);
+      setActiveStudent(newStudentName.trim());
+      setNewStudentName('');
+      setShowAddStudentForm(false);
+      addToast(`Added student track for ${newStudentName.trim()}`, 'success');
+    }
+  };
+
   const getCoveringStaff = (day, slotId) => {
     const matchingSession = sessions.find(s => {
       if (s.day !== day || s.timeSlotId !== slotId) return false;
       const cleanSubject = s.subject?.toLowerCase() || '';
       const cleanStudent = activeStudent.toLowerCase();
-      
-      const strippedSubject = cleanSubject.replace(/^(support|check|check-in|supervise|monitor)\s+/i, '').trim();
+      const strippedSubject = cleanSubject.replace(/^(support|check|check-in|supervise|monitor|check)\s+/i, '').trim();
 
       return (
         strippedSubject === cleanStudent ||
@@ -2198,8 +2229,8 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     });
 
     if (!matchingSession) return null;
-    // Query both live users state and initial bypass data to prevent blank/Assigned names
-    const ta = users.find(u => u.id === matchingSession.taId) || INITIAL_USERS.find(u => u.id === matchingSession.taId);
+    const resolverList = users.length > 0 ? users : INITIAL_USERS;
+    const ta = resolverList.find(u => u.id === matchingSession.taId);
     return ta ? ta.name.split(' ')[0] : 'Assigned'; 
   };
 
@@ -2221,19 +2252,19 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     if (!name) return '';
     const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const colors = [
-      'bg-blue-100/90 text-blue-800 border-blue-200/50',
-      'bg-emerald-100/90 text-emerald-800 border-emerald-200/50',
-      'bg-purple-100/90 text-purple-800 border-purple-200/50',
-      'bg-pink-100/90 text-pink-800 border-pink-200/50',
-      'bg-amber-100/90 text-amber-800 border-amber-200/50',
-      'bg-indigo-100/90 text-indigo-800 border-indigo-200/50',
-      'bg-teal-100/90 text-teal-800 border-teal-200/50'
+      'bg-blue-50 text-blue-800 border-blue-200/50',
+      'bg-emerald-50 text-emerald-800 border-emerald-200/50',
+      'bg-purple-50 text-purple-800 border-purple-200/50',
+      'bg-pink-50 text-pink-800 border-pink-200/50',
+      'bg-amber-50 text-amber-800 border-amber-200/50',
+      'bg-indigo-50 text-indigo-800 border-indigo-200/50',
+      'bg-teal-50 text-teal-800 border-teal-200/50'
     ];
     return colors[hash % colors.length];
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in font-sans">
       <div className="lg:col-span-3 space-y-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
           <div>
@@ -2246,9 +2277,9 @@ function StudentTimetablesView({ sessions, users, addToast }) {
               <button
                 key={student}
                 onClick={() => setActiveStudent(student)}
-                className={`w-full text-left px-4 py-3 rounded-xl font-normal text-xs transition-all flex items-center justify-between ${
+                className={`w-full text-left px-4 py-3 rounded-xl text-xs transition-all flex items-center justify-between ${
                   activeStudent === student 
-                    ? 'bg-[#1a1f36] text-white shadow-xs' 
+                    ? 'bg-[#1a1f36] text-white shadow-xs font-medium' 
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/50'
                 }`}
               >
@@ -2297,17 +2328,17 @@ function StudentTimetablesView({ sessions, users, addToast }) {
           <div className="space-y-3.5 pt-2">
             <div className="flex justify-between items-center border-b border-slate-50 pb-2">
               <span className="text-xs text-slate-400 font-medium">Assigned TA Hours:</span>
-              <span className="text-xs font-bold text-slate-800">{coveredWeeklyCount * 0.5} hours / wk</span>
+              <span className="text-xs font-medium text-slate-800">{coveredWeeklyCount * 0.5} hours / wk</span>
             </div>
             <div className="flex justify-between items-center border-b border-slate-50 pb-2">
               <span className="text-xs text-slate-400 font-medium">Unscheduled Gaps:</span>
-              <span className={`text-xs font-bold ${uncoveredWeeklyCount > 0 ? 'text-red-500' : 'text-slate-800'}`}>
+              <span className={`text-xs font-medium ${uncoveredWeeklyCount > 0 ? 'text-red-500' : 'text-slate-800'}`}>
                 {uncoveredWeeklyCount * 0.5} hours / wk
               </span>
             </div>
             <div className="flex justify-between items-center border-b border-slate-50 pb-2">
               <span className="text-xs text-slate-400 font-medium">Coverage Rate:</span>
-              <span className="text-xs font-black text-slate-800">{coveragePercentage}%</span>
+              <span className="text-xs font-semibold text-slate-800">{coveragePercentage}%</span>
             </div>
             
             <div className="space-y-1.5 pt-1">
@@ -2331,22 +2362,20 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       </div>
 
       <div className="lg:col-span-9 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-        <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-[#1a1f36]">Week-at-a-Glance Timetable</h2>
-            <p className="text-xs text-slate-400 mt-1">Review coverage allocations and identify scheduling gaps immediately.</p>
-          </div>
+        <div className="p-6 sm:p-8 border-b border-slate-100 bg-white">
+          <h2 className="text-xl font-bold text-[#1a1f36]">Week-at-a-Glance Timetable</h2>
+          <p className="text-xs text-slate-400 mt-1">Review coverage allocations and identify scheduling gaps immediately.</p>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-center border-collapse min-w-max table-fixed">
             <thead>
               <tr className="bg-slate-50">
-                <th className="p-4 bg-amber-400 text-[#1a1f36] font-medium text-sm border-r border-slate-200 w-44 uppercase tracking-widest select-none shadow-[inset_0_-2px_0_rgba(0,0,0,0.1)]">
+                <th className="p-4 bg-amber-400 text-[#1a1f36] font-normal text-xs border-r border-slate-200 w-44 uppercase tracking-wider select-none">
                   {activeStudent}
                 </th>
                 {DAYS.map(day => (
-                  <th key={day} className="p-4 bg-slate-100 text-slate-500 font-medium text-xs uppercase tracking-wider border-b border-slate-200">
+                  <th key={day} className="p-4 bg-slate-100 text-slate-500 font-normal text-xs uppercase tracking-wider border-b border-slate-200">
                     {day}
                   </th>
                 ))}
@@ -2392,7 +2421,10 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
     (s.tier === TIERS.CRITICAL || s.tier === TIERS.HIGH_NEEDS)
   );
 
-  const tas = users.filter(u => (u.roles || [u.role]).includes(ROLES.TA));
+  const tas = users.filter(u => {
+    const roles = u.roles || [u.role];
+    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
+  });
 
   const getTaAvailabilityInfo = (ta, targetSlotId) => {
     const otherSession = sessions.find(s => 
@@ -2423,7 +2455,7 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
   };
 
   return (
-    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4 font-sans">
       <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col overflow-hidden border border-amber-200">
         <div className="border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
           <div>
@@ -2518,7 +2550,7 @@ function TeamLeaderDashboard({ user, sessions, users }) {
   const teamSessions = sessions.filter(s => s.day === selectedDay && s.teamLeaderId === user.id);
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
+    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto font-sans">
       <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
         <div>
           <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
@@ -2543,14 +2575,13 @@ function TeamLeaderDashboard({ user, sessions, users }) {
 
 function TeacherDashboard({ user, sessions, users }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
-  
   const teacherSessions = sessions.filter(s => 
     s.day === selectedDay && 
     (s.teacherId === user.id || (s.teacherIds && s.teacherIds.includes(user.id)))
   );
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
+    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto font-sans">
       <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-[#f1f5f9]">
         <div>
           <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
@@ -2602,7 +2633,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
   }, [tas, activeTaId]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 font-sans">
       <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
           {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
@@ -2630,7 +2661,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
           </div>
 
           {activeTaId ? (
-            <div className="space-y-4 max-w-2xl mx-auto">
+            <div className="space-y-4 max-w-2xl mx-auto animate-fade-in">
               {TIME_SLOTS.map(slot => {
                 const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === activeTaId);
                 const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
@@ -2826,8 +2857,8 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in">
-        <h3 className="text-2xl font-bold text-slate-800 mb-2 font-sans">Coverage: {absentTa?.name}</h3>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in font-sans">
+        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {absentTa?.name}</h3>
         <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
         
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
@@ -2875,95 +2906,6 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
           <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
           <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function EditDutyModal({ editingCell, users, onClose, onSave, onDelete }) {
-  const [selectedTeacherIds, setSelectedTeacherIds] = useState(() => {
-    if (editingCell.session) {
-      if (editingCell.session.teacherIds) return editingCell.session.teacherIds;
-      if (editingCell.session.teacherId) return [editingCell.session.teacherId];
-    }
-    return [];
-  });
-
-  return (
-    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in">
-        <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">{editingCell.session ? 'Edit Duty' : 'Assign Duty'}</h3>
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          const formData = new FormData(e.target);
-          onSave({
-            subject: formData.get('subject'),
-            tier: formData.get('tier'),
-            teacherIds: selectedTeacherIds,
-            teacherId: selectedTeacherIds[0] || null, 
-            teamLeaderId: formData.get('teamLeaderId') || null
-          });
-        }} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Subject / Task Name</label>
-            <input type="text" name="subject" required defaultValue={editingCell.session?.subject} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Jess, H.W, Reading Support..." />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Priority Tier</label>
-            <select name="tier" defaultValue={editingCell.session?.tier || TIERS.ENRICHMENT} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
-              {Object.values(TIERS).map(tier => <option key={tier} value={tier}>{tier}</option>)}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Teacher(s)</label>
-            <div className="border border-slate-200 rounded-xl p-3 max-h-[140px] overflow-y-auto space-y-1.5 bg-slate-50">
-              {users.filter(u => {
-                const roles = u.roles || [u.role];
-                return roles.includes(ROLES.TEACHER) || roles.includes(ROLES.ORS_TEACHER) || roles.includes(ROLES.LSC);
-              }).sort((a, b) => a.name.localeCompare(b.name)).map(t => {
-                const isChecked = selectedTeacherIds.includes(t.id);
-                return (
-                  <label key={t.id} className="flex items-center space-x-2.5 p-1.5 bg-white rounded-lg border border-slate-100 cursor-pointer hover:border-[#6157e8]/30 transition-all shadow-xs">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => {
-                        if (isChecked) {
-                          setSelectedTeacherIds(selectedTeacherIds.filter(id => id !== t.id));
-                        } else {
-                          setSelectedTeacherIds([...selectedTeacherIds, t.id]);
-                        }
-                      }}
-                      className="w-4 h-4 text-[#6157e8] border-slate-300 rounded focus:ring-[#6157e8]"
-                    />
-                    <span className="text-xs font-medium text-slate-700">{t.name}</span>
-                  </label>
-                );
-              })}
-            </div>
-            <span className="text-[10px] text-slate-400 mt-1 block">Ticking multiple teachers handles sharing days (e.g., job-share partners).</span>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Team Leader</label>
-            <select name="teamLeaderId" defaultValue={editingCell.session?.teamLeaderId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
-              <option value="">None / No Team Leader</option>
-              {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEAM_LEADER)).sort((a, b) => a.name.localeCompare(b.name)).map(tl => (
-                <option key={tl.id} value={tl.id}>{tl.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex justify-end space-x-3 pt-4">
-            {editingCell.session && (
-              <button type="button" onClick={onDelete} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm transition-colors mr-auto flex items-center">
-                <Trash2 className="w-4 h-4 mr-2" /> Remove
-              </button>
-            )}
-            <button type="button" onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Cancel</button>
-            <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">Save Changes</button>
-          </div>
-        </form>
       </div>
     </div>
   );
