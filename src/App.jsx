@@ -61,6 +61,8 @@ const ROLES = {
   SENCO: 'SENCO',
   TEAM_LEADER: 'Team Leader',
   TEACHER: 'TEACHER',
+  ORS_TEACHER: 'ORS Teacher',
+  LSC: 'Learning Support Coordinator',
   TA: 'TA'
 };
 
@@ -138,7 +140,6 @@ const INITIAL_USERS = [
   { id: 'tl1', name: 'Greta Parkes-Dolan', role: ROLES.TEAM_LEADER, roles: [ROLES.TEAM_LEADER, ROLES.TEACHER], email: 'davis@school.edu', team: TEAMS.Y5_8 },
   { id: 't_val', name: 'Val Murray', role: ROLES.TA, roles: [ROLES.TA], email: 'val.murray@school.nz', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey' },
   { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, roles: [ROLES.TA], email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
-  // Seeding additional TAs matching the screenshot
   { id: 't_praboda', name: 'Praboda', role: ROLES.TA, roles: [ROLES.TA], email: 'praboda@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
   { id: 't_tiffany', name: 'Tiffany', role: ROLES.TA, roles: [ROLES.TA], email: 'tiffany@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
   { id: 't_jenny', name: 'Jenny', role: ROLES.TA, roles: [ROLES.TA], email: 'jenny@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
@@ -164,7 +165,6 @@ const INITIAL_ABSENCES = [
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
-// Adding default sessions for other students
 DAYS.forEach(day => {
   const daySessions = [
     { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Jess', teamLeaderId: 'tl1' },
@@ -177,15 +177,9 @@ DAYS.forEach(day => {
   });
 });
 
-// Seeding the exact coverage for H.W as requested from "Screenshot 2026-06-14 at 12.56.41 PM.png"
 DAYS.forEach(day => {
-  // 9:30 - 10:00 (t2) -> Val
   INITIAL_SESSIONS.push({ id: `hw_s1_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W' });
-  
-  // 11:10 - 12:00 (t6) -> Val
   INITIAL_SESSIONS.push({ id: `hw_s2_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W' });
-
-  // First lunch -> Praboda (Mon-Thurs), Karen (Fri)
   INITIAL_SESSIONS.push({ 
     id: `hw_s3_${day}`, 
     day, 
@@ -194,8 +188,6 @@ DAYS.forEach(day => {
     tier: TIERS.LUNCH, 
     subject: 'H.W (First lunch)' 
   });
-
-  // 12:30 - 1:00 -> Tiffany (Mon-Thurs), Tara (Fri)
   INITIAL_SESSIONS.push({ 
     id: `hw_s4_${day}`, 
     day, 
@@ -204,11 +196,7 @@ DAYS.forEach(day => {
     tier: TIERS.HIGH_NEEDS, 
     subject: 'H.W' 
   });
-
-  // 1:00 - 1:30 -> Jenny
   INITIAL_SESSIONS.push({ id: `hw_s5_${day}`, day, taId: 't_jenny', teacherId: 'u5', tier: TIERS.HIGH_NEEDS, subject: 'H.W' });
-
-  // Second lunch -> Praboda (Mon-Wed, Fri), Val (Thurs)
   INITIAL_SESSIONS.push({ 
     id: `hw_s6_${day}`, 
     day, 
@@ -217,8 +205,6 @@ DAYS.forEach(day => {
     tier: TIERS.LUNCH, 
     subject: 'H.W (Second lunch)' 
   });
-
-  // 2:00 - 3:00 (t11-t12) -> Tiffany (Mon-Thurs), Karen (Fri)
   INITIAL_SESSIONS.push({ 
     id: `hw_s7_${day}`, 
     day, 
@@ -229,7 +215,6 @@ DAYS.forEach(day => {
   });
 });
 
-// Seeding mock coverage for E.S across the week to demonstrate auto-pull
 DAYS.forEach(day => {
   if (day === 'Monday' || day === 'Wednesday' || day === 'Friday') {
     INITIAL_SESSIONS.push({
@@ -657,6 +642,7 @@ function App() {
         </div>
       )}
 
+      {}
       <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 bg-white sticky top-0 z-40 shadow-sm flex-wrap gap-3">
         <div className="flex items-center space-x-4">
           <div className="bg-[#f0efff] p-2 rounded-xl text-[#6157e8]">
@@ -1190,7 +1176,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [showManageStaff, setShowManageStaff] = useState(false);
   const [showCriticalCoverBoard, setShowCriticalCoverBoard] = useState(false); 
   
-  // Dashboard primary tab switcher: 'timetable' (staff overview) or 'students' (screenshot child weekly matrix)
   const [activeDashboardTab, setActiveDashboardTab] = useState('timetable');
 
   const [newStaffName, setNewStaffName] = useState('');
@@ -1772,7 +1757,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
                 {[...users].sort((a, b) => a.name.localeCompare(b.name)).map(u => (
-                  <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-xs hover:border-[#6157e8]/20 transition-all">
+                  <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-xs hover:border-[#6157e8]/25 transition-all">
                     <div>
                       <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
                       
@@ -1807,6 +1792,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </div>
             </div>
 
+            {}
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
@@ -2131,40 +2117,38 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   );
 }
 
-/* 
-  StudentTimetablesView:
-  An elegant, dedicated dashboard section built specifically to look like "Screenshot 2026-06-14 at 12.56.41 PM.png"
-  This gathers all sessions across the 5 days of the week for a selected high-needs child, identifies gaps instantly ("No cover"), 
-  and calculates their weekly funding metrics.
-*/
 function StudentTimetablesView({ sessions, users, addToast }) {
-  // Auto-extraction system that pulls student names/initials from live sessions list
+  // Advanced automatic extraction system to filter out times, system states, subjects (e.g., 'ESOL') 
+  // and clean labels like "Check K.S" into "K.S" to match Screenshot 2026-06-14 at 1.10.46 PM.png beautifully.
   const autoTrackedStudents = React.useMemo(() => {
     const ignoredKeywords = [
       'lunch', 'morning tea', 'tea', 'no cover', 'break', 'not working', 
-      'interval', 'meeting', 'duty', 'admin', 'planning', 'free session', 'Ōtawhito', 'otawhito'
+      'interval', 'meeting', 'duty', 'admin', 'planning', 'free session', 
+      'Ōtawhito', 'otawhito', 'esol', 'office', 'classroom', 'check-in'
     ];
-    // Default fallback set to ensure layout contains test targets
     const found = new Set(['H.W', 'Jess', 'Casey', 'Sam C', 'E.S']);
     
     sessions.forEach(s => {
       if (!s.subject) return;
+      
       // Split entries that might have delimiters e.g. "Jess / Ruby" or "Ōtawhito - Sam C"
-      const parts = s.subject.split(/[-\/&]|\band\b/i);
+      const parts = s.subject.split(/[-\/&+]|\band\b/i);
       parts.forEach(part => {
-        // Clear bracket remarks like "(First lunch)"
-        const cleaned = part.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+        let cleaned = part.replace(/\s*\(.*?\)\s*/g, ' ').trim();
         if (!cleaned) return;
         
+        // Strip out leading "Check " or "Check" prefixes (e.g., "Check K.S" -> "K.S", "Check Karlee" -> "Karlee")
+        cleaned = cleaned.replace(/^check\s+/i, '').trim();
+        
         const lower = cleaned.toLowerCase();
-        const isIgnored = ignoredKeywords.some(keyword => {
-          if (['lunch', 'morning tea', 'break'].includes(keyword)) {
-            return lower === keyword || lower.includes(' ' + keyword) || lower.includes(keyword + ' ');
-          }
-          return lower.includes(keyword);
+        
+        // Exclude patterns that look like direct time representations (e.g. "10:30am", "9:00", etc.)
+        const isTimeFormat = /\b\d{1,2}(:\d{2})?\s*(am|pm)?\b/i.test(lower);
+        
+        const isIgnored = isTimeFormat || ignoredKeywords.some(keyword => {
+          return lower === keyword || lower.includes(keyword);
         });
         
-        // Add to extracted list if not a system break or standard task
         if (!isIgnored && cleaned.length > 0 && cleaned.length <= 15) {
           found.add(cleaned);
         }
@@ -2182,9 +2166,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
   const [newStudentName, setNewStudentName] = useState('');
   const [showAddStudentForm, setShowAddStudentForm] = useState(false);
 
-  // Helper to match session subjects to student tags securely
   const getCoveringStaff = (day, slotId) => {
-    // Find any assignment that belongs to this child
     const matchingSession = sessions.find(s => {
       if (s.day !== day || s.timeSlotId !== slotId) return false;
       const cleanSubject = s.subject?.toLowerCase() || '';
@@ -2202,7 +2184,6 @@ function StudentTimetablesView({ sessions, users, addToast }) {
 
     if (!matchingSession) return null;
     
-    // Find the corresponding Teacher Aide assigned to this block
     const ta = users.find(u => u.id === matchingSession.taId);
     return ta ? ta.name.split(' ')[0] : 'Assigned'; 
   };
@@ -2222,7 +2203,6 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     addToast(`Added ${name} to manual student tracking lists.`, 'success');
   };
 
-  // Funding Coverage Metrics Math
   const totalWeeklySlots = TIME_SLOTS.length * DAYS.length;
   let coveredWeeklyCount = 0;
   
@@ -2237,7 +2217,6 @@ function StudentTimetablesView({ sessions, users, addToast }) {
   const uncoveredWeeklyCount = totalWeeklySlots - coveredWeeklyCount;
   const coveragePercentage = Math.round((coveredWeeklyCount / totalWeeklySlots) * 100);
 
-  // Soft pastel color map for TA names to keep the look clean and pretty
   const nameToColorClass = (name) => {
     if (!name) return '';
     const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -2367,7 +2346,6 @@ function StudentTimetablesView({ sessions, users, addToast }) {
           <table className="w-full text-center border-collapse min-w-max table-fixed">
             <thead>
               <tr className="bg-slate-50">
-                {/* Yellow Highlighted Student Identifier header cell strictly styled as requested */}
                 <th className="p-4 bg-amber-400 text-[#1a1f36] font-extrabold text-sm border-r border-slate-200 w-44 uppercase tracking-widest select-none shadow-[inset_0_-2px_0_rgba(0,0,0,0.1)]">
                   {activeStudent}
                 </th>
@@ -2380,17 +2358,14 @@ function StudentTimetablesView({ sessions, users, addToast }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {TIME_SLOTS.map(slot => {
-                // If the slot is t5 (special marked gap from screenshot), we can format it
                 const isSpecialSlot = slot.label === 'No cover' || slot.label === 'First lunch' || slot.label === 'Second lunch';
                 
                 return (
                   <tr key={slot.id} className="hover:bg-slate-55/40 transition-all">
-                    {/* Time Header column on the left */}
                     <td className="p-4 font-bold text-slate-700 text-xs border-r border-slate-200 bg-slate-50/50 whitespace-nowrap">
                       {slot.label}
                     </td>
                     
-                    {/* Dynamic Week coverage columns Mon - Fri */}
                     {DAYS.map(day => {
                       const coveringName = getCoveringStaff(day, slot.id);
                       
@@ -2401,7 +2376,6 @@ function StudentTimetablesView({ sessions, users, addToast }) {
                               {coveringName}
                             </div>
                           ) : (
-                            // Matches the screenshot gap layout styling
                             <div className="py-3 px-2 bg-rose-50/60 border border-dashed border-rose-200 rounded-xl text-rose-500 text-xs font-bold leading-none italic select-none">
                               No cover
                             </div>
@@ -2946,9 +2920,12 @@ function EditDutyModal({ editingCell, users, onClose, onSave, onDelete }) {
           </div>
           
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Teacher(s) (Supports Job Sharing)</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Teacher(s)</label>
             <div className="border border-slate-200 rounded-xl p-3 max-h-[140px] overflow-y-auto space-y-1.5 bg-slate-50">
-              {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(t => {
+              {users.filter(u => {
+                const roles = u.roles || [u.role];
+                return roles.includes(ROLES.TEACHER) || roles.includes(ROLES.ORS_TEACHER) || roles.includes(ROLES.LSC);
+              }).sort((a, b) => a.name.localeCompare(b.name)).map(t => {
                 const isChecked = selectedTeacherIds.includes(t.id);
                 return (
                   <label key={t.id} className="flex items-center space-x-2.5 p-1.5 bg-white rounded-lg border border-slate-100 cursor-pointer hover:border-[#6157e8]/30 transition-all shadow-xs">
