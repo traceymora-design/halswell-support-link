@@ -229,6 +229,29 @@ DAYS.forEach(day => {
   });
 });
 
+// Seeding mock coverage for E.S across the week to demonstrate auto-pull
+DAYS.forEach(day => {
+  if (day === 'Monday' || day === 'Wednesday' || day === 'Friday') {
+    INITIAL_SESSIONS.push({
+      id: `es_s1_${day}`,
+      day,
+      taId: 't_ruby',
+      teacherId: 'u3',
+      tier: TIERS.CRITICAL,
+      subject: 'E.S'
+    });
+  } else {
+    INITIAL_SESSIONS.push({
+      id: `es_s2_${day}`,
+      day,
+      taId: 't_val',
+      teacherId: 'u2',
+      tier: TIERS.HIGH_NEEDS,
+      subject: 'E.S'
+    });
+  }
+});
+
 const TIER_STYLES = {
   [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-[#fff5f6]', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
   [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-[#fffaf5]', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
@@ -2115,9 +2138,47 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   and calculates their weekly funding metrics.
 */
 function StudentTimetablesView({ sessions, users, addToast }) {
-  // Default list of tracked students. Sencos can also register custom ones.
-  const [trackedStudents, setTrackedStudents] = useState(['H.W', 'Jess', 'Casey', 'Sam C']);
-  const [activeStudent, setActiveStudent] = useState('H.W');
+  // Auto-extraction system that pulls student names/initials from live sessions list
+  const autoTrackedStudents = React.useMemo(() => {
+    const ignoredKeywords = [
+      'lunch', 'morning tea', 'tea', 'no cover', 'break', 'not working', 
+      'interval', 'meeting', 'duty', 'admin', 'planning', 'free session', 'Ōtawhito', 'otawhito'
+    ];
+    // Default fallback set to ensure layout contains test targets
+    const found = new Set(['H.W', 'Jess', 'Casey', 'Sam C', 'E.S']);
+    
+    sessions.forEach(s => {
+      if (!s.subject) return;
+      // Split entries that might have delimiters e.g. "Jess / Ruby" or "Ōtawhito - Sam C"
+      const parts = s.subject.split(/[-\/&]|\band\b/i);
+      parts.forEach(part => {
+        // Clear bracket remarks like "(First lunch)"
+        const cleaned = part.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+        if (!cleaned) return;
+        
+        const lower = cleaned.toLowerCase();
+        const isIgnored = ignoredKeywords.some(keyword => {
+          if (['lunch', 'morning tea', 'break'].includes(keyword)) {
+            return lower === keyword || lower.includes(' ' + keyword) || lower.includes(keyword + ' ');
+          }
+          return lower.includes(keyword);
+        });
+        
+        // Add to extracted list if not a system break or standard task
+        if (!isIgnored && cleaned.length > 0 && cleaned.length <= 15) {
+          found.add(cleaned);
+        }
+      });
+    });
+    return Array.from(found).sort();
+  }, [sessions]);
+
+  const [manualStudents, setManualStudents] = useState([]);
+  const allTrackedStudents = React.useMemo(() => {
+    return Array.from(new Set([...autoTrackedStudents, ...manualStudents])).sort();
+  }, [autoTrackedStudents, manualStudents]);
+
+  const [activeStudent, setActiveStudent] = useState('E.S');
   const [newStudentName, setNewStudentName] = useState('');
   const [showAddStudentForm, setShowAddStudentForm] = useState(false);
 
@@ -2128,7 +2189,15 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       if (s.day !== day || s.timeSlotId !== slotId) return false;
       const cleanSubject = s.subject?.toLowerCase() || '';
       const cleanStudent = activeStudent.toLowerCase();
-      return cleanSubject === cleanStudent || cleanSubject.startsWith(cleanStudent + ' ') || cleanSubject.includes('(' + cleanStudent + ')') || cleanSubject.includes(' - ' + cleanStudent);
+      
+      return (
+        cleanSubject === cleanStudent || 
+        cleanSubject.startsWith(cleanStudent + ' ') || 
+        cleanSubject.endsWith(' ' + cleanStudent) ||
+        cleanSubject.includes('(' + cleanStudent + ')') || 
+        cleanSubject.includes(' - ' + cleanStudent) ||
+        cleanSubject.split(/[-\/&\s]/).some(part => part.trim() === cleanStudent)
+      );
     });
 
     if (!matchingSession) return null;
@@ -2141,15 +2210,16 @@ function StudentTimetablesView({ sessions, users, addToast }) {
   const handleCreateStudent = (e) => {
     e.preventDefault();
     if (!newStudentName.trim()) return;
-    if (trackedStudents.includes(newStudentName.trim())) {
-      addToast('Student is already registered for tracking.', 'error');
+    const name = newStudentName.trim();
+    if (allTrackedStudents.includes(name)) {
+      addToast('Student is already registered or auto-detected.', 'error');
       return;
     }
-    setTrackedStudents(prev => [...prev, newStudentName.trim()]);
-    setActiveStudent(newStudentName.trim());
+    setManualStudents(prev => [...prev, name]);
+    setActiveStudent(name);
     setNewStudentName('');
     setShowAddStudentForm(false);
-    addToast(`Added ${newStudentName.trim()} to active tracking.`, 'success');
+    addToast(`Added ${name} to manual student tracking lists.`, 'success');
   };
 
   // Funding Coverage Metrics Math
@@ -2191,11 +2261,11 @@ function StudentTimetablesView({ sessions, users, addToast }) {
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
           <div>
             <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-2">Tracked Students</h3>
-            <p className="text-xs text-slate-400">Select a student profile to render their week-at-a-glance coverage.</p>
+            <p className="text-xs text-slate-400">Select a student profile to render their week-at-a-glance coverage. This lists auto-detected initials from active duties.</p>
           </div>
 
           <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
-            {trackedStudents.map(student => (
+            {allTrackedStudents.map(student => (
               <button
                 key={student}
                 onClick={() => setActiveStudent(student)}
