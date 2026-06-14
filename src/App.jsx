@@ -115,17 +115,17 @@ const isSencoSupervisingTa = (senco, ta) => {
 const TIME_SLOTS = [
   { id: 't1', start: '9:00', end: '9:30', label: '9:00 - 9:30' },
   { id: 't2', start: '9:30', end: '10:00', label: '9:30 - 10:00' },
-  { id: 't3', start: '10:00', end: '10:30', label: '10:00 - 10:50' },
-  { id: 't4', start: '10:30', end: '10:50', label: '10:50 - 11:10' },
-  { id: 't5', start: '10:50', end: '11:10', label: 'No cover' },
-  { id: 't6', start: '11:10', end: '11:30', label: '11:10 - 12:00' },
-  { id: 't7', start: '11:30', end: '12:00', label: 'First lunch' },
-  { id: 't8', start: '12:00', end: '12:30', label: '12:30 - 1:00' },
-  { id: 't9', start: '12:30', end: '1:00', label: '1:00 - 1:30' },
-  { id: 't10', start: '1:00', end: '1:30', label: 'Second lunch' },
-  { id: 't11', start: '1:30', end: '2:00', label: '2:00 - 2:30' },
-  { id: 't12', start: '2:00', end: '2:30', label: '2:30 - 3:00' },
-  { id: 't13', start: '2:30', end: '3:00', label: 'End block' }
+  { id: 't3', start: '10:00', end: '10:50', label: '10:00 - 10:50' },
+  { id: 't4', start: '10:50', end: '11:10', label: '10:50 - 11:10' },
+  { id: 't5', start: '11:10', end: '11:10', label: 'No cover' },
+  { id: 't6', start: '11:10', end: '12:00', label: '11:10 - 12:00' },
+  { id: 't7', start: '12:00', end: '12:30', label: 'First lunch' },
+  { id: 't8', start: '12:30', end: '1:00', label: '12:30 - 1:00' },
+  { id: 't9', start: '1:00', end: '1:30', label: '1:00 - 1:30' },
+  { id: 't10', start: '1:30', end: '2:00', label: 'Second lunch' },
+  { id: 't11', start: '2:00', end: '2:30', label: '2:00 - 2:30' },
+  { id: 't12', start: '2:30', end: '3:00', label: '2:30 - 3:00' },
+  { id: 't13', start: '3:00', end: '3:30', label: 'End block' }
 ];
 
 const INITIAL_USERS = [
@@ -645,7 +645,7 @@ function App() {
         </div>
       )}
 
-      {}
+      {/* Header section... */}
       <header className="px-6 py-4 flex justify-between items-center border-b border-slate-100 bg-white sticky top-0 z-40 shadow-sm flex-wrap gap-3">
         <div className="flex items-center space-x-4">
           <div className="bg-[#f0efff] p-2 rounded-xl text-[#6157e8]">
@@ -724,7 +724,7 @@ function App() {
         </div>
       </header>
 
-      {}
+      {/* Main Container */}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {activeRole === ROLES.SENCO && (
           <SencoDashboard 
@@ -745,7 +745,7 @@ function App() {
         )}
       </main>
 
-      {}
+      {/* Mobile Sync Modals and connection integrity checks */}
       {showMobileSync && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 text-center animate-fade-in">
@@ -1098,9 +1098,8 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
             const IconComponent = style?.icon || Star;
             return (
               <div key={slot.id} className="flex items-stretch group border-b border-slate-50 pb-4 last:border-0 last:pb-0">
-                <div className="w-16 md:w-24 flex-shrink-0 pr-4 border-r flex flex-col justify-center items-end text-right">
-                  <span className="font-bold text-slate-800 text-sm md:text-base">{slot.start}</span>
-                  <span className="text-[10px] md:text-xs font-semibold text-slate-400">{slot.end}</span>
+                <div className="w-16 md:w-28 flex-shrink-0 pr-4 border-r flex flex-col justify-center items-end text-right">
+                  <span className="font-normal text-slate-600 text-xs sm:text-sm text-right leading-tight">{slot.label}</span>
                 </div>
                 <div className={`flex-1 ml-4 md:ml-6 p-4 rounded-xl border flex items-center ${style?.wrapper}`}>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${style?.iconBg} ${style?.iconColor}`}><IconComponent size={18} /></div>
@@ -2153,7 +2152,8 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       parts.forEach(part => {
         let cleaned = part.replace(/\s*\(.*?\)\s*/g, ' ').trim();
         if (!cleaned) return;
-        cleaned = cleaned.replace(/^check\s+/i, '').trim();
+        // Clean prefixes like "Support ", "Check " to isolate true initials
+        cleaned = cleaned.replace(/^(support|check|check-in|supervise)\s+/i, '').trim();
         const lower = cleaned.toLowerCase();
         const isTimeFormat = /\b\d{1,2}(:\d{2})?\s*(am|pm)?\b/i.test(lower);
         const isIgnored = isTimeFormat || ignoredKeywords.some(keyword => lower === keyword || lower.includes(keyword));
@@ -2181,7 +2181,10 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       const cleanSubject = s.subject?.toLowerCase() || '';
       const cleanStudent = activeStudent.toLowerCase();
       
+      const strippedSubject = cleanSubject.replace(/^(support|check|check-in|supervise)\s+/i, '').trim();
+
       return (
+        strippedSubject === cleanStudent ||
         cleanSubject === cleanStudent || 
         cleanSubject.startsWith(cleanStudent + ' ') || 
         cleanSubject.endsWith(' ' + cleanStudent) ||
@@ -2254,7 +2257,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
               <button
                 key={student}
                 onClick={() => setActiveStudent(student)}
-                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-between ${
+                className={`w-full text-left px-4 py-3 rounded-xl font-normal text-xs transition-all flex items-center justify-between ${
                   activeStudent === student 
                     ? 'bg-[#1a1f36] text-white shadow-xs' 
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/50'
@@ -2275,7 +2278,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
                 placeholder="Student Name / Initials"
                 value={newStudentName}
                 onChange={e => setNewStudentName(e.target.value)}
-                className="w-full text-xs font-bold border rounded-lg px-3 py-2.5 outline-none focus:ring-1 focus:ring-[#6157e8]"
+                className="w-full text-xs font-medium border rounded-lg px-3 py-2.5 outline-none focus:ring-1 focus:ring-[#6157e8]"
                 maxLength={10}
                 required
                 autoFocus
@@ -2350,20 +2353,20 @@ function StudentTimetablesView({ sessions, users, addToast }) {
           <table className="w-full text-center border-collapse min-w-max table-fixed">
             <thead>
               <tr className="bg-slate-50">
-                <th className="p-4 bg-amber-400 text-[#1a1f36] font-extrabold text-sm border-r border-slate-200 w-44 uppercase tracking-widest select-none shadow-[inset_0_-2px_0_rgba(0,0,0,0.1)]">
+                <th className="p-4 bg-amber-400 text-[#1a1f36] font-medium text-sm border-r border-slate-200 w-44 uppercase tracking-widest select-none shadow-[inset_0_-2px_0_rgba(0,0,0,0.1)]">
                   {activeStudent}
                 </th>
                 {DAYS.map(day => (
-                  <th key={day} className="p-4 bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-wider border-b border-slate-200">
-                    {day.substring(0, 5)}
+                  <th key={day} className="p-4 bg-slate-100 text-slate-500 font-medium text-xs uppercase tracking-wider border-b border-slate-200">
+                    {day}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {TIME_SLOTS.map(slot => (
-                <tr key={slot.id} className="hover:bg-slate-55/40 transition-all">
-                  <td className="p-4 font-bold text-slate-700 text-xs border-r border-slate-200 bg-slate-50/50 whitespace-nowrap">
+                <tr key={slot.id} className="hover:bg-slate-50/30 transition-all">
+                  <td className="p-4 font-normal text-slate-500 text-xs border-r border-slate-200 bg-slate-50/50 whitespace-nowrap">
                     {slot.label}
                   </td>
                   
@@ -2373,11 +2376,11 @@ function StudentTimetablesView({ sessions, users, addToast }) {
                     return (
                       <td key={`${slot.id}-${day}`} className="p-2 border-r border-slate-100 last:border-r-0" style={{ width: '160px' }}>
                         {coveringName ? (
-                          <div className={`py-3 px-2 rounded-xl text-xs font-extrabold border shadow-xs transition-transform hover:scale-[1.01] ${nameToColorClass(coveringName)}`}>
+                          <div className={`py-3 px-2 rounded-xl text-xs font-normal border shadow-xs transition-transform hover:scale-[1.01] ${nameToColorClass(coveringName)}`}>
                             {coveringName}
                           </div>
                         ) : (
-                          <div className="py-3 px-2 bg-rose-50/60 border border-dashed border-rose-200 rounded-xl text-rose-500 text-xs font-bold leading-none italic select-none">
+                          <div className="py-3 px-2 bg-rose-50/60 border border-dashed border-rose-200 rounded-xl text-rose-400 text-xs font-normal leading-none italic select-none">
                             No cover
                           </div>
                         )}
@@ -2621,7 +2624,6 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
         </div>
       </div>
 
-      {}
       {viewMode === 'single' ? (
         <div className="px-1.5 sm:px-6 py-4 space-y-6 animate-fade-in">
           <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
@@ -2651,9 +2653,8 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                     className={`flex items-stretch group ${isEditable ? 'cursor-pointer' : ''}`}
                     onClick={() => isEditable && onCellClick(slot.id, activeTaId, session)}
                   >
-                    <div className="w-14 sm:w-24 flex-shrink-0 flex flex-col items-end pr-2.5 sm:pr-6 pt-4 border-r border-slate-100">
-                      <span className="font-bold text-slate-800 text-xs sm:text-sm">{slot.start}</span>
-                      <span className="text-[10px] font-semibold text-slate-400 mt-0.5">{slot.end}</span>
+                    <div className="w-14 sm:w-28 flex-shrink-0 flex items-center justify-end pr-2.5 sm:pr-6 border-r border-slate-100">
+                      <span className="font-normal text-slate-500 text-xs sm:text-sm text-right leading-tight">{slot.label}</span>
                     </div>
 
                     <div className="flex-1 pl-3 sm:pl-6 relative">
@@ -2729,9 +2730,9 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
             </thead>
             <tbody className="divide-y divide-slate-100">
               {TIME_SLOTS.map(slot => (
-                <tr key={slot.id} className="hover:bg-slate-55/40 transition-colors">
-                  <td className="p-4 font-medium text-slate-800 text-sm whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
-                    {slot.start} <span className="text-slate-400 text-xs ml-1 font-medium">{slot.end}</span>
+                <tr key={slot.id} className="hover:bg-slate-50/30 transition-colors">
+                  <td className="p-4 font-normal text-slate-500 text-xs whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
+                    {slot.label}
                   </td>
                   {tas.map(ta => {
                     const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === ta.id);
