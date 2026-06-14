@@ -3,7 +3,7 @@ import {
   Calendar, AlertCircle, Users, CheckCircle, 
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
-  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop, MessageSquare
+  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop, MessageSquare, CloudLightning
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -82,6 +82,34 @@ const TIERS = {
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
+const isSencoSupervisingTa = (senco, ta) => {
+  if (!senco || !ta) return false;
+  if (senco.team === TEAMS.ALL) return true;
+  
+  if (ta.allocatedSenco) {
+    if (ta.allocatedSenco === senco.id) return true;
+    
+    if (ta.allocatedSenco === 'senco_tracey') {
+      const isTracey = senco.id === 'senco_tracey' || 
+                       senco.email?.toLowerCase().includes('tracey') || 
+                       senco.name?.toLowerCase().includes('tracey');
+      if (isTracey) return true;
+    }
+    
+    if (ta.allocatedSenco === 'senco_cathie') {
+      const isCathie = senco.id === 'senco_cathie' || 
+                       senco.email?.toLowerCase().includes('cathie') || 
+                       senco.name?.toLowerCase().includes('cathie');
+      if (isCathie) return true;
+    }
+  }
+  
+  if (ta.team === TEAMS.BOTH) return true;
+  if (senco.team === ta.team) return true;
+  
+  return false;
+};
+
 const TIME_SLOTS = [
   { id: 't1', start: '9:00', end: '9:30' },
   { id: 't2', start: '9:30', end: '10:00' },
@@ -159,34 +187,6 @@ const TIER_STYLES = {
   [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
   [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
   [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
-};
-
-const isSencoSupervisingTa = (senco, ta) => {
-  if (!senco || !ta) return false;
-  if (senco.team === TEAMS.ALL) return true;
-  
-  if (ta.allocatedSenco) {
-    if (ta.allocatedSenco === senco.id) return true;
-    
-    if (ta.allocatedSenco === 'senco_tracey') {
-      const isTracey = senco.id === 'senco_tracey' || 
-                       senco.email?.toLowerCase().includes('tracey') || 
-                       senco.name?.toLowerCase().includes('tracey');
-      if (isTracey) return true;
-    }
-    
-    if (ta.allocatedSenco === 'senco_cathie') {
-      const isCathie = senco.id === 'senco_cathie' || 
-                       senco.email?.toLowerCase().includes('cathie') || 
-                       senco.name?.toLowerCase().includes('cathie');
-      if (isCathie) return true;
-    }
-  }
-  
-  if (ta.team === TEAMS.BOTH) return true;
-  if (senco.team === ta.team) return true;
-  
-  return false;
 };
 
 const Toast = ({ message, type = 'success' }) => (
@@ -663,6 +663,7 @@ function App() {
         </div>
       </header>
 
+      {}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {activeRole === ROLES.SENCO && (
           <SencoDashboard 
@@ -697,6 +698,7 @@ function App() {
         </div>
       )}
 
+      {}
       {showSaveVerificationModal && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 text-center animate-fade-in border border-slate-100">
@@ -1011,7 +1013,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         </div>
       )}
 
-      {}
       <div className="flex space-x-1 overflow-x-auto bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm scrollbar-hide">
         {DAYS.map(d => (
           <button 
@@ -1026,6 +1027,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         ))}
       </div>
 
+      {}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-8 space-y-4">
         {sortedSessions.length === 0 ? (
           <div className="text-center p-12 text-slate-400 font-medium">No active support duties allocated for {selectedDay}.</div>
@@ -1044,11 +1046,17 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                   <div>
                     <span className={`text-[9px] font-bold tracking-wider uppercase block ${style?.text}`}>{session?.tier}</span>
                     <h4 className="font-medium text-slate-800 text-sm md:text-base mt-0.5">{session?.subject}</h4>
-                    {session?.teacherId && (
-                      <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded mt-1.5">
-                        Teacher: {users.find(u => u.id === session.teacherId)?.name}
-                      </span>
-                    )}
+                    {(() => {
+                      const assignedTeachers = session?.teacherIds 
+                        ? users.filter(u => session.teacherIds.includes(u.id)) 
+                        : (session?.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
+                      if (assignedTeachers.length === 0) return null;
+                      return (
+                        <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded mt-1.5">
+                          Teacher: {assignedTeachers.map(t => t.name).join(' & ')}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -1409,6 +1417,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             </button>
           </div>
           
+          {}
           <div className="grid grid-cols-1 gap-4">
             {directAbsences.map(a => {
               const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
@@ -1623,6 +1632,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
+      {}
       {resolvingAbsence && (
         <CoverageResolver 
           absence={resolvingAbsence} 
@@ -1642,6 +1652,18 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         />
       )}
 
+      {showCriticalCoverBoard && (
+        <CriticalCoverageBoard 
+          day={selectedDay}
+          users={users}
+          sessions={sessions}
+          saveSessionToDb={saveSessionToDb}
+          onClose={() => setShowCriticalCoverBoard(false)}
+          addToast={addToast}
+        />
+      )}
+
+      {}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col md:grid md:grid-cols-12 md:gap-8 overflow-hidden">
@@ -1690,6 +1712,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </div>
             </div>
 
+            {}
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
@@ -1761,6 +1784,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       </select>
                     </div>
 
+                    {}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Teacher</label>
@@ -1805,6 +1829,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
+      {}
       <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -1842,6 +1867,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       </div>
 
+      {}
       {resolvedAbsences.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4 animate-fade-in">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -1993,59 +2019,13 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       )}
 
       {editingCell && (
-        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in">
-            <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">{editingCell.session ? 'Edit Duty' : 'Assign Duty'}</h3>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target);
-              handleSaveSession({
-                subject: formData.get('subject'),
-                tier: formData.get('tier'),
-                teacherId: formData.get('teacherId') || null,
-                teamLeaderId: formData.get('teamLeaderId') || null
-              });
-            }} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Subject / Task Name</label>
-                <input type="text" name="subject" required defaultValue={editingCell.session?.subject} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Reading Support..." />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Priority Tier</label>
-                <select name="tier" defaultValue={editingCell.session?.tier || TIERS.ENRICHMENT} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
-                  {Object.values(TIERS).map(tier => <option key={tier} value={tier}>{tier}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Teacher</label>
-                <select name="teacherId" defaultValue={editingCell.session?.teacherId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
-                  <option value="">None / Self-Directed</option>
-                  {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Team Leader</label>
-                <select name="teamLeaderId" defaultValue={editingCell.session?.teamLeaderId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
-                  <option value="">None / No Team Leader</option>
-                  {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEAM_LEADER)).sort((a, b) => a.name.localeCompare(b.name)).map(tl => (
-                    <option key={tl.id} value={tl.id}>{tl.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex justify-end space-x-3 pt-4">
-                {editingCell.session && (
-                  <button type="button" onClick={handleDeleteSession} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm transition-colors mr-auto flex items-center">
-                    <Trash2 className="w-4 h-4 mr-2" /> Remove
-                  </button>
-                )}
-                <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Cancel</button>
-                <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">Save Changes</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <EditDutyModal 
+          editingCell={editingCell} 
+          users={users} 
+          onClose={() => setEditingCell(null)} 
+          onSave={handleSaveSession} 
+          onDelete={handleDeleteSession} 
+        />
       )}
     </div>
   );
@@ -2208,7 +2188,11 @@ function TeamLeaderDashboard({ user, sessions, users }) {
 
 function TeacherDashboard({ user, sessions, users }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
-  const teacherSessions = sessions.filter(s => s.day === selectedDay && s.teacherId === user.id);
+  
+  const teacherSessions = sessions.filter(s => 
+    s.day === selectedDay && 
+    (s.teacherId === user.id || (s.teacherIds && s.teacherIds.includes(user.id)))
+  );
 
   return (
     <div className="space-y-6 animate-fade-in max-w-5xl mx-auto">
@@ -2325,13 +2309,20 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                               {session.subject}
                             </h4>
                             
-                            {(session.teacherId || session.teamLeaderId) && (
+                            {}
+                            {(session.teacherId || session.teacherIds || session.teamLeaderId) && (
                               <div className="mt-2 flex flex-wrap gap-1.5">
-                                {session.teacherId && (
-                                  <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
-                                    T: {users.find(u => u.id === session.teacherId)?.name || 'Teacher'}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const assignedTeachers = session.teacherIds 
+                                    ? users.filter(u => session.teacherIds.includes(u.id)) 
+                                    : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
+                                  if (assignedTeachers.length === 0) return null;
+                                  return (
+                                    <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
+                                      T: {assignedTeachers.map(t => t.name).join(' & ')}
+                                    </span>
+                                  );
+                                })()}
                                 {session.teamLeaderId && (
                                   <span className="bg-purple-50 text-purple-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
                                     L: {users.find(u => u.id === session.teamLeaderId)?.name || 'Leader'}
@@ -2400,6 +2391,17 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                             <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </div>
+                            {(() => {
+                              const assignedTeachers = session.teacherIds 
+                                ? users.filter(u => session.teacherIds.includes(u.id)) 
+                                : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
+                              if (assignedTeachers.length === 0) return null;
+                              return (
+                                <span className="text-[9px] font-bold text-slate-400 mt-1 truncate">
+                                  {assignedTeachers.map(t => t.name.split(' ')[0]).join(' & ')}
+                                </span>
+                              );
+                            })()}
                           </div>
                         ) : (
                           <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">Free</div>
@@ -2514,6 +2516,92 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
           <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
           <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EditDutyModal({ editingCell, users, onClose, onSave, onDelete }) {
+  const [selectedTeacherIds, setSelectedTeacherIds] = useState(() => {
+    if (editingCell.session) {
+      if (editingCell.session.teacherIds) return editingCell.session.teacherIds;
+      if (editingCell.session.teacherId) return [editingCell.session.teacherId];
+    }
+    return [];
+  });
+
+  return (
+    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in">
+        <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">{editingCell.session ? 'Edit Duty' : 'Assign Duty'}</h3>
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+          onSave({
+            subject: formData.get('subject'),
+            tier: formData.get('tier'),
+            teacherIds: selectedTeacherIds,
+            teacherId: selectedTeacherIds[0] || null, 
+            teamLeaderId: formData.get('teamLeaderId') || null
+          });
+        }} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Subject / Task Name</label>
+            <input type="text" name="subject" required defaultValue={editingCell.session?.subject} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Reading Support..." />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Priority Tier</label>
+            <select name="tier" defaultValue={editingCell.session?.tier || TIERS.ENRICHMENT} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+              {Object.values(TIERS).map(tier => <option key={tier} value={tier}>{tier}</option>)}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Teacher(s) (Supports Job Sharing)</label>
+            <div className="border border-slate-200 rounded-xl p-3 max-h-[140px] overflow-y-auto space-y-1.5 bg-slate-50">
+              {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(t => {
+                const isChecked = selectedTeacherIds.includes(t.id);
+                return (
+                  <label key={t.id} className="flex items-center space-x-2.5 p-1.5 bg-white rounded-lg border border-slate-100 cursor-pointer hover:border-[#6157e8]/30 transition-all shadow-xs">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => {
+                        if (isChecked) {
+                          setSelectedTeacherIds(selectedTeacherIds.filter(id => id !== t.id));
+                        } else {
+                          setSelectedTeacherIds([...selectedTeacherIds, t.id]);
+                        }
+                      }}
+                      className="w-4 h-4 text-[#6157e8] border-slate-300 rounded focus:ring-[#6157e8]"
+                    />
+                    <span className="text-xs font-medium text-slate-700">{t.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">Ticking multiple teachers handles sharing days (e.g., job-share partners).</span>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Team Leader</label>
+            <select name="teamLeaderId" defaultValue={editingCell.session?.teamLeaderId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+              <option value="">None / No Team Leader</option>
+              {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEAM_LEADER)).sort((a, b) => a.name.localeCompare(b.name)).map(tl => (
+                <option key={tl.id} value={tl.id}>{tl.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex justify-end space-x-3 pt-4">
+            {editingCell.session && (
+              <button type="button" onClick={onDelete} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm transition-colors mr-auto flex items-center">
+                <Trash2 className="w-4 h-4 mr-2" /> Remove
+              </button>
+            )}
+            <button type="button" onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Cancel</button>
+            <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">Save Changes</button>
+          </div>
+        </form>
       </div>
     </div>
   );
