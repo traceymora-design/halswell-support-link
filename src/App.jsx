@@ -3,7 +3,7 @@ import {
   Calendar, AlertCircle, Users, CheckCircle, 
   Copy, LogOut, Bell, HeartHandshake, ChevronLeft,
   QrCode, User, Star, AlertTriangle, Coffee, Utensils,
-  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop, MessageSquare, CloudLightning
+  Plus, Edit3, Trash2, Loader2, RefreshCw, Smartphone, ChevronRight, ShieldCheck, Laptop, MessageSquare, CloudLightning, FileText, Search, TrendingUp
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -111,19 +111,19 @@ const isSencoSupervisingTa = (senco, ta) => {
 };
 
 const TIME_SLOTS = [
-  { id: 't1', start: '9:00', end: '9:30' },
-  { id: 't2', start: '9:30', end: '10:00' },
-  { id: 't3', start: '10:00', end: '10:30' },
-  { id: 't4', start: '10:30', end: '10:50' },
-  { id: 't5', start: '10:50', end: '11:10' },
-  { id: 't6', start: '11:10', end: '11:30' },
-  { id: 't7', start: '11:30', end: '12:00' },
-  { id: 't8', start: '12:00', end: '12:30' },
-  { id: 't9', start: '12:30', end: '1:00' },
-  { id: 't10', start: '1:00', end: '1:30' },
-  { id: 't11', start: '1:30', end: '2:00' },
-  { id: 't12', start: '2:00', end: '2:30' },
-  { id: 't13', start: '2:30', end: '3:00' }
+  { id: 't1', start: '9:00', end: '9:30', label: '9:00 - 9:30' },
+  { id: 't2', start: '9:30', end: '10:00', label: '9:30 - 10:00' },
+  { id: 't3', start: '10:00', end: '10:30', label: '10:00 - 10:50' },
+  { id: 't4', start: '10:30', end: '10:50', label: '10:50 - 11:10' },
+  { id: 't5', start: '10:50', end: '11:10', label: 'No cover' },
+  { id: 't6', start: '11:10', end: '11:30', label: '11:10 - 12:00' },
+  { id: 't7', start: '11:30', end: '12:00', label: 'First lunch' },
+  { id: 't8', start: '12:00', end: '12:30', label: '12:30 - 1:00' },
+  { id: 't9', start: '12:30', end: '1:00', label: '1:00 - 1:30' },
+  { id: 't10', start: '1:00', end: '1:30', label: 'Second lunch' },
+  { id: 't11', start: '1:30', end: '2:00', label: '2:00 - 2:30' },
+  { id: 't12', start: '2:00', end: '2:30', label: '2:30 - 3:00' },
+  { id: 't13', start: '2:30', end: '3:00', label: 'End block' }
 ];
 
 const INITIAL_USERS = [
@@ -135,9 +135,14 @@ const INITIAL_USERS = [
   { id: 'u5', name: 'Cameron Eaves', role: ROLES.TEACHER, roles: [ROLES.TEACHER], email: 'cameron@school.edu', team: TEAMS.Y5_8 },
   { id: 'u6', name: 'Cindy Stanford', role: ROLES.TEACHER, roles: [ROLES.TEACHER], email: 'cindy@school.edu', team: TEAMS.Y5_8 },
   { id: 't1', name: 'Karen Cate', role: ROLES.TA, roles: [ROLES.TA], email: 'karen@school.edu', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey' },
-  { id: 'tl1', name: 'Greta Parkes-Dolan', role: ROLES.TEAM_LEADER, roles: [ROLES.TEAM_LEADER], email: 'davis@school.edu', team: TEAMS.Y5_8 },
+  { id: 'tl1', name: 'Greta Parkes-Dolan', role: ROLES.TEAM_LEADER, roles: [ROLES.TEAM_LEADER, ROLES.TEACHER], email: 'davis@school.edu', team: TEAMS.Y5_8 },
   { id: 't_val', name: 'Val Murray', role: ROLES.TA, roles: [ROLES.TA], email: 'val.murray@school.nz', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey' },
-  { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, roles: [ROLES.TA], email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
+  { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, roles: [ROLES.TA], email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
+  // Seeding additional TAs matching the screenshot
+  { id: 't_praboda', name: 'Praboda', role: ROLES.TA, roles: [ROLES.TA], email: 'praboda@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
+  { id: 't_tiffany', name: 'Tiffany', role: ROLES.TA, roles: [ROLES.TA], email: 'tiffany@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
+  { id: 't_jenny', name: 'Jenny', role: ROLES.TA, roles: [ROLES.TA], email: 'jenny@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
+  { id: 't_tara', name: 'Tara', role: ROLES.TA, roles: [ROLES.TA], email: 'tara@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
 ];
 
 const INITIAL_ABSENCES = [
@@ -159,33 +164,77 @@ const INITIAL_ABSENCES = [
 let INITIAL_SESSIONS = [];
 let sessionIdCounter = 1;
 
+// Adding default sessions for other students
 DAYS.forEach(day => {
   const daySessions = [
-    { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
-    { timeSlotId: 't2', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito/Check Karlee', teamLeaderId: 'tl1' },
+    { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Jess', teamLeaderId: 'tl1' },
     { timeSlotId: 't3', tier: TIERS.MORNING_TEA, subject: 'Morning Tea', teacherId: null },
     { timeSlotId: 't4', tier: TIERS.ENRICHMENT, subject: 'Casey', teamLeaderId: 'tl1' },
-    { timeSlotId: 't5', tier: TIERS.CRITICAL, subject: 'Jess' },
-    { timeSlotId: 't6', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito - Sam C/Check Karlee' },
-    { timeSlotId: 't7', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito - Sam C/Check Karlee' },
-    { timeSlotId: 't8', tier: TIERS.ENRICHMENT, subject: 'Casey' },
-    { timeSlotId: 't9', tier: TIERS.LUNCH, subject: 'Lunch', teacherId: null },
-    { timeSlotId: 't10', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito' },
-    { timeSlotId: 't11', tier: TIERS.ENRICHMENT, subject: 'Casey' },
-    { timeSlotId: 't12', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito' },
-    { timeSlotId: 't13', tier: TIERS.HIGH_NEEDS, subject: 'Ōtawhito' }
+    { timeSlotId: 't9', tier: TIERS.LUNCH, subject: 'Lunch', teacherId: null }
   ];
   daySessions.forEach(s => {
-    INITIAL_SESSIONS.push({ id: `s${sessionIdCounter++}`, day, taId: 't1', teacherId: s.teacherId !== undefined ? s.teacherId : 'u2', ...s });
+    INITIAL_SESSIONS.push({ id: `s${sessionIdCounter++}`, day, taId: 't1', teacherId: 'u2', ...s });
+  });
+});
+
+// Seeding the exact coverage for H.W as requested from "Screenshot 2026-06-14 at 12.56.41 PM.png"
+DAYS.forEach(day => {
+  // 9:30 - 10:00 (t2) -> Val
+  INITIAL_SESSIONS.push({ id: `hw_s1_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W' });
+  
+  // 11:10 - 12:00 (t6) -> Val
+  INITIAL_SESSIONS.push({ id: `hw_s2_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W' });
+
+  // First lunch -> Praboda (Mon-Thurs), Karen (Fri)
+  INITIAL_SESSIONS.push({ 
+    id: `hw_s3_${day}`, 
+    day, 
+    taId: day === 'Friday' ? 't1' : 't_praboda', 
+    teacherId: 'u4', 
+    tier: TIERS.LUNCH, 
+    subject: 'H.W (First lunch)' 
+  });
+
+  // 12:30 - 1:00 -> Tiffany (Mon-Thurs), Tara (Fri)
+  INITIAL_SESSIONS.push({ 
+    id: `hw_s4_${day}`, 
+    day, 
+    taId: day === 'Friday' ? 't_tara' : 't_tiffany', 
+    teacherId: 'u2', 
+    tier: TIERS.HIGH_NEEDS, 
+    subject: 'H.W' 
+  });
+
+  // 1:00 - 1:30 -> Jenny
+  INITIAL_SESSIONS.push({ id: `hw_s5_${day}`, day, taId: 't_jenny', teacherId: 'u5', tier: TIERS.HIGH_NEEDS, subject: 'H.W' });
+
+  // Second lunch -> Praboda (Mon-Wed, Fri), Val (Thurs)
+  INITIAL_SESSIONS.push({ 
+    id: `hw_s6_${day}`, 
+    day, 
+    taId: day === 'Thursday' ? 't_val' : 't_praboda', 
+    teacherId: 'u3', 
+    tier: TIERS.LUNCH, 
+    subject: 'H.W (Second lunch)' 
+  });
+
+  // 2:00 - 3:00 (t11-t12) -> Tiffany (Mon-Thurs), Karen (Fri)
+  INITIAL_SESSIONS.push({ 
+    id: `hw_s7_${day}`, 
+    day, 
+    taId: day === 'Friday' ? 't1' : 't_tiffany', 
+    teacherId: 'u2', 
+    tier: TIERS.CRITICAL, 
+    subject: 'H.W' 
   });
 });
 
 const TIER_STYLES = {
-  [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-white', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
-  [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-white', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
-  [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-white', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
-  [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-white', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
+  [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-[#fff5f6]', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
+  [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-[#fffaf5]', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
+  [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-[#f5f7ff]', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
+  [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
+  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
   [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
 };
 
@@ -534,7 +583,7 @@ function App() {
                 <div className="text-[9px] font-bold text-slate-400 uppercase text-left">SENCO Admins:</div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button onClick={() => handleBypassSignIn('senco_cathie')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-700 font-semibold border rounded text-[11px] transition-colors">Cathie (SENCO Y0-4)</button>
-                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-700 font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
+                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
                 </div>
               </div>
               
@@ -575,10 +624,10 @@ function App() {
             <button onClick={() => handleBypassSignIn('t_ruby')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 't_ruby' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Ruby Gray (TA)
             </button>
-            <button onClick={() => handleBypassSignIn('senco_tracey')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_tracey' ? 'bg-amber-200 text-amber-900 border-amber-300 shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+            <button onClick={() => handleBypassSignIn('senco_tracey')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_tracey' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Tracey (SENCO Y5-8)
             </button>
-            <button onClick={() => handleBypassSignIn('senco_cathie')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_cathie' ? 'bg-amber-200 text-amber-900 border-amber-300 shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+            <button onClick={() => handleBypassSignIn('senco_cathie')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_cathie' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Cathie (SENCO Y0-4)
             </button>
           </div>
@@ -663,7 +712,6 @@ function App() {
         </div>
       </header>
 
-      {}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {activeRole === ROLES.SENCO && (
           <SencoDashboard 
@@ -698,7 +746,6 @@ function App() {
         </div>
       )}
 
-      {}
       {showSaveVerificationModal && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 text-center animate-fade-in border border-slate-100">
@@ -1027,7 +1074,6 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         ))}
       </div>
 
-      {}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-8 space-y-4">
         {sortedSessions.length === 0 ? (
           <div className="text-center p-12 text-slate-400 font-medium">No active support duties allocated for {selectedDay}.</div>
@@ -1121,6 +1167,9 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const [showManageStaff, setShowManageStaff] = useState(false);
   const [showCriticalCoverBoard, setShowCriticalCoverBoard] = useState(false); 
   
+  // Dashboard primary tab switcher: 'timetable' (staff overview) or 'students' (screenshot child weekly matrix)
+  const [activeDashboardTab, setActiveDashboardTab] = useState('timetable');
+
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffEmail, setNewStaffEmail] = useState('');
   const [newStaffRoles, setNewStaffRoles] = useState([ROLES.TA]); 
@@ -1388,6 +1437,32 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             </select>
           </div>
         </div>
+        
+        {/* Toggle buttons for Master Timetable or Child Week View */}
+        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <button 
+            onClick={() => setActiveDashboardTab('timetable')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 ${
+              activeDashboardTab === 'timetable' ? 'bg-white text-[#1a1f36] shadow-xs' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Calendar size={14} className={activeDashboardTab === 'timetable' ? 'text-[#6157e8]' : 'text-slate-400'} />
+            <span>Master Timetable</span>
+          </button>
+          <button 
+            onClick={() => setActiveDashboardTab('students')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-1.5 ${
+              activeDashboardTab === 'students' ? 'bg-white text-[#1a1f36] shadow-xs' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <TrendingUp size={14} className={activeDashboardTab === 'students' ? 'text-[#6157e8]' : 'text-slate-400'} />
+            <span className="flex items-center">
+              Student Week View
+              <span className="ml-1.5 bg-yellow-400 text-black px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase">NEW</span>
+            </span>
+          </button>
+        </div>
+
         <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
           <button 
             onClick={() => setShowCriticalCoverBoard(true)} 
@@ -1417,7 +1492,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             </button>
           </div>
           
-          {}
           <div className="grid grid-cols-1 gap-4">
             {directAbsences.map(a => {
               const ta = users.find(u => u.id === a.taId) || INITIAL_USERS.find(u => u.id === a.taId);
@@ -1632,7 +1706,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {}
       {resolvingAbsence && (
         <CoverageResolver 
           absence={resolvingAbsence} 
@@ -1663,7 +1736,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         />
       )}
 
-      {}
       {showManageStaff && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col md:grid md:grid-cols-12 md:gap-8 overflow-hidden">
@@ -1712,7 +1784,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </div>
             </div>
 
-            {}
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
@@ -1784,7 +1855,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       </select>
                     </div>
 
-                    {}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Teacher</label>
@@ -1829,45 +1899,52 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {}
-      <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-[#1a1f36]">Master Timetable</h2>
-            <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-1">Live Database Connected</p>
+      {/* Render the Master Timetable Grid or the Student Weekly Timetable depending on Tab Switcher state */}
+      {activeDashboardTab === 'timetable' ? (
+        <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
+          <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-[#1a1f36]">Master Timetable</h2>
+              <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-1">Live Database Connected</p>
+            </div>
+            
+            <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
+              <button 
+                onClick={() => setShowCopyDayModal(true)}
+                className="flex items-center px-4 py-2.5 bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] font-medium text-sm rounded-xl transition-colors shadow-sm border border-[#a7f3d0]"
+              >
+                <Copy className="w-4 h-4 mr-1.5" /> 
+                <span>Copy Schedule</span>
+              </button>
+              <select 
+                value={selectedDay}
+                onChange={(e) => setSelectedDay(e.target.value)}
+                className="bg-slate-50 border border-slate-200 text-[#1a1f36] font-semibold rounded-xl focus:ring-[#6157e8] focus:border-[#6157e8] block px-4 py-2.5 outline-none flex-1 sm:flex-none cursor-pointer"
+              >
+                {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
           </div>
-          
-          <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-y-3">
-            <button 
-              onClick={() => setShowCopyDayModal(true)}
-              className="flex items-center px-4 py-2.5 bg-[#ecfdf5] hover:bg-[#d1fae5] text-[#059669] font-medium text-sm rounded-xl transition-colors shadow-sm border border-[#a7f3d0]"
-            >
-              <Copy className="w-4 h-4 mr-1.5" /> 
-              <span>Copy Schedule</span>
-            </button>
-            <select 
-              value={selectedDay}
-              onChange={(e) => setSelectedDay(e.target.value)}
-              className="bg-slate-50 border border-slate-200 text-[#1a1f36] font-semibold rounded-xl focus:ring-[#6157e8] focus:border-[#6157e8] block px-4 py-2.5 outline-none flex-1 sm:flex-none cursor-pointer"
-            >
-              {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
+
+          <div className="p-0">
+            <TimetableGrid 
+              sessions={sessions} 
+              day={selectedDay} 
+              users={users} 
+              isEditable={true}
+              teamFilter={activeTeamFilter}
+              onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} 
+            />
           </div>
         </div>
+      ) : (
+        <StudentTimetablesView 
+          sessions={sessions}
+          users={users}
+          addToast={addToast}
+        />
+      )}
 
-        <div className="p-0">
-          <TimetableGrid 
-            sessions={sessions} 
-            day={selectedDay} 
-            users={users} 
-            isEditable={true}
-            teamFilter={activeTeamFilter}
-            onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} 
-          />
-        </div>
-      </div>
-
-      {}
       {resolvedAbsences.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4 animate-fade-in">
           <div className="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -2027,6 +2104,249 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           onDelete={handleDeleteSession} 
         />
       )}
+    </div>
+  );
+}
+
+/* 
+  StudentTimetablesView:
+  An elegant, dedicated dashboard section built specifically to look like "Screenshot 2026-06-14 at 12.56.41 PM.png"
+  This gathers all sessions across the 5 days of the week for a selected high-needs child, identifies gaps instantly ("No cover"), 
+  and calculates their weekly funding metrics.
+*/
+function StudentTimetablesView({ sessions, users, addToast }) {
+  // Default list of tracked students. Sencos can also register custom ones.
+  const [trackedStudents, setTrackedStudents] = useState(['H.W', 'Jess', 'Casey', 'Sam C']);
+  const [activeStudent, setActiveStudent] = useState('H.W');
+  const [newStudentName, setNewStudentName] = useState('');
+  const [showAddStudentForm, setShowAddStudentForm] = useState(false);
+
+  // Helper to match session subjects to student tags securely
+  const getCoveringStaff = (day, slotId) => {
+    // Find any assignment that belongs to this child
+    const matchingSession = sessions.find(s => {
+      if (s.day !== day || s.timeSlotId !== slotId) return false;
+      const cleanSubject = s.subject?.toLowerCase() || '';
+      const cleanStudent = activeStudent.toLowerCase();
+      return cleanSubject === cleanStudent || cleanSubject.startsWith(cleanStudent + ' ') || cleanSubject.includes('(' + cleanStudent + ')') || cleanSubject.includes(' - ' + cleanStudent);
+    });
+
+    if (!matchingSession) return null;
+    
+    // Find the corresponding Teacher Aide assigned to this block
+    const ta = users.find(u => u.id === matchingSession.taId);
+    return ta ? ta.name.split(' ')[0] : 'Assigned'; 
+  };
+
+  const handleCreateStudent = (e) => {
+    e.preventDefault();
+    if (!newStudentName.trim()) return;
+    if (trackedStudents.includes(newStudentName.trim())) {
+      addToast('Student is already registered for tracking.', 'error');
+      return;
+    }
+    setTrackedStudents(prev => [...prev, newStudentName.trim()]);
+    setActiveStudent(newStudentName.trim());
+    setNewStudentName('');
+    setShowAddStudentForm(false);
+    addToast(`Added ${newStudentName.trim()} to active tracking.`, 'success');
+  };
+
+  // Funding Coverage Metrics Math
+  const totalWeeklySlots = TIME_SLOTS.length * DAYS.length;
+  let coveredWeeklyCount = 0;
+  
+  DAYS.forEach(day => {
+    TIME_SLOTS.forEach(slot => {
+      if (getCoveringStaff(day, slot.id)) {
+        coveredWeeklyCount++;
+      }
+    });
+  });
+
+  const uncoveredWeeklyCount = totalWeeklySlots - coveredWeeklyCount;
+  const coveragePercentage = Math.round((coveredWeeklyCount / totalWeeklySlots) * 100);
+
+  // Soft pastel color map for TA names to keep the look clean and pretty
+  const nameToColorClass = (name) => {
+    if (!name) return '';
+    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const colors = [
+      'bg-blue-100/90 text-blue-800 border-blue-200/50',
+      'bg-emerald-100/90 text-emerald-800 border-emerald-200/50',
+      'bg-purple-100/90 text-purple-800 border-purple-200/50',
+      'bg-pink-100/90 text-pink-800 border-pink-200/50',
+      'bg-amber-100/90 text-amber-800 border-amber-200/50',
+      'bg-indigo-100/90 text-indigo-800 border-indigo-200/50',
+      'bg-teal-100/90 text-teal-800 border-teal-200/50'
+    ];
+    return colors[hash % colors.length];
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
+      
+      {/* Sidebar Controls Panel */}
+      <div className="lg:col-span-3 space-y-6">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-2">Tracked Students</h3>
+            <p className="text-xs text-slate-400">Select a student profile to render their week-at-a-glance coverage.</p>
+          </div>
+
+          <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+            {trackedStudents.map(student => (
+              <button
+                key={student}
+                onClick={() => setActiveStudent(student)}
+                className={`w-full text-left px-4 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-between ${
+                  activeStudent === student 
+                    ? 'bg-[#1a1f36] text-white shadow-xs' 
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/50'
+                }`}
+              >
+                <span>{student}</span>
+                {activeStudent === student && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-ping"></span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {showAddStudentForm ? (
+            <form onSubmit={handleCreateStudent} className="space-y-2 pt-2 border-t border-slate-100 animate-fade-in">
+              <input
+                type="text"
+                placeholder="Student Name / Initials"
+                value={newStudentName}
+                onChange={e => setNewStudentName(e.target.value)}
+                className="w-full text-xs font-bold border rounded-lg px-3 py-2.5 outline-none focus:ring-1 focus:ring-[#6157e8]"
+                maxLength={10}
+                required
+                autoFocus
+              />
+              <div className="flex gap-1.5">
+                <button type="submit" className="flex-1 py-1.5 bg-[#6157e8] hover:bg-[#5249d6] text-white font-bold text-[10px] rounded uppercase tracking-wider">Save</button>
+                <button type="button" onClick={() => setShowAddStudentForm(false)} className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-[10px] rounded uppercase">Cancel</button>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => setShowAddStudentForm(true)}
+              className="w-full py-3 border border-dashed border-[#6157e8]/50 text-[#6157e8] hover:bg-violet-50/50 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5"
+            >
+              <Plus size={14} />
+              <span>Track New Student</span>
+            </button>
+          )}
+        </div>
+
+        {/* Dynamic Funding Metrics Summary Container */}
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-1">Funding Coverage</h3>
+            <span className="text-[10px] font-bold text-[#6157e8] uppercase tracking-widest block">Operational Audit</span>
+          </div>
+
+          <div className="space-y-3.5 pt-2">
+            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+              <span className="text-xs text-slate-400 font-medium">Assigned TA Hours:</span>
+              <span className="text-xs font-bold text-slate-800">{coveredWeeklyCount * 0.5} hours / wk</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+              <span className="text-xs text-slate-400 font-medium">Unscheduled Gaps:</span>
+              <span className={`text-xs font-bold ${uncoveredWeeklyCount > 0 ? 'text-red-500' : 'text-slate-800'}`}>
+                {uncoveredWeeklyCount * 0.5} hours / wk
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+              <span className="text-xs text-slate-400 font-medium">Coverage Rate:</span>
+              <span className="text-xs font-black text-slate-800">{coveragePercentage}%</span>
+            </div>
+            
+            <div className="space-y-1.5 pt-1">
+              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 ${
+                    coveragePercentage >= 90 ? 'bg-emerald-500' :
+                    coveragePercentage >= 70 ? 'bg-amber-400' : 'bg-red-400'
+                  }`}
+                  style={{ width: `${coveragePercentage}%` }}
+                ></div>
+              </div>
+              <span className="text-[10px] text-slate-400 block italic leading-relaxed">
+                {uncoveredWeeklyCount > 0 
+                  ? `💡 Needs attention! You have ${uncoveredWeeklyCount} uncovered slots this week.` 
+                  : "🎉 Perfect coverage! No empty slots found."}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Timetable View Area */}
+      <div className="lg:col-span-9 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-[#1a1f36]">Week-at-a-Glance Timetable</h2>
+            <p className="text-xs text-slate-400 mt-1">Review coverage allocations and identify scheduling gaps immediately.</p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-center border-collapse min-w-max table-fixed">
+            <thead>
+              <tr className="bg-slate-50">
+                {/* Yellow Highlighted Student Identifier header cell strictly styled as requested */}
+                <th className="p-4 bg-amber-400 text-[#1a1f36] font-extrabold text-sm border-r border-slate-200 w-44 uppercase tracking-widest select-none shadow-[inset_0_-2px_0_rgba(0,0,0,0.1)]">
+                  {activeStudent}
+                </th>
+                {DAYS.map(day => (
+                  <th key={day} className="p-4 bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-wider border-b border-slate-200">
+                    {day.substring(0, 5)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {TIME_SLOTS.map(slot => {
+                // If the slot is t5 (special marked gap from screenshot), we can format it
+                const isSpecialSlot = slot.label === 'No cover' || slot.label === 'First lunch' || slot.label === 'Second lunch';
+                
+                return (
+                  <tr key={slot.id} className="hover:bg-slate-55/40 transition-all">
+                    {/* Time Header column on the left */}
+                    <td className="p-4 font-bold text-slate-700 text-xs border-r border-slate-200 bg-slate-50/50 whitespace-nowrap">
+                      {slot.label}
+                    </td>
+                    
+                    {/* Dynamic Week coverage columns Mon - Fri */}
+                    {DAYS.map(day => {
+                      const coveringName = getCoveringStaff(day, slot.id);
+                      
+                      return (
+                        <td key={`${slot.id}-${day}`} className="p-2 border-r border-slate-100 last:border-r-0" style={{ width: '160px' }}>
+                          {coveringName ? (
+                            <div className={`py-3 px-2 rounded-xl text-xs font-extrabold border shadow-xs transition-transform hover:scale-[1.01] ${nameToColorClass(coveringName)}`}>
+                              {coveringName}
+                            </div>
+                          ) : (
+                            // Matches the screenshot gap layout styling
+                            <div className="py-3 px-2 bg-rose-50/60 border border-dashed border-rose-200 rounded-xl text-rose-500 text-xs font-bold leading-none italic select-none">
+                              No cover
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }
@@ -2309,7 +2629,6 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                               {session.subject}
                             </h4>
                             
-                            {}
                             {(session.teacherId || session.teacherIds || session.teamLeaderId) && (
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 {(() => {
@@ -2547,7 +2866,7 @@ function EditDutyModal({ editingCell, users, onClose, onSave, onDelete }) {
         }} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Subject / Task Name</label>
-            <input type="text" name="subject" required defaultValue={editingCell.session?.subject} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Reading Support..." />
+            <input type="text" name="subject" required defaultValue={editingCell.session?.subject} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Jess, H.W, Reading Support..." />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Priority Tier</label>
