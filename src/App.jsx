@@ -2141,9 +2141,13 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       'interval', 'meeting', 'duty', 'admin', 'planning', 'free session', 
       'Ōtawhito', 'otawhito', 'esol', 'office', 'classroom', 'check-in'
     ];
-    const found = new Set(['H.W', 'Jess', 'Casey', 'Sam C', 'E.S']);
+    // Defaulting only to initial known Critical & High Needs student categories
+    const found = new Set(['H.W', 'Jess', 'Sam C', 'E.S']);
     
     sessions.forEach(s => {
+      // ONLY pull student profiles if the session tier is Critical or High Needs
+      if (s.tier !== TIERS.CRITICAL && s.tier !== TIERS.HIGH_NEEDS) return;
+
       if (!s.subject) return;
       const parts = s.subject.split(/[-\/&+]|\band\b/i);
       parts.forEach(part => {
