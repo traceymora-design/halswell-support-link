@@ -142,7 +142,7 @@ const INITIAL_USERS = [
   { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, roles: [ROLES.TA], email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
   { id: 't_praboda', name: 'Praboda', role: ROLES.TA, roles: [ROLES.TA], email: 'praboda@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
   { id: 't_tiffany', name: 'Tiffany', role: ROLES.TA, roles: [ROLES.TA], email: 'tiffany@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
-  { id: 't_jenny', name: 'Jenny', role: ROLES.TA, roles: [ROLES.TA], email: 'jenny@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
+  { id: 't_jenny', name: 'Jenny', role: ROLES.ORS_TEACHER, roles: [ROLES.ORS_TEACHER], email: 'jenny@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
   { id: 't_tara', name: 'Tara', role: ROLES.TA, roles: [ROLES.TA], email: 'tara@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
 ];
 
@@ -632,6 +632,9 @@ function App() {
             <button onClick={() => handleBypassSignIn('t_ruby')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 't_ruby' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Ruby Gray (TA)
             </button>
+            <button onClick={() => handleBypassSignIn('t_jenny')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 't_jenny' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
+              Jenny (ORS Teacher)
+            </button>
             <button onClick={() => handleBypassSignIn('senco_tracey')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_tracey' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Tracey (SENCO Y5-8)
             </button>
@@ -721,6 +724,7 @@ function App() {
         </div>
       </header>
 
+      {}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {activeRole === ROLES.SENCO && (
           <SencoDashboard 
@@ -734,13 +738,14 @@ function App() {
         {activeRole === ROLES.TEACHER && (
           <TeacherDashboard user={currentUser} sessions={safeSessions} users={safeUsers} />
         )}
-        {activeRole === ROLES.TA && (
+        {(activeRole === ROLES.TA || activeRole === ROLES.ORS_TEACHER) && (
           <TADashboard 
             user={currentUser} sessions={safeSessions} absences={safeAbsences} addToast={addToast} saveAbsenceToDb={saveAbsenceToDb} users={safeUsers}
           />
         )}
       </main>
 
+      {}
       {showMobileSync && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 text-center animate-fade-in">
@@ -755,6 +760,7 @@ function App() {
         </div>
       )}
 
+      {}
       {showSaveVerificationModal && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 text-center animate-fade-in border border-slate-100">
@@ -1222,24 +1228,35 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     addToast(`Absence marked as ${newStatus} and archived.`, 'success');
   };
 
-  const handleTriggerTestAlert = () => {
-    saveAbsenceToDb({
+  const tas = users.filter(u => {
+    const roles = u.roles || [u.role];
+    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
+  const handleTriggerTestAlert = async () => {
+    const targetTa = tas[Math.floor(Math.random() * tas.length)] || { id: 't1', name: 'Karen Cate', team: TEAMS.Y5_8 };
+    const reasons = [
+      "Woke up with high fever symptoms.",
+      "Sudden domestic burst pipe emergency.",
+      "Migraine headache block - seeking emergency cover."
+    ];
+    const reasonText = reasons[Math.floor(Math.random() * reasons.length)];
+    const testAbs = {
       id: 'abs_test_' + Date.now(),
-      taId: 't1',
+      taId: targetTa.id,
       day: selectedDay,
-      reason: 'Simulated sick leave: Woke up feeling unwell today and seeking coverage.',
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: new Date().toISOString().split('T')[0],
+      formattedDate: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }),
+      isAdvance: false,
+      reason: reasonText,
       status: 'Pending',
       reply: '',
-      isAdvance: false,
-      startDate: '2026-06-15',
-      endDate: '2026-06-15',
-      formattedDate: '15 Jun 2026',
       approvedByStuart: 'N/A'
-    });
-    addToast('Simulated real-time absence alert triggered!', 'success');
+    };
+    await saveAbsenceToDb(testAbs);
+    addToast(`Test alert successfully simulated for ${targetTa.name}!`, 'info');
   };
-
-  const tas = users.filter(u => (u.roles || [u.role]).includes(ROLES.TA)).sort((a, b) => a.name.localeCompare(b.name));
 
   useEffect(() => {
     if (tas.length > 0 && !copySelectedTaId) {
@@ -1290,24 +1307,24 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         role: primaryRole,
         roles: newStaffRoles,
         team: newStaffTeam,
-        allocatedSenco: newStaffRoles.includes(ROLES.TA) ? newStaffSenco : '',
-        allocatedTeacher: newStaffRoles.includes(ROLES.TA) ? newStaffTeacher : '',
-        allocatedTeamLeader: newStaffRoles.includes(ROLES.TA) ? newStaffTeamLeader : ''
+        allocatedSenco: (newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) ? newStaffSenco : '',
+        allocatedTeacher: (newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) ? newStaffTeacher : '',
+        allocatedTeamLeader: (newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) ? newStaffTeamLeader : ''
       };
       addUserToDb(updatedStaff);
       addToast(`${newStaffName} updated successfully.`, 'success');
       setEditingStaff(null);
     } else {
       const newStaff = {
-        id: (newStaffRoles.includes(ROLES.TA) ? 't' : 'u') + Date.now(),
+        id: ((newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) ? 't' : 'u') + Date.now(),
         name: newStaffName,
         role: primaryRole,
         roles: newStaffRoles,
         email: newStaffEmail.toLowerCase().trim(),
         team: newStaffTeam,
-        allocatedSenco: newStaffRoles.includes(ROLES.TA) ? newStaffSenco : '',
-        allocatedTeacher: newStaffRoles.includes(ROLES.TA) ? newStaffTeacher : '',
-        allocatedTeamLeader: newStaffRoles.includes(ROLES.TA) ? newStaffTeamLeader : ''
+        allocatedSenco: (newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) ? newStaffSenco : '',
+        allocatedTeacher: (newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) ? newStaffTeacher : '',
+        allocatedTeamLeader: (newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) ? newStaffTeamLeader : ''
       };
       addUserToDb(newStaff);
       addToast(`${newStaffName} added successfully.`, 'success');
@@ -1446,7 +1463,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
         </div>
         
-        {/* Toggle buttons for Master Timetable or Child Week View */}
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
           <button 
             onClick={() => setActiveDashboardTab('timetable')}
@@ -1792,7 +1808,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </div>
             </div>
 
-            {}
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-y-auto max-h-[45vh] md:max-h-[55vh] pt-4 md:pt-0">
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
@@ -1847,59 +1862,62 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       <option value={TEAMS.ALL}>{TEAMS.ALL}</option>
                     </select>
                   </div>
-                </div>
 
-                {newStaffRoles.includes(ROLES.TA) && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Allocated SENCO</label>
-                      <select 
-                        value={newStaffSenco} 
-                        onChange={(e) => setNewStaffSenco(e.target.value)} 
-                        className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                      >
-                        <option value="">None / Both (Shared)</option>
-                        <option value="senco_cathie">Cathie (SENCO Y0-4)</option>
-                        <option value="senco_tracey">Tracey (SENCO Y5-8)</option>
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
+                  {(newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) && (
+                    <div className="space-y-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Teacher</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Allocated SENCO</label>
                         <select 
-                          value={newStaffTeacher} 
-                          onChange={(e) => setNewStaffTeacher(e.target.value)} 
+                          value={newStaffSenco} 
+                          onChange={(e) => setNewStaffSenco(e.target.value)} 
                           className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
                         >
-                          <option value="">None / Select Teacher</option>
-                          {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(t => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
-                          ))}
+                          <option value="">None / Both (Shared)</option>
+                          <option value="senco_cathie">Cathie (SENCO Y0-4)</option>
+                          <option value="senco_tracey">Tracey (SENCO Y5-8)</option>
                         </select>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Team Leader</label>
-                        <select 
-                          value={newStaffTeamLeader} 
-                          onChange={(e) => setNewStaffTeamLeader(e.target.value)} 
-                          className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
-                        >
-                          <option value="">None / Select Team Leader</option>
-                          {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEAM_LEADER)).sort((a, b) => a.name.localeCompare(b.name)).map(tl => (
-                            <option key={tl.id} value={tl.id}>{tl.name}</option>
-                          ))}
-                        </select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Teacher</label>
+                          <select 
+                            value={newStaffTeacher} 
+                            onChange={(e) => setNewStaffTeacher(e.target.value)} 
+                            className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
+                          >
+                            <option value="">None / Select Teacher</option>
+                            {users.filter(u => {
+                              const roles = u.roles || [u.role];
+                              return roles.includes(ROLES.TEACHER) || roles.includes(ROLES.ORS_TEACHER) || roles.includes(ROLES.LSC);
+                            }).sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Primary Team Leader</label>
+                          <select 
+                            value={newStaffTeamLeader} 
+                            onChange={(e) => setNewStaffTeamLeader(e.target.value)} 
+                            className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
+                          >
+                            <option value="">None / Select Team Leader</option>
+                            {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEAM_LEADER)).sort((a, b) => a.name.localeCompare(b.name)).map(tl => (
+                              <option key={tl.id} value={tl.id}>{tl.name}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
+                  )}
+
+                  <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                    {editingStaff && <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">Cancel Edit</button>}
+                    <button onClick={() => { setShowManageStaff(false); handleCancelEditStaff(); }} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Done</button>
+                    <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">Save Staff</button>
                   </div>
-                )}
-
-                <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
-                  {editingStaff && <button onClick={handleCancelEditStaff} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors">Cancel Edit</button>}
-                  <button onClick={() => { setShowManageStaff(false); handleCancelEditStaff(); }} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Done</button>
-                  <button onClick={handleAddOrUpdateStaff} className="px-6 py-3 bg-[#6157e8] text-white font-bold hover:bg-[#5249d6] rounded-xl transition-colors shadow-md text-sm">Save Staff</button>
                 </div>
               </div>
             </div>
@@ -1908,7 +1926,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         </div>
       )}
 
-      {/* Render the Master Timetable Grid or the Student Weekly Timetable depending on Tab Switcher state */}
       {activeDashboardTab === 'timetable' ? (
         <div className="bg-white rounded-[28px] shadow-sm border border-slate-200 overflow-hidden animate-fade-in">
           <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -2118,8 +2135,6 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 }
 
 function StudentTimetablesView({ sessions, users, addToast }) {
-  // Advanced automatic extraction system to filter out times, system states, subjects (e.g., 'ESOL') 
-  // and clean labels like "Check K.S" into "K.S" to match Screenshot 2026-06-14 at 1.10.46 PM.png beautifully.
   const autoTrackedStudents = React.useMemo(() => {
     const ignoredKeywords = [
       'lunch', 'morning tea', 'tea', 'no cover', 'break', 'not working', 
@@ -2130,24 +2145,14 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     
     sessions.forEach(s => {
       if (!s.subject) return;
-      
-      // Split entries that might have delimiters e.g. "Jess / Ruby" or "Ōtawhito - Sam C"
       const parts = s.subject.split(/[-\/&+]|\band\b/i);
       parts.forEach(part => {
         let cleaned = part.replace(/\s*\(.*?\)\s*/g, ' ').trim();
         if (!cleaned) return;
-        
-        // Strip out leading "Check " or "Check" prefixes (e.g., "Check K.S" -> "K.S", "Check Karlee" -> "Karlee")
         cleaned = cleaned.replace(/^check\s+/i, '').trim();
-        
         const lower = cleaned.toLowerCase();
-        
-        // Exclude patterns that look like direct time representations (e.g. "10:30am", "9:00", etc.)
         const isTimeFormat = /\b\d{1,2}(:\d{2})?\s*(am|pm)?\b/i.test(lower);
-        
-        const isIgnored = isTimeFormat || ignoredKeywords.some(keyword => {
-          return lower === keyword || lower.includes(keyword);
-        });
+        const isIgnored = isTimeFormat || ignoredKeywords.some(keyword => lower === keyword || lower.includes(keyword));
         
         if (!isIgnored && cleaned.length > 0 && cleaned.length <= 15) {
           found.add(cleaned);
@@ -2183,7 +2188,6 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     });
 
     if (!matchingSession) return null;
-    
     const ta = users.find(u => u.id === matchingSession.taId);
     return ta ? ta.name.split(' ')[0] : 'Assigned'; 
   };
@@ -2234,8 +2238,6 @@ function StudentTimetablesView({ sessions, users, addToast }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in">
-      
-      {/* Sidebar Controls Panel */}
       <div className="lg:col-span-3 space-y-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
           <div>
@@ -2290,7 +2292,6 @@ function StudentTimetablesView({ sessions, users, addToast }) {
           )}
         </div>
 
-        {/* Dynamic Funding Metrics Summary Container */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
           <div>
             <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-1">Funding Coverage</h3>
@@ -2333,7 +2334,6 @@ function StudentTimetablesView({ sessions, users, addToast }) {
         </div>
       </div>
 
-      {/* Main Timetable View Area */}
       <div className="lg:col-span-9 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         <div className="p-6 sm:p-8 border-b border-slate-100 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -2357,40 +2357,35 @@ function StudentTimetablesView({ sessions, users, addToast }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {TIME_SLOTS.map(slot => {
-                const isSpecialSlot = slot.label === 'No cover' || slot.label === 'First lunch' || slot.label === 'Second lunch';
-                
-                return (
-                  <tr key={slot.id} className="hover:bg-slate-55/40 transition-all">
-                    <td className="p-4 font-bold text-slate-700 text-xs border-r border-slate-200 bg-slate-50/50 whitespace-nowrap">
-                      {slot.label}
-                    </td>
+              {TIME_SLOTS.map(slot => (
+                <tr key={slot.id} className="hover:bg-slate-55/40 transition-all">
+                  <td className="p-4 font-bold text-slate-700 text-xs border-r border-slate-200 bg-slate-50/50 whitespace-nowrap">
+                    {slot.label}
+                  </td>
+                  
+                  {DAYS.map(day => {
+                    const coveringName = getCoveringStaff(day, slot.id);
                     
-                    {DAYS.map(day => {
-                      const coveringName = getCoveringStaff(day, slot.id);
-                      
-                      return (
-                        <td key={`${slot.id}-${day}`} className="p-2 border-r border-slate-100 last:border-r-0" style={{ width: '160px' }}>
-                          {coveringName ? (
-                            <div className={`py-3 px-2 rounded-xl text-xs font-extrabold border shadow-xs transition-transform hover:scale-[1.01] ${nameToColorClass(coveringName)}`}>
-                              {coveringName}
-                            </div>
-                          ) : (
-                            <div className="py-3 px-2 bg-rose-50/60 border border-dashed border-rose-200 rounded-xl text-rose-500 text-xs font-bold leading-none italic select-none">
-                              No cover
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
+                    return (
+                      <td key={`${slot.id}-${day}`} className="p-2 border-r border-slate-100 last:border-r-0" style={{ width: '160px' }}>
+                        {coveringName ? (
+                          <div className={`py-3 px-2 rounded-xl text-xs font-extrabold border shadow-xs transition-transform hover:scale-[1.01] ${nameToColorClass(coveringName)}`}>
+                            {coveringName}
+                          </div>
+                        ) : (
+                          <div className="py-3 px-2 bg-rose-50/60 border border-dashed border-rose-200 rounded-xl text-rose-500 text-xs font-bold leading-none italic select-none">
+                            No cover
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
-
     </div>
   );
 }
@@ -2585,7 +2580,10 @@ function TeacherDashboard({ user, sessions, users }) {
 function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilter }) {
   const [viewMode, setViewMode] = useState('single'); 
   
-  const allTas = users.filter(u => (u.roles || [u.role]).includes(ROLES.TA)).sort((a, b) => a.name.localeCompare(b.name));
+  const allTas = users.filter(u => {
+    const roles = u.roles || [u.role];
+    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
+  }).sort((a, b) => a.name.localeCompare(b.name));
   
   const tas = allTas.filter(ta => {
     if (!teamFilter || teamFilter === TEAMS.ALL) return true;
@@ -2619,6 +2617,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
         </div>
       </div>
 
+      {}
       {viewMode === 'single' ? (
         <div className="px-1.5 sm:px-6 py-4 space-y-6 animate-fade-in">
           <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
@@ -2726,7 +2725,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
             </thead>
             <tbody className="divide-y divide-slate-100">
               {TIME_SLOTS.map(slot => (
-                <tr key={slot.id} className="hover:bg-slate-50/50 transition-colors">
+                <tr key={slot.id} className="hover:bg-slate-55/40 transition-colors">
                   <td className="p-4 font-medium text-slate-800 text-sm whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
                     {slot.start} <span className="text-slate-400 text-xs ml-1 font-medium">{slot.end}</span>
                   </td>
@@ -2787,7 +2786,10 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
   const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
   
   const otherTas = users
-    .filter(u => (u.roles || [u.role]).includes(ROLES.TA) && u.id !== absence.taId)
+    .filter(u => {
+      const roles = u.roles || [u.role];
+      return (roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER)) && u.id !== absence.taId;
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
   
   const [assignments, setAssignments] = useState({});
