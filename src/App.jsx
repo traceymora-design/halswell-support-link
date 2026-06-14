@@ -2229,7 +2229,15 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     });
 
     if (!matchingSession) return null;
-    const resolverList = users.length > 0 ? users : INITIAL_USERS;
+    
+    // Combine live Firestore users with INITIAL_USERS to ensure any unsynced TA names can still be resolved
+    const resolverList = [...users];
+    INITIAL_USERS.forEach(iu => {
+      if (!resolverList.some(u => u.id === iu.id)) {
+        resolverList.push(iu);
+      }
+    });
+
     const ta = resolverList.find(u => u.id === matchingSession.taId);
     return ta ? ta.name.split(' ')[0] : 'Assigned'; 
   };
