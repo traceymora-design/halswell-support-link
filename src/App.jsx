@@ -115,17 +115,17 @@ const isSencoSupervisingTa = (senco, ta) => {
 const TIME_SLOTS = [
   { id: 't1', start: '9:00', end: '9:30', label: '9:00 - 9:30' },
   { id: 't2', start: '9:30', end: '10:00', label: '9:30 - 10:00' },
-  { id: 't3', start: '10:00', end: '10:50', label: '10:00 - 10:50' },
-  { id: 't4', start: '10:50', end: '11:10', label: '10:50 - 11:10' },
-  { id: 't5', start: '11:10', end: '11:10', label: 'No cover' },
-  { id: 't6', start: '11:10', end: '12:00', label: '11:10 - 12:00' },
-  { id: 't7', start: '12:00', end: '12:30', label: 'First lunch' },
-  { id: 't8', start: '12:30', end: '1:00', label: '12:30 - 1:00' },
-  { id: 't9', start: '1:00', end: '1:30', label: '1:00 - 1:30' },
-  { id: 't10', start: '1:30', end: '2:00', label: 'Second lunch' },
-  { id: 't11', start: '2:00', end: '2:30', label: '2:00 - 2:30' },
-  { id: 't12', start: '2:30', end: '3:00', label: '2:30 - 3:00' },
-  { id: 't13', start: '3:00', end: '3:30', label: 'End block' }
+  { id: 't3', start: '10:00', end: '10:30', label: '10:00 - 10:30' },
+  { id: 't4', start: '10:30', end: '10:50', label: '10:30 - 10:50' },
+  { id: 't5', start: '10:50', end: '11:10', label: '10:50 - 11:10' },
+  { id: 't6', start: '11:10', end: '11:30', label: '11:10 - 11:30' },
+  { id: 't7', start: '11:30', end: '12:00', label: '11:30 - 12:00' },
+  { id: 't8', start: '12:00', end: '12:30', label: '12:00 - 12:30' },
+  { id: 't9', start: '12:30', end: '1:00', label: '12:30 - 1:00' },
+  { id: 't10', start: '1:00', end: '1:30', label: '1:00 - 1:30' },
+  { id: 't11', start: '1:30', end: '2:00', label: '1:30 - 2:00' },
+  { id: 't12', start: '2:00', end: '2:30', label: '2:00 - 2:30' },
+  { id: 't13', start: '2:30', end: '3:00', label: '2:30 - 3:00' }
 ];
 
 const INITIAL_USERS = [
