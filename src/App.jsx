@@ -2228,7 +2228,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       );
     });
 
-    if (!matchingSession) return null;
+    if (!matchingSession || !matchingSession.taId) return null;
     
     // Combine live Firestore users with INITIAL_USERS to ensure any unsynced TA names can still be resolved
     const resolverList = [...users];
@@ -2239,7 +2239,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     });
 
     const ta = resolverList.find(u => u.id === matchingSession.taId);
-    return ta ? ta.name.split(' ')[0] : 'Assigned'; 
+    return ta ? ta.name.split(' ')[0] : null; 
   };
 
   const totalWeeklySlots = TIME_SLOTS.length * DAYS.length;
