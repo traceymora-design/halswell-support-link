@@ -8,21 +8,25 @@ import {
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, signInAnonymously, onAuthStateChanged, 
-  GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut,
-  setPersistence, browserLocalPersistence 
+  GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut,
+  setPersistence, browserLocalPersistence, signInWithCustomToken 
 } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 
+// Parse environmental or sandbox configurations safely
 const getFirebaseConfig = () => {
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
-      const parsed = JSON.parse(__firebase_config);
+      const parsed = typeof __firebase_config === 'string' 
+        ? JSON.parse(__firebase_config) 
+        : __firebase_config;
       if (parsed && parsed.apiKey) return parsed;
     } catch (e) {
-      console.error("Failed to parse sandbox config", e);
+      console.error("Failed to parse sandbox environment config", e);
     }
   }
   
+  // High-reliability fallback configuration for independent browser hosting
   return {
     apiKey: "AIzaSyDnWi7OUCjyApvDC0nclGBKWJaaCc-Cr1s",
     authDomain: "support-link-app.firebaseapp.com",
@@ -39,9 +43,10 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Rule 1: Get clean dynamic application namespace and replace slashes to ensure it never splits into multiple invalid segments
 const getCleanAppId = () => {
   const rawId = typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production";
-  return rawId.split('/')[0];
+  return rawId.replace(/\//g, '_');
 };
 const appId = getCleanAppId();
 
@@ -83,6 +88,22 @@ const TIERS = {
 };
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+const isStudentMatch = (subjectText, studentText) => {
+  if (!subjectText || !studentText) return false;
+  
+  const cleanString = (str) => {
+    return str.toLowerCase()
+      .replace(/^(support|check|check-in|supervise|monitor|check|critical|high needs)\s+/i, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+  };
+  
+  const cleanedSubject = cleanString(subjectText);
+  const cleanedStudent = cleanString(studentText);
+  
+  return cleanedSubject.includes(cleanedStudent) || cleanedStudent.includes(cleanedSubject);
+};
 
 const isSencoSupervisingTa = (senco, ta) => {
   if (!senco || !ta) return false;
@@ -128,10 +149,12 @@ const INITIAL_USERS = [
   { id: 'tl1', name: 'Greta Parkes-Dolan', role: ROLES.TEAM_LEADER, roles: [ROLES.TEAM_LEADER, ROLES.TEACHER], email: 'davis@school.edu', team: TEAMS.Y5_8 },
   { id: 't_val', name: 'Val Murray', role: ROLES.TA, roles: [ROLES.TA], email: 'val.murray@school.nz', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey' },
   { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, roles: [ROLES.TA], email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
-  { id: 't_praboda', name: 'Praboda', role: ROLES.TA, roles: [ROLES.TA], email: 'praboda@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
+  { id: 't_praboda', name: 'Prabodha', role: ROLES.TA, roles: [ROLES.TA], email: 'praboda@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
   { id: 't_tiffany', name: 'Tiffany', role: ROLES.TA, roles: [ROLES.TA], email: 'tiffany@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
   { id: 't_jenny', name: 'Jenny', role: ROLES.ORS_TEACHER, roles: [ROLES.ORS_TEACHER], email: 'jenny@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
-  { id: 't_tara', name: 'Tara', role: ROLES.TA, roles: [ROLES.TA], email: 'tara@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
+  { id: 't_tara', name: 'Tara', role: ROLES.TA, roles: [ROLES.TA], email: 'tara@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
+  { id: 't_helena', name: 'Helena', role: ROLES.TA, roles: [ROLES.TA], email: 'helena@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
+  { id: 't_marcela', name: 'Marcela', role: ROLES.TA, roles: [ROLES.TA], email: 'marcela@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
 ];
 
 const INITIAL_ABSENCES = [
@@ -151,78 +174,95 @@ const INITIAL_ABSENCES = [
 ];
 
 let INITIAL_SESSIONS = [];
-let sessionIdCounter = 1;
 
 DAYS.forEach(day => {
-  const daySessions = [
-    { timeSlotId: 't1', tier: TIERS.HIGH_NEEDS, subject: 'Jess', teamLeaderId: 'tl1' },
-    { timeSlotId: 't3', tier: TIERS.MORNING_TEA, subject: 'Morning Tea', teacherId: null },
-    { timeSlotId: 't4', tier: TIERS.ENRICHMENT, subject: 'Casey', teamLeaderId: 'tl1' },
-    { timeSlotId: 't9', tier: TIERS.LUNCH, subject: 'Lunch', teacherId: null }
-  ];
-  daySessions.forEach(s => {
-    INITIAL_SESSIONS.push({ id: `s${sessionIdCounter++}`, day, taId: 't1', teacherId: 'u2', ...s });
-  });
-});
+  INITIAL_SESSIONS.push({ id: `es_s1_t1_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't1' });
+  INITIAL_SESSIONS.push({ id: `es_s1_t2_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't2' });
+  INITIAL_SESSIONS.push({ id: `es_s1_t3_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't3' });
+  INITIAL_SESSIONS.push({ id: `es_s1_t4_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't4' });
 
-DAYS.forEach(day => {
-  INITIAL_SESSIONS.push({ id: `hw_s1_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W' });
-  INITIAL_SESSIONS.push({ id: `hw_s2_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W' });
+  if (day === 'Friday') {
+    INITIAL_SESSIONS.push({ id: `es_s1_t5_${day}`, day, taId: 't_marcela', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't5' });
+  } else {
+    INITIAL_SESSIONS.push({ id: `es_s1_t5_${day}`, day, taId: 't_helena', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't5' });
+  }
+
+  if (day === 'Monday') {
+    INITIAL_SESSIONS.push({ id: `es_s1_t6_${day}`, day, taId: 't_jenny', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't6' });
+    INITIAL_SESSIONS.push({ id: `es_s1_t7_${day}`, day, taId: 't_jenny', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't7' });
+  }
+
+  if (day === 'Friday') {
+    INITIAL_SESSIONS.push({ id: `es_s1_t8_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't8' });
+  } else {
+    INITIAL_SESSIONS.push({ id: `es_s1_t8_${day}`, day, taId: 't_helena', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't8' });
+  }
+
+  if (day === 'Wednesday') {
+    INITIAL_SESSIONS.push({ id: `es_s1_t9_${day}`, day, taId: 't_marcela', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't9' });
+    INITIAL_SESSIONS.push({ id: `es_s1_t10_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't10' });
+  } else {
+    INITIAL_SESSIONS.push({ id: `es_s1_t9_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't9' });
+    INITIAL_SESSIONS.push({ id: `es_s1_t10_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't10' });
+  }
+
+  if (day === 'Thursday') {
+    INITIAL_SESSIONS.push({ id: `es_s1_t11_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't11' });
+  } else {
+    INITIAL_SESSIONS.push({ id: `es_s1_t11_${day}`, day, taId: 't_marcela', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't11' });
+  }
+
+  INITIAL_SESSIONS.push({ id: `es_s1_t12_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't12' });
+  INITIAL_SESSIONS.push({ id: `es_s1_t13_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't13' });
+
+  INITIAL_SESSIONS.push({ id: `hw_s1_t2_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W', timeSlotId: 't2' });
+  INITIAL_SESSIONS.push({ id: `hw_s1_t6_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W', timeSlotId: 't6' });
   INITIAL_SESSIONS.push({ 
-    id: `hw_s3_${day}`, 
+    id: `hw_s1_t7_${day}`, 
     day, 
     taId: day === 'Friday' ? 't1' : 't_praboda', 
     teacherId: 'u4', 
     tier: TIERS.LUNCH, 
-    subject: 'H.W (First lunch)' 
+    subject: 'H.W',
+    timeSlotId: 't7'
   });
   INITIAL_SESSIONS.push({ 
-    id: `hw_s4_${day}`, 
+    id: `hw_s1_t9_${day}`, 
     day, 
     taId: day === 'Friday' ? 't_tara' : 't_tiffany', 
     teacherId: 'u2', 
     tier: TIERS.HIGH_NEEDS, 
-    subject: 'H.W' 
+    subject: 'H.W',
+    timeSlotId: 't9'
   });
-  INITIAL_SESSIONS.push({ id: `hw_s5_${day}`, day, taId: 't_jenny', teacherId: 'u5', tier: TIERS.HIGH_NEEDS, subject: 'H.W' });
+  INITIAL_SESSIONS.push({ id: `hw_s1_t10_${day}`, day, taId: 't_jenny', teacherId: 'u5', tier: TIERS.HIGH_NEEDS, subject: 'H.W', timeSlotId: 't10' });
   INITIAL_SESSIONS.push({ 
-    id: `hw_s6_${day}`, 
+    id: `hw_s1_t11_${day}`, 
     day, 
     taId: day === 'Thursday' ? 't_val' : 't_praboda', 
     teacherId: 'u3', 
     tier: TIERS.LUNCH, 
-    subject: 'H.W (Second lunch)' 
+    subject: 'H.W',
+    timeSlotId: 't11'
   });
   INITIAL_SESSIONS.push({ 
-    id: `hw_s7_${day}`, 
+    id: `hw_s1_t12_${day}`, 
     day, 
     taId: day === 'Friday' ? 't1' : 't_tiffany', 
     teacherId: 'u2', 
     tier: TIERS.CRITICAL, 
-    subject: 'H.W' 
+    subject: 'H.W',
+    timeSlotId: 't12'
   });
-});
-
-DAYS.forEach(day => {
-  if (day === 'Monday' || day === 'Wednesday' || day === 'Friday') {
-    INITIAL_SESSIONS.push({
-      id: `es_s1_${day}`,
-      day,
-      taId: 't_ruby',
-      teacherId: 'u3',
-      tier: TIERS.CRITICAL,
-      subject: 'E.S'
-    });
-  } else {
-    INITIAL_SESSIONS.push({
-      id: `es_s2_${day}`,
-      day,
-      taId: 't_val',
-      teacherId: 'u2',
-      tier: TIERS.HIGH_NEEDS,
-      subject: 'E.S'
-    });
-  }
+  INITIAL_SESSIONS.push({ 
+    id: `hw_s1_t13_${day}`, 
+    day, 
+    taId: day === 'Friday' ? 't1' : 't_tiffany', 
+    teacherId: 'u2', 
+    tier: TIERS.CRITICAL, 
+    subject: 'H.W',
+    timeSlotId: 't13'
+  });
 });
 
 const TIER_STYLES = {
@@ -293,6 +333,7 @@ function App() {
   const [rememberMe, setRememberMe] = useState(true);
   const [showMobileSync, setShowMobileSync] = useState(false);
   const [verifyingGoogle, setVerifyingGoogle] = useState(false);
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
 
   const [syncStatus, setSyncStatus] = useState('synced'); 
   const [lastSavedTime, setLastSavedTime] = useState(() => new Date().toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -313,6 +354,7 @@ function App() {
     }
   }, [currentUser]);
 
+  // Rule 3 Guard: Strictly authenticate first before performing querying snapshots or writes
   const handlePostSignIn = async (firebaseUser) => {
     if (!firebaseUser) return;
     const email = firebaseUser.email?.toLowerCase();
@@ -347,22 +389,26 @@ function App() {
     }
   };
 
+  // Rule 3: Auth Before Queries (Strict connection prioritizing __initial_auth_token)
   useEffect(() => {
     const initAuth = async () => {
       try {
         const persistenceType = browserLocalPersistence;
         await setPersistence(auth, persistenceType);
 
-        const redirectResult = await getRedirectResult(auth);
-        if (redirectResult && redirectResult.user) {
-          await handlePostSignIn(redirectResult.user);
-        } else if (auth.currentUser && !auth.currentUser.isAnonymous) {
-          await handlePostSignIn(auth.currentUser);
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
         } else {
           await signInAnonymously(auth);
         }
       } catch (err) {
         console.error("Auth init failed:", err);
+        // Fallback to anonymous if security token failed
+        try {
+          await signInAnonymously(auth);
+        } catch (e) {
+          console.error("Critical: Anonymous auth fallback also failed:", e);
+        }
       } finally {
         setAuthCompleted(true);
       }
@@ -375,6 +421,7 @@ function App() {
     return () => unsubscribe();
   }, [rememberMe]);
 
+  // Handle live subscriptions cleanly with user authenticated guard (Rule 3)
   useEffect(() => {
     if (!authCompleted || !dbUser) return;
 
@@ -393,9 +440,7 @@ function App() {
         setUsers(fetchedUsers);
         
         if (fetchedUsers.length === 0) {
-          INITIAL_USERS.forEach(u => setDoc(doc(usersRef, u.id), u));
-          INITIAL_SESSIONS.forEach(s => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id), s));
-          INITIAL_ABSENCES.forEach(a => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id), a));
+          await handleRestoreDefaultSeeds();
         }
 
         if (auth.currentUser && !auth.currentUser.isAnonymous && auth.currentUser.email) {
@@ -436,7 +481,57 @@ function App() {
     return () => { unsubUsers(); unsubSessions(); unsubAbsences(); };
   }, [authCompleted, dbUser]);
 
+  // Strict guard helper for write sessions
+  const handleRestoreDefaultSeeds = async () => {
+    if (!auth.currentUser) {
+      console.warn("Restore seeds aborted: User authentication state not loaded yet.");
+      return;
+    }
+    setSyncStatus('saving');
+    try {
+      const batch = writeBatch(db);
+      
+      const sessionsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'sessions'));
+      sessionsSnapshot.docs.forEach(d => batch.delete(d.ref));
+
+      const absencesSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'absences'));
+      absencesSnapshot.docs.forEach(d => batch.delete(d.ref));
+
+      const usersSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users'));
+      usersSnapshot.docs.forEach(d => batch.delete(d.ref));
+
+      INITIAL_USERS.forEach(u => {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', u.id);
+        batch.set(docRef, u);
+      });
+
+      INITIAL_SESSIONS.forEach(s => {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id);
+        batch.set(docRef, s);
+      });
+
+      INITIAL_ABSENCES.forEach(a => {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id);
+        batch.set(docRef, a);
+      });
+
+      await batch.commit();
+      setSyncStatus('synced');
+      setLastSavedTime(new Date().toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      addToast("Prised school roster & E.S timetable restored!", "success");
+    } catch (e) {
+      console.error(e);
+      setSyncStatus('error');
+      addToast("Failed to restore default seeds.", "error");
+    }
+  };
+
+  // Rule 3: Database operations are explicitly guarded against non-authenticated scopes
   const handleDbOp = async (opFn) => {
+    if (!auth.currentUser) {
+      console.warn("Database sync ignored: authenticated context is required.");
+      return;
+    }
     setSyncStatus('saving');
     try {
       await opFn();
@@ -605,15 +700,24 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
       {isSandbox && (
-        <div className="bg-amber-50 border-b border-amber-200/60 px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-amber-800 select-none shadow-inner">
+        <div className="bg-amber-50 border-b border-amber-200/60 px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-amber-800 select-none shadow-inner">
           <div className="flex items-center gap-1.5 font-bold">
             <span className="flex h-2.5 w-2.5 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
             </span>
-            <span>TESTING MODE — Quick Switch Dashboard Roles:</span>
+            <span>SANDBOX ACTIONS & QUICK SWITCH ROLES:</span>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            <button 
+              onClick={() => setShowResetConfirmModal(true)}
+              className="px-3.5 py-1.5 rounded-lg font-bold text-[11px] bg-red-600 text-white hover:bg-red-700 transition-all border border-red-700 shadow-sm flex items-center gap-1"
+            >
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <span>Restore Default Timetable (Includes Val Mon/Fri)</span>
+            </button>
+
             <button onClick={() => handleBypassSignIn('t1')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 't1' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Karen Cate (TA)
             </button>
@@ -716,6 +820,7 @@ function App() {
           <SencoDashboard 
             currentUser={currentUser} users={safeUsers} sessions={safeSessions} absences={safeAbsences} addToast={addToast} 
             addUserToDb={addUserToDb} deleteUserFromDb={deleteUserFromDb} saveSessionToDb={saveSessionToDb} deleteSessionFromDb={deleteSessionFromDb} saveAbsenceToDb={saveAbsenceToDb}
+            handleRestoreDefaultSeeds={handleRestoreDefaultSeeds}
           />
         )}
         {activeRole === ROLES.TEAM_LEADER && (
@@ -730,6 +835,37 @@ function App() {
           />
         )}
       </main>
+
+      {showResetConfirmModal && (
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-[24px] shadow-2xl max-w-md w-full p-6 animate-fade-in text-center border border-slate-100">
+            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100">
+              <RefreshCw className="w-6 h-6 animate-spin" />
+            </div>
+            <h3 className="text-xl font-bold text-[#1a1f36] mb-2">Reset Live Timetable?</h3>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+              This action will reset your cloud database back to default settings, instantly mapping **Val Murray** to **E.S** on Mondays and Fridays. Proceed?
+            </p>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setShowResetConfirmModal(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  setShowResetConfirmModal(false);
+                  await handleRestoreDefaultSeeds();
+                }}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition-colors shadow-md"
+              >
+                Reset Database
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showMobileSync && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
@@ -803,6 +939,16 @@ function App() {
                     <span>Run Integrity Verification</span>
                   </>
                 )}
+              </button>
+              <button 
+                onClick={() => {
+                  setShowSaveVerificationModal(false);
+                  setShowResetConfirmModal(true);
+                }}
+                className="w-full py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Restore Clean Seeds (Reset DB)</span>
               </button>
               <button 
                 onClick={() => setShowSaveVerificationModal(false)} 
@@ -1158,7 +1304,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   );
 }
 
-function SencoDashboard({ currentUser, users, sessions, absences, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb }) {
+function SencoDashboard({ currentUser, users, sessions, absences, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb, handleRestoreDefaultSeeds }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [resolvingAbsence, setResolvingAbsence] = useState(null);
   const [editingCell, setEditingCell] = useState(null); 
@@ -1186,6 +1332,52 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false
   });
   const [copyOverwrite, setCopyOverwrite] = useState(true);
+
+  // States to control current inputs inside Edit Duty Modal for Double-allocation Warning checks
+  const [modalSubject, setModalSubject] = useState('');
+  const [modalTier, setModalTier] = useState(TIERS.ENRICHMENT);
+  const [modalTeacherId, setModalTeacherId] = useState('');
+  const [modalTeamLeaderId, setModalTeamLeaderId] = useState('');
+  const [overrideConfirm, setOverrideConfirm] = useState(false);
+
+  // Sync inputs dynamically when clicking on target timetable cell
+  useEffect(() => {
+    if (editingCell) {
+      setModalSubject(editingCell.session?.subject || '');
+      setModalTier(editingCell.session?.tier || TIERS.ENRICHMENT);
+      setModalTeacherId(editingCell.session?.teacherId || '');
+      setModalTeamLeaderId(editingCell.session?.teamLeaderId || '');
+      setOverrideConfirm(false);
+    }
+  }, [editingCell]);
+
+  // Live lookup scanner to check for duplicated high priority student support
+  const duplicateSession = useMemo(() => {
+    if (!editingCell || !modalSubject.trim()) return null;
+    
+    return sessions.find(s => {
+      // Must be same day and same timeslot
+      if (s.day !== selectedDay || s.timeSlotId !== editingCell.timeSlotId) return false;
+      
+      // Skip if it's the exact same session record we are editing
+      if (editingCell.session && s.id === editingCell.session.id) return false;
+      
+      // Filter out duplicate checks for general school breaks or lunches
+      if (s.tier !== TIERS.CRITICAL && s.tier !== TIERS.HIGH_NEEDS) return false;
+      if (modalTier !== TIERS.CRITICAL && modalTier !== TIERS.HIGH_NEEDS) return false;
+      
+      // Verify if student names or initials match up cleanly
+      return isStudentMatch(s.subject, modalSubject);
+    });
+  }, [modalSubject, modalTier, sessions, selectedDay, editingCell]);
+
+  const duplicateTaName = useMemo(() => {
+    if (!duplicateSession) return '';
+    const ta = users.find(u => u.id === duplicateSession.taId) || INITIAL_USERS.find(u => u.id === duplicateSession.taId);
+    return ta ? ta.name : 'Another Teacher Aide';
+  }, [duplicateSession, users]);
+
+  const isSubmitDisabled = duplicateSession && !overrideConfirm;
 
   const directAbsences = absences.filter(a => {
     if (a.status !== 'Pending') return false;
@@ -1843,50 +2035,105 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
       {editingCell && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in">
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
             <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">{editingCell.session ? 'Edit Duty' : 'Assign Duty'}</h3>
             <form onSubmit={(e) => {
               e.preventDefault();
-              const formData = new FormData(e.target);
               handleSaveSession({
-                subject: formData.get('subject'),
-                tier: formData.get('tier'),
-                teacherId: formData.get('teacherId') || null,
-                teamLeaderId: formData.get('teamLeaderId') || null
+                subject: modalSubject,
+                tier: modalTier,
+                teacherId: modalTeacherId || null,
+                teamLeaderId: modalTeamLeaderId || null
               });
             }} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Subject / Task Name</label>
-                <input type="text" name="subject" required defaultValue={editingCell.session?.subject} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Reading Support..." />
+                <input 
+                  type="text" 
+                  name="subject" 
+                  required 
+                  value={modalSubject} 
+                  onChange={(e) => setModalSubject(e.target.value)} 
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-sm font-medium text-slate-700" 
+                  placeholder="e.g. Reading Support..." 
+                />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Priority Tier</label>
-                <select name="tier" defaultValue={editingCell.session?.tier || TIERS.ENRICHMENT} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                <select 
+                  name="tier" 
+                  value={modalTier} 
+                  onChange={(e) => setModalTier(e.target.value)} 
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-sm font-medium text-slate-700 cursor-pointer"
+                >
                   {Object.values(TIERS).map(tier => <option key={tier} value={tier}>{tier}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Teacher</label>
-                <select name="teacherId" defaultValue={editingCell.session?.teacherId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                <select 
+                  name="teacherId" 
+                  value={modalTeacherId} 
+                  onChange={(e) => setModalTeacherId(e.target.value)} 
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-sm font-medium text-slate-700 cursor-pointer"
+                >
                   <option value="">None / Self-Directed</option>
                   {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Supporting Team Leader</label>
-                <select name="teamLeaderId" defaultValue={editingCell.session?.teamLeaderId || ''} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none">
+                <select 
+                  name="teamLeaderId" 
+                  value={modalTeamLeaderId} 
+                  onChange={(e) => setModalTeamLeaderId(e.target.value)} 
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-sm font-medium text-slate-700 cursor-pointer"
+                >
                   <option value="">None / No Team Leader</option>
                   {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEAM_LEADER)).sort((a, b) => a.name.localeCompare(b.name)).map(tl => <option key={tl.id} value={tl.id}>{tl.name}</option>)}
                 </select>
               </div>
-              <div className="flex justify-end space-x-3 pt-4">
+
+              {/* Dynamic Double-Allocation Alert Check box display */}
+              {duplicateSession && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-2 text-xs text-amber-800 animate-fade-in shadow-xs">
+                  <div className="flex items-center gap-2 font-bold text-amber-900">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <span>Double-Allocation Detected!</span>
+                  </div>
+                  <p className="leading-relaxed">
+                    <strong>{duplicateTaName}</strong> is already assigned to support <strong>"{duplicateSession.subject}"</strong> on {selectedDay} during this timeslot ({TIME_SLOTS.find(t => t.id === editingCell.timeSlotId)?.label}).
+                  </p>
+                  <label className="flex items-center gap-2.5 mt-2 cursor-pointer select-none font-bold text-amber-950">
+                    <input 
+                      type="checkbox" 
+                      checked={overrideConfirm} 
+                      onChange={(e) => setOverrideConfirm(e.target.checked)} 
+                      className="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500 cursor-pointer" 
+                    />
+                    <span>Allow double-up (Job-sharing / Joint support)</span>
+                  </label>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
                 {editingCell.session && (
                   <button type="button" onClick={handleDeleteSession} className="px-5 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-bold text-sm transition-colors mr-auto flex items-center">
                     <Trash2 className="w-4 h-4 mr-2" /> Remove
                   </button>
                 )}
                 <button type="button" onClick={() => setEditingCell(null)} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors text-sm">Cancel</button>
-                <button type="submit" className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl transition-colors shadow-md text-sm">Save Changes</button>
+                <button 
+                  type="submit" 
+                  disabled={isSubmitDisabled}
+                  className={`px-6 py-3 font-bold rounded-xl transition-colors shadow-md text-sm ${
+                    isSubmitDisabled 
+                      ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' 
+                      : 'bg-[#1a1f36] text-white hover:bg-black'
+                  }`}
+                >
+                  Save Changes
+                </button>
               </div>
             </form>
           </div>
@@ -1945,7 +2192,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
               </h4>
-              <div className="space-y-4 text-xs font-medium">
+              <div className="space-y-4 text-xs font-medium border-t border-slate-100 pt-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
                   <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Ruby Gray" />
@@ -2105,6 +2352,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           sessions={sessions}
           users={users}
           addToast={addToast}
+          handleRestoreDefaultSeeds={handleRestoreDefaultSeeds}
         />
       )}
 
@@ -2161,13 +2409,16 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   );
 }
 
-function StudentTimetablesView({ sessions, users, addToast }) {
+function StudentTimetablesView({ sessions, users, addToast, handleRestoreDefaultSeeds }) {
   const autoTrackedStudents = useMemo(() => {
     const ignoredKeywords = [
       'lunch', 'morning tea', 'tea', 'no cover', 'break', 'not working', 
       'interval', 'meeting', 'duty', 'admin', 'planning', 'free session', 
       'Ōtawhito', 'otawhito', 'esol', 'office', 'classroom', 'check-in',
-      'monitor', 'support', 'supervise', 'check', 'supervision'
+      'monitor', 'support', 'supervise', 'check', 'supervision',
+      'val', 'ruby', 'praboda', 'karen', 'tiffany', 'jenny', 'tara', 
+      'cathie', 'tracey', 'ben', 'ally', 'bryony', 'cameron', 'cindy', 
+      'greta', 'helena', 'marcela', 'stuart', 'jess'
     ];
     const found = new Set(['H.W', 'E.S', 'Sam C']);
     
@@ -2213,24 +2464,11 @@ function StudentTimetablesView({ sessions, users, addToast }) {
   const getCoveringStaff = (day, slotId) => {
     const matchingSession = sessions.find(s => {
       if (s.day !== day || s.timeSlotId !== slotId) return false;
-      const cleanSubject = s.subject?.toLowerCase() || '';
-      const cleanStudent = activeStudent.toLowerCase();
-      const strippedSubject = cleanSubject.replace(/^(support|check|check-in|supervise|monitor|check)\s+/i, '').trim();
-
-      return (
-        strippedSubject === cleanStudent ||
-        cleanSubject === cleanStudent || 
-        cleanSubject.startsWith(cleanStudent + ' ') || 
-        cleanSubject.endsWith(' ' + cleanStudent) ||
-        cleanSubject.includes('(' + cleanStudent + ')') || 
-        cleanSubject.includes(' - ' + cleanStudent) ||
-        cleanSubject.split(/[-\/&\s]/).some(part => part.trim() === cleanStudent)
-      );
+      return isStudentMatch(s.subject, activeStudent);
     });
 
     if (!matchingSession || !matchingSession.taId) return null;
     
-    // Combine live Firestore users with INITIAL_USERS to ensure any unsynced TA names can still be resolved
     const resolverList = [...users];
     INITIAL_USERS.forEach(iu => {
       if (!resolverList.some(u => u.id === iu.id)) {
@@ -2353,7 +2591,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
               <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
                 <div 
                   className={`h-full transition-all duration-500 ${
-                    coveragePercentage >= 90 ? 'bg-emerald-500' :
+                    coveragePercentage >= 90 ? 'bg-[#10b981]' :
                     coveragePercentage >= 70 ? 'bg-amber-400' : 'bg-red-400'
                   }`}
                   style={{ width: `${coveragePercentage}%` }}
