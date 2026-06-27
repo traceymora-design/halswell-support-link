@@ -41,7 +41,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Get clean dynamic application namespace and replace slashes to ensure it never splits into multiple segments
+// Rule 1: Get clean dynamic application namespace and replace slashes to ensure it never splits into multiple segments
 const getCleanAppId = () => {
   const rawId = typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production";
   return rawId.replace(/\//g, '_');
@@ -988,43 +988,49 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     }
   }, [editingCell]);
 
-  // Live lookup scanner to check for duplicated high priority student support
-  const duplicateSession = useMemo(() => {
-    if (!editingCell || !modalSubject.trim()) return null;
-    
+  // Check if the current Teacher Aide is already assigned to another duty in this slot
+  const taConflictSession = useMemo(() => {
+    if (!editingCell || !editingCell.taId) return null;
     return sessions.find(s => {
-      // Must be same day and same timeslot
       if (s.day !== selectedDay || s.timeSlotId !== editingCell.timeSlotId) return false;
-      
-      // Skip if it's the exact same session record we are editing
       if (editingCell.session && s.id === editingCell.session.id) return false;
-      
+      if (s.taId !== editingCell.taId) return false;
+      // Skip not working tier
+      if (s.tier === TIERS.NOT_WORKING) return false;
+      return true;
+    });
+  }, [sessions, selectedDay, editingCell]);
+
+  // Check if the current Student/Subject is already assigned to another TA in this slot
+  const studentConflictSession = useMemo(() => {
+    if (!editingCell || !modalSubject.trim()) return null;
+    return sessions.find(s => {
+      if (s.day !== selectedDay || s.timeSlotId !== editingCell.timeSlotId) return false;
+      if (editingCell.session && s.id === editingCell.session.id) return false;
+      // Don't flag if it's the same TA (that's handled by TA conflict)
+      if (s.taId === editingCell.taId) return false;
       // Filter out duplicate checks for general school breaks or lunches
       if (s.tier !== TIERS.CRITICAL && s.tier !== TIERS.HIGH_NEEDS) return false;
       if (modalTier !== TIERS.CRITICAL && modalTier !== TIERS.HIGH_NEEDS) return false;
       
-      // Verify if student names or initials match up cleanly
       return isStudentMatch(s.subject, modalSubject);
     });
   }, [modalSubject, modalTier, sessions, selectedDay, editingCell]);
 
-  // Explicit dynamic lookup to locate and resolve the conflicting TA's actual name
-  const duplicateTaName = useMemo(() => {
-    if (!duplicateSession) return '';
-    const lookupId = duplicateSession.taId;
-    const foundTa = users.find(u => u.id === lookupId) || INITIAL_USERS.find(u => u.id === lookupId);
-    
-    if (foundTa) return foundTa.name;
-    
-    // Fuzzy/approximate lookup fallbacks if synced IDs slightly differ
-    const approximateTa = users.find(u => u.id?.toLowerCase().includes(String(lookupId).toLowerCase())) || 
-                          INITIAL_USERS.find(u => u.id?.toLowerCase().includes(String(lookupId).toLowerCase()));
-    
-    if (approximateTa) return approximateTa.name;
-    return `TA (${lookupId || 'Unknown ID'})`;
-  }, [duplicateSession, users]);
+  const taConflictTaName = useMemo(() => {
+    if (!editingCell || !editingCell.taId) return '';
+    const found = users.find(u => u.id === editingCell.taId) || INITIAL_USERS.find(u => u.id === editingCell.taId);
+    return found ? found.name : 'Selected Teacher Aide';
+  }, [editingCell, users]);
 
-  const isSubmitDisabled = duplicateSession && !overrideConfirm;
+  const studentConflictTaName = useMemo(() => {
+    if (!studentConflictSession) return '';
+    const lookupId = studentConflictSession.taId;
+    const found = users.find(u => u.id === lookupId) || INITIAL_USERS.find(u => u.id === lookupId);
+    return found ? found.name : 'Another Teacher Aide';
+  }, [studentConflictSession, users]);
+
+  const isSubmitDisabled = (taConflictSession || studentConflictSession) && !overrideConfirm;
 
   const directAbsences = absences.filter(a => {
     if (a.status !== 'Pending') return false;
@@ -1486,7 +1492,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       />
                       <button
                         onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')}
-                        className="px-4 py-2.5 bg-slate-755 hover:bg-slate-800 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
+                        className="px-4 py-2.5 bg-slate-750 hover:bg-slate-800 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
                       >
                         Send Reply & Archive
                       </button>
@@ -1745,15 +1751,26 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               </div>
 
               {/* Dynamic Double-Allocation Alert Check box display */}
-              {duplicateSession && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-2 text-xs text-amber-800 animate-fade-in shadow-xs">
+              {(taConflictSession || studentConflictSession) && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 text-xs text-amber-800 animate-fade-in shadow-xs">
                   <div className="flex items-center gap-2 font-bold text-amber-900">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                    <span>Double-Allocation Detected!</span>
+                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 animate-pulse" />
+                    <span>Double-Allocation Warning!</span>
                   </div>
-                  <p className="leading-relaxed">
-                    Teacher Aide <strong>{duplicateTaName}</strong> is already assigned to support <strong>"{duplicateSession.subject}"</strong> on {selectedDay} during this timeslot ({TIME_SLOTS.find(t => t.id === editingCell.timeSlotId)?.label}).
-                  </p>
+                  
+                  <div className="space-y-2 leading-relaxed">
+                    {taConflictSession && (
+                      <p>
+                        ⚠️ Teacher Aide <strong>{taConflictTaName}</strong> is already scheduled for <strong>"{taConflictSession.subject}"</strong> on {selectedDay} during this timeslot ({TIME_SLOTS.find(t => t.id === editingCell.timeSlotId)?.label}).
+                      </p>
+                    )}
+                    {studentConflictSession && (
+                      <p>
+                        ⚠️ Student receiving support (<strong>"{modalSubject}"</strong>) is already scheduled with Teacher Aide <strong>{studentConflictTaName}</strong> during this timeslot.
+                      </p>
+                    )}
+                  </div>
+
                   <label className="flex items-center gap-2.5 mt-2 cursor-pointer select-none font-bold text-amber-955">
                     <input 
                       type="checkbox" 
@@ -1761,7 +1778,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       onChange={(e) => setOverrideConfirm(e.target.checked)} 
                       className="w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500 cursor-pointer" 
                     />
-                    <span>Allow double-up (Job-sharing / Joint support)</span>
+                    <span>Allow double-up (Joint support / Job-sharing)</span>
                   </label>
                 </div>
               )}
