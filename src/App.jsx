@@ -41,7 +41,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Get clean dynamic application namespace and replace slashes to ensure it never splits into multiple segments
+// Rule 1: Get clean dynamic application namespace and replace slashes to ensure it never splits into multiple segments
 const getCleanAppId = () => {
   const rawId = typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production";
   return rawId.replace(/\//g, '_');
@@ -130,6 +130,7 @@ const TIME_SLOTS = [
   { id: 't13', start: '2:30', end: '3:00', label: '2:30 - 3:00' }
 ];
 
+// Cleaned up INITIAL_USERS defaults to keep only those with first and last names
 const INITIAL_USERS = [
   { id: 'senco_cathie', name: 'Cathie Zelas', role: ROLES.SENCO, roles: [ROLES.SENCO], email: 'cathie@halswell.school.nz', team: TEAMS.Y0_4 },
   { id: 'senco_tracey', name: 'Tracey Mora', role: ROLES.SENCO, roles: [ROLES.SENCO], email: 'tracey@halswell.school.nz', team: TEAMS.Y5_8 },
@@ -142,12 +143,7 @@ const INITIAL_USERS = [
   { id: 'tl1', name: 'Greta Parkes-Dolan', role: ROLES.TEAM_LEADER, roles: [ROLES.TEAM_LEADER, ROLES.TEACHER], email: 'davis@school.edu', team: TEAMS.Y5_8 },
   { id: 't_val', name: 'Val Murray', role: ROLES.TA, roles: [ROLES.TA], email: 'val.murray@school.nz', team: TEAMS.Y5_8, allocatedSenco: 'senco_tracey' },
   { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, roles: [ROLES.TA], email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
-  { id: 't_praboda', name: 'Prabodha', role: ROLES.TA, roles: [ROLES.TA], email: 'praboda@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
-  { id: 't_tiffany', name: 'Tiffany', role: ROLES.TA, roles: [ROLES.TA], email: 'tiffany@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
-  { id: 't_jenny', name: 'Jenny Randall', role: ROLES.ORS_TEACHER, roles: [ROLES.ORS_TEACHER, ROLES.TEACHER], email: 'jenny@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
-  { id: 't_tara', name: 'Tara', role: ROLES.TA, roles: [ROLES.TA], email: 'tara@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
-  { id: 't_helena', name: 'Helena', role: ROLES.TA, roles: [ROLES.TA], email: 'helena@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
-  { id: 't_marcela', name: 'Marcela', role: ROLES.TA, roles: [ROLES.TA], email: 'marcela@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
+  { id: 't_jenny', name: 'Jenny Randall', role: ROLES.ORS_TEACHER, roles: [ROLES.ORS_TEACHER, ROLES.TEACHER], email: 'jenny@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' }
 ];
 
 const INITIAL_ABSENCES = [
@@ -292,8 +288,15 @@ function App() {
     const seenEmails = new Set();
     const seenNames = new Set();
 
+    const hasFirstAndLastName = (name) => {
+      if (!name) return false;
+      const parts = name.trim().split(/\s+/);
+      return parts.length >= 2;
+    };
+
     // 1. Add current Firestore database entries (including newly added staff/TAs)
     users.forEach(u => {
+      if (!hasFirstAndLastName(u.name)) return; // Skip if only first name is used
       const emailKey = u.email?.toLowerCase().trim();
       const nameKey = u.name?.toLowerCase().trim();
       const idKey = u.id;
@@ -307,6 +310,7 @@ function App() {
 
     // 2. Add local defaults as safety fallbacks
     INITIAL_USERS.forEach(iu => {
+      if (!hasFirstAndLastName(iu.name)) return; // Skip if only first name is used
       const emailKey = iu.email?.toLowerCase().trim();
       const nameKey = iu.name?.toLowerCase().trim();
       const idKey = iu.id;
@@ -454,7 +458,7 @@ function App() {
           </div>
           
           <h1 className="text-[32px] font-bold text-[#1a1f36] mb-1 tracking-tight">Support Link</h1>
-          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.1em] mb-8 uppercase text-center">Halswell School TA Management Portal</p>
+          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.15em] uppercase mt-0.5">Halswell School TA Management Portal</p>
 
           <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 space-y-6 animate-fade-in flex flex-col items-stretch">
             <form onSubmit={handleEmailLoginSubmit} className="space-y-4">
@@ -1798,7 +1802,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
               <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
-                {users.filter(u => u.roles?.includes(ROLES.TA) || u.roles?.includes(ROLES.ORS_TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(u => (
+                {safeUsers.filter(u => u.roles?.includes(ROLES.TA) || u.roles?.includes(ROLES.ORS_TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(u => (
                   <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-xs hover:border-[#6157e8]/25 transition-all">
                     <div>
                       <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
@@ -1815,10 +1819,10 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                         <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider space-y-0.5 mt-2">
                           <div>SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span></div>
                           {u.allocatedTeacher && (
-                            <div>Teacher: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeacher)?.name || 'Assigned'}</span></div>
+                            <div>Teacher: <span className="text-[#6157e8]">{safeUsers.find(x => x.id === u.allocatedTeacher)?.name || 'Assigned'}</span></div>
                           )}
                           {u.allocatedTeamLeader && (
-                            <div>Team Leader: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeamLeader)?.name || 'Assigned'}</span></div>
+                            <div>Team Leader: <span className="text-[#6157e8]">{safeUsers.find(x => x.id === u.allocatedTeamLeader)?.name || 'Assigned'}</span></div>
                           )}
                         </div>
                       )}
