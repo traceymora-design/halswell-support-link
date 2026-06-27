@@ -1371,10 +1371,20 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     });
   }, [modalSubject, modalTier, sessions, selectedDay, editingCell]);
 
+  // Explicit dynamic lookup to locate and resolve the conflicting TA's actual name
   const duplicateTaName = useMemo(() => {
     if (!duplicateSession) return '';
-    const ta = users.find(u => u.id === duplicateSession.taId) || INITIAL_USERS.find(u => u.id === duplicateSession.taId);
-    return ta ? ta.name : 'Another Teacher Aide';
+    const lookupId = duplicateSession.taId;
+    const foundTa = users.find(u => u.id === lookupId) || INITIAL_USERS.find(u => u.id === lookupId);
+    
+    if (foundTa) return foundTa.name;
+    
+    // Fuzzy/approximate lookup fallbacks if synced IDs slightly differ
+    const approximateTa = users.find(u => u.id?.toLowerCase().includes(String(lookupId).toLowerCase())) || 
+                          INITIAL_USERS.find(u => u.id?.toLowerCase().includes(String(lookupId).toLowerCase()));
+    
+    if (approximateTa) return approximateTa.name;
+    return `TA (${lookupId || 'Unknown ID'})`;
   }, [duplicateSession, users]);
 
   const isSubmitDisabled = duplicateSession && !overrideConfirm;
@@ -2105,7 +2115,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                     <span>Double-Allocation Detected!</span>
                   </div>
                   <p className="leading-relaxed">
-                    <strong>{duplicateTaName}</strong> is already assigned to support <strong>"{duplicateSession.subject}"</strong> on {selectedDay} during this timeslot ({TIME_SLOTS.find(t => t.id === editingCell.timeSlotId)?.label}).
+                    Teacher Aide <strong>{duplicateTaName}</strong> is already assigned to support <strong>"{duplicateSession.subject}"</strong> on {selectedDay} during this timeslot ({TIME_SLOTS.find(t => t.id === editingCell.timeSlotId)?.label}).
                   </p>
                   <label className="flex items-center gap-2.5 mt-2 cursor-pointer select-none font-bold text-amber-950">
                     <input 
