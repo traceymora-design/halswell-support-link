@@ -345,6 +345,17 @@ function App() {
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
+  // RULE OF HOOKS: Place the useMemo at the very top of the App component before ANY early returns
+  const safeUsers = useMemo(() => {
+    const merged = [...users];
+    INITIAL_USERS.forEach(iu => {
+      if (!merged.some(u => u.id === iu.id)) {
+        merged.push(iu);
+      }
+    });
+    return merged;
+  }, [users]);
+
   useEffect(() => {
     if (currentUser) {
       const availableRoles = currentUser.roles || [currentUser.role];
@@ -674,7 +685,7 @@ function App() {
                 <div className="text-[9px] font-bold text-slate-400 uppercase text-left">SENCO Admins:</div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button onClick={() => handleBypassSignIn('senco_cathie')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-700 font-semibold border rounded text-[11px] transition-colors">Cathie (SENCO Y0-4)</button>
-                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
+                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
                 </div>
               </div>
               
@@ -692,20 +703,6 @@ function App() {
       </div>
     );
   }
-
-  // Globally merge fetched Firestore users with initial local user arrays to prevent missing profile links
-  const safeUsers = useMemo(() => {
-    const merged = [...users];
-    INITIAL_USERS.forEach(iu => {
-      if (!merged.some(u => u.id === iu.id)) {
-        merged.push(iu);
-      }
-    });
-    return merged;
-  }, [users]);
-
-  const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
-  const safeAbsences = absences || [];
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
@@ -1084,7 +1081,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
 
       {showAbsenceForm && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl space-y-4 animate-fade-in max-w-lg w-full max-h-[95vh] overflow-y-auto">
+          <div className="bg-white p-6 rounded-3xl border border-red-200 shadow-2xl space-y-4 animate-fade-in max-w-lg w-full max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h4 className="font-bold text-slate-800 text-md flex items-center gap-2">
                 <AlertCircle className="text-red-500 w-5 h-5" />
