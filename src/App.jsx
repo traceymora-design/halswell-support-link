@@ -693,7 +693,17 @@ function App() {
     );
   }
 
-  const safeUsers = users.length > 0 ? users : INITIAL_USERS;
+  // Globally merge fetched Firestore users with initial local user arrays to prevent missing profile links
+  const safeUsers = useMemo(() => {
+    const merged = [...users];
+    INITIAL_USERS.forEach(iu => {
+      if (!merged.some(u => u.id === iu.id)) {
+        merged.push(iu);
+      }
+    });
+    return merged;
+  }, [users]);
+
   const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
   const safeAbsences = absences || [];
 
@@ -1269,7 +1279,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                   </span>
                   <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
                     a.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' : 
-                    a.status.startsWith('Approved') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+                    a.status.startsWith('Approved') ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
                   }`}>{a.status.startsWith('Approved') ? 'Approved' : a.status}</span>
                 </div>
                 
