@@ -151,7 +151,7 @@ const INITIAL_USERS = [
   { id: 't_ruby', name: 'Ruby Gray', role: ROLES.TA, roles: [ROLES.TA], email: 'ruby.gray@halswell.school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
   { id: 't_praboda', name: 'Prabodha', role: ROLES.TA, roles: [ROLES.TA], email: 'praboda@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
   { id: 't_tiffany', name: 'Tiffany', role: ROLES.TA, roles: [ROLES.TA], email: 'tiffany@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
-  { id: 't_jenny', name: 'Jenny', role: ROLES.ORS_TEACHER, roles: [ROLES.ORS_TEACHER], email: 'jenny@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
+  { id: 't_jenny', name: 'Jenny Randall', role: ROLES.ORS_TEACHER, roles: [ROLES.ORS_TEACHER, ROLES.TEACHER], email: 'jenny@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
   { id: 't_tara', name: 'Tara', role: ROLES.TA, roles: [ROLES.TA], email: 'tara@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' },
   { id: 't_helena', name: 'Helena', role: ROLES.TA, roles: [ROLES.TA], email: 'helena@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_cathie' },
   { id: 't_marcela', name: 'Marcela', role: ROLES.TA, roles: [ROLES.TA], email: 'marcela@school.nz', team: TEAMS.BOTH, allocatedSenco: 'senco_tracey' }
@@ -725,7 +725,7 @@ function App() {
               Ruby Gray (TA)
             </button>
             <button onClick={() => handleBypassSignIn('t_jenny')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 't_jenny' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
-              Jenny (ORS Teacher)
+              Jenny Randall (ORS)
             </button>
             <button onClick={() => handleBypassSignIn('senco_tracey')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser.id === 'senco_tracey' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
               Tracey (SENCO Y5-8)
@@ -1074,7 +1074,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
 
       {showAbsenceForm && (
         <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white p-6 rounded-3xl border border-red-200 shadow-2xl space-y-4 animate-fade-in max-w-lg w-full max-h-[95vh] overflow-y-auto">
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xl space-y-4 animate-fade-in max-w-lg w-full max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h4 className="font-bold text-slate-800 text-md flex items-center gap-2">
                 <AlertCircle className="text-red-500 w-5 h-5" />
@@ -1728,7 +1728,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   </div>
 
                   <div className="space-y-1.5 pl-2">
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center">
+                    <label className="block text-[11px] font-bold text-[#6157e8] uppercase tracking-wider flex items-center">
                       <MessageSquare size={12} className="mr-1 text-[#6157e8]" /> Write a Reply Response Note:
                     </label>
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -2078,7 +2078,10 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none text-sm font-medium text-slate-700 cursor-pointer"
                 >
                   <option value="">None / Self-Directed</option>
-                  {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {users.filter(u => {
+                    const roles = u.roles || [u.role];
+                    return roles.includes(ROLES.TEACHER) || roles.includes(ROLES.ORS_TEACHER);
+                  }).sort((a, b) => a.name.localeCompare(b.name)).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div>
@@ -2192,7 +2195,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
               </h4>
-              <div className="space-y-4 text-xs font-medium border-t border-slate-100 pt-3">
+              <div className="space-y-4 text-xs font-medium">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
                   <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Ruby Gray" />
@@ -2266,7 +2269,10 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                           className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none"
                         >
                           <option value="">None / Select Teacher</option>
-                          {users.filter(u => (u.roles || [u.role]).includes(ROLES.TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                          {users.filter(u => {
+                            const roles = u.roles || [u.role];
+                            return roles.includes(ROLES.TEACHER) || roles.includes(ROLES.ORS_TEACHER);
+                          }).sort((a, b) => a.name.localeCompare(b.name)).map(t => (
                             <option key={t.id} value={t.id}>{t.name}</option>
                           ))}
                         </select>
