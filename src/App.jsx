@@ -345,16 +345,117 @@ function App() {
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
-  // RULE OF HOOKS: Place the useMemo at the very top of the App component before ANY early returns
+  // RULE OF HOOKS: Place clean deduplicated state at the very top of the App component before ANY early returns
   const safeUsers = useMemo(() => {
-    const merged = [...users];
-    INITIAL_USERS.forEach(iu => {
-      if (!merged.some(u => u.id === iu.id)) {
-        merged.push(iu);
+    const merged = [];
+    const seenIds = new Set();
+    const seenEmails = new Set();
+    const seenNames = new Set();
+
+    // 1. Add current Firestore database entries (including newly added staff/TAs)
+    users.forEach(u => {
+      const emailKey = u.email?.toLowerCase().trim();
+      const nameKey = u.name?.toLowerCase().trim();
+      const idKey = u.id;
+      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey)) && (!nameKey || !seenNames.has(nameKey))) {
+        merged.push(u);
+        seenIds.add(idKey);
+        if (emailKey) seenEmails.add(emailKey);
+        if (nameKey) seenNames.add(nameKey);
       }
     });
+
+    // 2. Add local defaults as safety fallbacks
+    INITIAL_USERS.forEach(iu => {
+      const emailKey = iu.email?.toLowerCase().trim();
+      const nameKey = iu.name?.toLowerCase().trim();
+      const idKey = iu.id;
+      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey)) && (!nameKey || !seenNames.has(nameKey))) {
+        merged.push(iu);
+        seenIds.add(idKey);
+        if (emailKey) seenEmails.add(emailKey);
+        if (nameKey) seenNames.add(nameKey);
+      }
+    });
+
     return merged;
   }, [users]);
+
+  // Safely declare safeSessions variable used in dashboard rendering below early return blocks
+  const safeSessions = useMemo(() => {
+    const activeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
+    // Map sessions to make sure they do not reference deleted/invalid TAs
+    return activeSessions.map(s => {
+      const taExists = safeUsers.some(u => u.id === s.taId);
+      if (!taExists && s.taId) {
+        // Orphan-protect it so it renders cleanly as unassigned 'No cover' on the timetable
+        return { ...s, taId: null };
+      }
+      return s;
+    });
+  }, [sessions, safeUsers]);
+
+  // Auth / Sign-in handlers must be declared before any conditional returns
+  const handleSimpleSignIn = (staffObj) => {
+    setCurrentUser(staffObj);
+    addToast(`Signed in as ${staffObj.name}`, 'success');
+  };
+
+  const handleGoogleSignIn = async () => {
+    setVerifyingGoogle(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      if (isSandbox) {
+        handleSimpleSignIn({
+          id: 'senco_tracey',
+          name: 'Tracey Mora',
+          role: ROLES.SENCO,
+          roles: [ROLES.SENCO],
+          email: 'tracey@halswell.school.nz',
+          team: TEAMS.Y5_8
+        });
+        return;
+      }
+
+      try {
+        const result = await signInWithPopup(auth, provider);
+        await handlePostSignIn(result.user);
+      } catch (popupErr) {
+        console.warn("Popup blocked, falling back to secure redirect strategy:", popupErr);
+        await signInWithRedirect(auth, provider);
+      }
+    } catch (e) {
+      console.error("Google Sign-In failed completely:", e);
+      addToast("Secure verification blocked or failed.", "error");
+    } finally {
+      setVerifyingGoogle(false);
+    }
+  };
+
+  const handleBypassSignIn = async (id) => {
+    const found = safeUsers.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id);
+    if (found) {
+      try {
+        await addUserToDb(found);
+      } catch (err) {
+        console.error("Bypass profile save skipped:", err);
+      }
+      setCurrentUser(found);
+      addToast(`Entered view for ${found.name}`, 'success');
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setCurrentUser(null);
+    setAccessDenied(false);
+    addToast("Logged out of session.", "info");
+    try {
+      await signInAnonymously(auth);
+    } catch (err) {
+      console.error("Anonymous fallback failed:", err);
+    }
+  };
 
   useEffect(() => {
     if (currentUser) {
@@ -561,73 +662,6 @@ function App() {
   const deleteSessionFromDb = async (sessionId) => handleDbOp(() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId)));
   const saveAbsenceToDb = async (absenceData) => handleDbOp(() => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData));
 
-  const addToast = (message, type = 'success') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
-  };
-
-  const handleSimpleSignIn = (staffObj) => {
-    setCurrentUser(staffObj);
-    addToast(`Signed in as ${staffObj.name}`, 'success');
-  };
-
-  const handleGoogleSignIn = async () => {
-    setVerifyingGoogle(true);
-    const provider = new GoogleAuthProvider();
-    try {
-      if (isSandbox) {
-        handleSimpleSignIn({
-          id: 'senco_tracey',
-          name: 'Tracey Mora',
-          role: ROLES.SENCO,
-          roles: [ROLES.SENCO],
-          email: 'tracey@halswell.school.nz',
-          team: TEAMS.Y5_8
-        });
-        return;
-      }
-
-      try {
-        const result = await signInWithPopup(auth, provider);
-        await handlePostSignIn(result.user);
-      } catch (popupErr) {
-        console.warn("Popup blocked, falling back to secure redirect strategy:", popupErr);
-        await signInWithRedirect(auth, provider);
-      }
-    } catch (e) {
-      console.error("Google Sign-In failed completely:", e);
-      addToast("Secure verification blocked or failed.", "error");
-    } finally {
-      setVerifyingGoogle(false);
-    }
-  };
-
-  const handleBypassSignIn = async (id) => {
-    const found = users.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id);
-    if (found) {
-      try {
-        await addUserToDb(found);
-      } catch (err) {
-        console.error("Bypass profile save skipped:", err);
-      }
-      setCurrentUser(found);
-      addToast(`Entered view for ${found.name}`, 'success');
-    }
-  };
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    setCurrentUser(null);
-    setAccessDenied(false);
-    addToast("Logged out of session.", "info");
-    try {
-      await signInAnonymously(auth);
-    } catch (err) {
-      console.error("Anonymous fallback failed:", err);
-    }
-  };
-
   if (!authCompleted) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
@@ -685,7 +719,7 @@ function App() {
                 <div className="text-[9px] font-bold text-slate-400 uppercase text-left">SENCO Admins:</div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button onClick={() => handleBypassSignIn('senco_cathie')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-700 font-semibold border rounded text-[11px] transition-colors">Cathie (SENCO Y0-4)</button>
-                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
+                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
                 </div>
               </div>
               
@@ -703,10 +737,6 @@ function App() {
       </div>
     );
   }
-
-  // Safely declare variables used in dashboard rendering below early return blocks
-  const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
-  const safeAbsences = absences || [];
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
@@ -1789,7 +1819,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       <div className="flex items-center gap-3 flex-wrap">
                         <button 
                           onClick={() => handleUpdateAbsenceStatus(a, 'Approved (Leave in Advance)')} 
-                          className="px-4 py-2 bg-[#6157e8] hover:bg-[#5249d6] text-white font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
+                          className="px-4 py-2 bg-[#6157e8] hover:bg-[#5249d6] text-[#ffffff] font-bold text-xs uppercase tracking-wide rounded-lg transition-all shadow-sm"
                         >
                           Approve Advance Leave (Coverage Deferred)
                         </button>
@@ -1860,7 +1890,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       />
                       <button
                         onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')}
-                        className="px-4 py-2.5 bg-slate-750 hover:bg-slate-800 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
+                        className="px-4 py-2.5 bg-slate-755 hover:bg-slate-800 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
                       >
                         Send Reply & Archive
                       </button>
@@ -2216,7 +2246,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
               <h4 className="font-bold text-[#1a1f36] text-sm mb-3">
                 {editingStaff ? `Edit Details: ${editingStaff.name}` : 'Add New Staff'}
               </h4>
-              <div className="space-y-4 text-xs font-medium">
+              <div className="space-y-4 text-xs font-medium border-t border-slate-100 pt-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Staff Full Name</label>
                   <input type="text" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-[#6157e8] outline-none" placeholder="e.g. Ruby Gray" />
