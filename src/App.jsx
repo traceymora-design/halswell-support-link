@@ -345,6 +345,13 @@ function App() {
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
+  // Toast handler defined at the top so it is immediately accessible to state, useMemos, and subfunctions
+  const addToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
+
   // RULE OF HOOKS: Place clean deduplicated state at the very top of the App component before ANY early returns
   const safeUsers = useMemo(() => {
     const merged = [];
@@ -786,7 +793,7 @@ function App() {
             className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all shadow-sm ${
               syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-800 border-emerald-200/85 hover:bg-emerald-100/70' :
               syncStatus === 'saving' ? 'bg-amber-50 text-amber-800 border-amber-200 animate-pulse' :
-              'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+              'bg-rose-50 text-rose-800 border-rose-100 hover:bg-rose-105'
             }`}
           >
             <span className="relative flex h-2 w-2">
@@ -831,7 +838,7 @@ function App() {
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {activeRole === ROLES.SENCO && (
           <SencoDashboard 
-            currentUser={currentUser} users={safeUsers} sessions={safeSessions} absences={safeAbsences} addToast={addToast} 
+            currentUser={currentUser} users={safeUsers} absences={safeAbsences} addToast={addToast} 
             addUserToDb={addUserToDb} deleteUserFromDb={deleteUserFromDb} saveSessionToDb={saveSessionToDb} deleteSessionFromDb={deleteSessionFromDb} saveAbsenceToDb={saveAbsenceToDb}
           />
         )}
@@ -886,15 +893,15 @@ function App() {
               </div>
               <div className="flex justify-between border-b border-slate-200/40 pb-1.5">
                 <span className="text-slate-400">Timetable Assignments</span>
-                <span className="text-slate-800">{safeSessions.length} active duties</span>
+                <span className="#1a1f36">{safeSessions.length} active duties</span>
               </div>
               <div className="flex justify-between border-b border-slate-200/40 pb-1.5">
                 <span className="text-slate-400">Absence Logs Active</span>
-                <span className="text-slate-800">{safeAbsences.length} records</span>
+                <span className="#1a1f36">{safeAbsences.length} records</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Last Synced Timestamp</span>
-                <span className="text-slate-800">{lastSavedTime} NZST</span>
+                <span className="#1a1f36">{lastSavedTime} NZST</span>
               </div>
             </div>
 
@@ -1037,7 +1044,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         </div>
         <button 
           onClick={() => setShowAbsenceForm(true)} 
-          className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all shadow-sm"
+          className="w-full md:w-auto px-5 py-3 bg-[#e04f64] hover:bg-[#c93e53] text-white rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all shadow-sm"
         >
           Report Absence / Leave
         </button>
@@ -1468,7 +1475,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         allocatedTeamLeader: (newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) ? newStaffTeamLeader : ''
       };
       addUserToDb(updatedStaff);
-      addToast(`${newStaffName} updated successfully.`, 'success');
+      addToast(`Updated details for ${newStaffName}.`, 'success');
       setEditingStaff(null);
     } else {
       const newStaff = {
@@ -1483,7 +1490,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         allocatedTeamLeader: (newStaffRoles.includes(ROLES.TA) || newStaffRoles.includes(ROLES.ORS_TEACHER)) ? newStaffTeamLeader : ''
       };
       addUserToDb(newStaff);
-      addToast(`${newStaffName} added successfully.`, 'success');
+      addToast(`Added new profile for ${newStaffName}.`, 'success');
     }
 
     setNewStaffName('');
