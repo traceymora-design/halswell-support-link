@@ -12,15 +12,19 @@ import {
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 
+// Parse environmental or sandbox configurations safely
 const getFirebaseConfig = () => {
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
-      const parsed = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+      const parsed = typeof __firebase_config === 'string' 
+        ? JSON.parse(__firebase_config) 
+        : __firebase_config;
       if (parsed && parsed.apiKey) return parsed;
     } catch (e) {
-      console.error("Failed to parse sandbox config", e);
+      console.error("Failed to parse sandbox environment config", e);
     }
   }
+  
   return {
     apiKey: "AIzaSyDnWi7OUCjyApvDC0nclGBKWJaaCc-Cr1s",
     authDomain: "support-link-app.firebaseapp.com",
@@ -37,7 +41,12 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const appId = (typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production").replace(/\//g, '_');
+// Get clean dynamic application namespace and replace slashes to ensure it never splits into multiple segments
+const getCleanAppId = () => {
+  const rawId = typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production";
+  return rawId.replace(/\//g, '_');
+};
+const appId = getCleanAppId();
 
 const isSandbox = typeof window !== 'undefined' && (
   window.location.hostname === 'localhost' || 
@@ -75,21 +84,34 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 const isStudentMatch = (subjectText, studentText) => {
   if (!subjectText || !studentText) return false;
-  const clean = (str) => str.toLowerCase()
-    .replace(/^(support|check|check-in|supervise|monitor|check|critical|high needs)\s+/i, '')
-    .replace(/[^a-z0-9]/g, '').trim();
-  return clean(subjectText).includes(clean(studentText)) || clean(studentText).includes(clean(subjectText));
+  
+  const cleanString = (str) => {
+    return str.toLowerCase()
+      .replace(/^(support|check|check-in|supervise|monitor|check|critical|high needs)\s+/i, '')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+  };
+  
+  const cleanedSubject = cleanString(subjectText);
+  const cleanedStudent = cleanString(studentText);
+  
+  return cleanedSubject.includes(cleanedStudent) || cleanedStudent.includes(cleanedSubject);
 };
 
 const isSencoSupervisingTa = (senco, ta) => {
   if (!senco || !ta) return false;
   if (senco.team === TEAMS.ALL) return true;
+  
   if (ta.allocatedSenco) {
     if (ta.allocatedSenco === senco.id) return true;
-    if (ta.allocatedSenco === 'senco_tracey' && senco.id === 'senco_tracey') return true;
-    if (ta.allocatedSenco === 'senco_cathie' && senco.id === 'senco_cathie') return true;
+    if (ta.allocatedSenco === 'senco_tracey' && (senco.id === 'senco_tracey' || senco.name?.toLowerCase().includes('tracey'))) return true;
+    if (ta.allocatedSenco === 'senco_cathie' && (senco.id === 'senco_cathie' || senco.name?.toLowerCase().includes('cathie'))) return true;
   }
-  return ta.team === TEAMS.BOTH || senco.team === ta.team;
+  
+  if (ta.team === TEAMS.BOTH) return true;
+  if (senco.team === ta.team) return true;
+  
+  return false;
 };
 
 const TIME_SLOTS = [
@@ -256,18 +278,21 @@ function App() {
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
+  // Toast handler defined at the top so it is immediately accessible to state, useMemos, and subfunctions
   const addToast = (message, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
+  // RULE OF HOOKS: Place clean deduplicated state at the very top of the App component before ANY early returns
   const safeUsers = useMemo(() => {
     const merged = [];
     const seenIds = new Set();
     const seenEmails = new Set();
     const seenNames = new Set();
 
+    // 1. Add current Firestore database entries (including newly added staff/TAs)
     users.forEach(u => {
       const emailKey = u.email?.toLowerCase().trim();
       const nameKey = u.name?.toLowerCase().trim();
@@ -280,6 +305,7 @@ function App() {
       }
     });
 
+    // 2. Add local defaults as safety fallbacks
     INITIAL_USERS.forEach(iu => {
       const emailKey = iu.email?.toLowerCase().trim();
       const nameKey = iu.name?.toLowerCase().trim();
@@ -295,17 +321,21 @@ function App() {
     return merged;
   }, [users]);
 
+  // Safely declare safeSessions variable used in dashboard rendering below early return blocks
   const safeSessions = useMemo(() => {
     const activeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
+    // Map sessions to make sure they do not reference deleted/invalid TAs
     return activeSessions.map(s => {
       const taExists = safeUsers.some(u => u.id === s.taId);
       if (!taExists && s.taId) {
+        // Orphan-protect it so it renders cleanly as unassigned 'No cover' on the timetable
         return { ...s, taId: null };
       }
       return s;
     });
   }, [sessions, safeUsers]);
 
+  // Safely declare safeAbsences variable used in dashboard rendering below early return blocks
   const safeAbsences = useMemo(() => {
     return absences || [];
   }, [absences]);
@@ -865,7 +895,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {myAbsences.map(a => (
-              <div key={a.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2 transition-all hover:border-[#6157e8]/30">
+              <div key={a.id} className="p-4 bg-slate-50 rounded-xl border border-[#e2e8f0] shadow-sm flex flex-col gap-2 transition-all hover:border-[#6157e8]/30">
                 <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-slate-700">
                     {a.isAdvance ? `Leave in Advance (${a.formattedDate || a.day})` : `Sick Leave (${a.formattedDate || a.day})`}
@@ -1768,7 +1798,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
               <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
-                {safeUsers.filter(u => u.roles?.includes(ROLES.TA) || u.roles?.includes(ROLES.ORS_TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(u => (
+                {users.filter(u => u.roles?.includes(ROLES.TA) || u.roles?.includes(ROLES.ORS_TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(u => (
                   <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-xs hover:border-[#6157e8]/25 transition-all">
                     <div>
                       <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
@@ -1785,10 +1815,10 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                         <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider space-y-0.5 mt-2">
                           <div>SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span></div>
                           {u.allocatedTeacher && (
-                            <div>Teacher: <span className="text-[#6157e8]">{safeUsers.find(x => x.id === u.allocatedTeacher)?.name || 'Assigned'}</span></div>
+                            <div>Teacher: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeacher)?.name || 'Assigned'}</span></div>
                           )}
                           {u.allocatedTeamLeader && (
-                            <div>Team Leader: <span className="text-[#6157e8]">{safeUsers.find(x => x.id === u.allocatedTeamLeader)?.name || 'Assigned'}</span></div>
+                            <div>Team Leader: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeamLeader)?.name || 'Assigned'}</span></div>
                           )}
                         </div>
                       )}
