@@ -12,19 +12,15 @@ import {
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 
-// Parse environmental or sandbox configurations safely
 const getFirebaseConfig = () => {
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
-      const parsed = typeof __firebase_config === 'string' 
-        ? JSON.parse(__firebase_config) 
-        : __firebase_config;
+      const parsed = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
       if (parsed && parsed.apiKey) return parsed;
     } catch (e) {
-      console.error("Failed to parse sandbox environment config", e);
+      console.error("Failed to parse sandbox config", e);
     }
   }
-  
   return {
     apiKey: "AIzaSyDnWi7OUCjyApvDC0nclGBKWJaaCc-Cr1s",
     authDomain: "support-link-app.firebaseapp.com",
@@ -41,11 +37,14 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const getCleanAppId = () => {
-  const rawId = typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production";
-  return rawId.replace(/\//g, '_');
-};
-const appId = getCleanAppId();
+const appId = (typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production").replace(/\//g, '_');
+
+const isSandbox = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' || 
+  window.location.hostname.includes('web-platform') || 
+  window.location.hostname.includes('sandbox') || 
+  !window.location.hostname.includes('vercel.app')
+);
 
 const ROLES = {
   SENCO: 'SENCO',
@@ -76,15 +75,10 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 const isStudentMatch = (subjectText, studentText) => {
   if (!subjectText || !studentText) return false;
-  const cleanString = (str) => {
-    return str.toLowerCase()
-      .replace(/^(support|check|check-in|supervise|monitor|check|critical|high needs)\s+/i, '')
-      .replace(/[^a-z0-9]/g, '')
-      .trim();
-  };
-  const cleanedSubject = cleanString(subjectText);
-  const cleanedStudent = cleanString(studentText);
-  return cleanedSubject.includes(cleanedStudent) || cleanedStudent.includes(cleanedSubject);
+  const clean = (str) => str.toLowerCase()
+    .replace(/^(support|check|check-in|supervise|monitor|check|critical|high needs)\s+/i, '')
+    .replace(/[^a-z0-9]/g, '').trim();
+  return clean(subjectText).includes(clean(studentText)) || clean(studentText).includes(clean(subjectText));
 };
 
 const isSencoSupervisingTa = (senco, ta) => {
@@ -92,12 +86,10 @@ const isSencoSupervisingTa = (senco, ta) => {
   if (senco.team === TEAMS.ALL) return true;
   if (ta.allocatedSenco) {
     if (ta.allocatedSenco === senco.id) return true;
-    if (ta.allocatedSenco === 'senco_tracey' && (senco.id === 'senco_tracey' || senco.name?.toLowerCase().includes('tracey'))) return true;
-    if (ta.allocatedSenco === 'senco_cathie' && (senco.id === 'senco_cathie' || senco.name?.toLowerCase().includes('cathie'))) return true;
+    if (ta.allocatedSenco === 'senco_tracey' && senco.id === 'senco_tracey') return true;
+    if (ta.allocatedSenco === 'senco_cathie' && senco.id === 'senco_cathie') return true;
   }
-  if (ta.team === TEAMS.BOTH) return true;
-  if (senco.team === ta.team) return true;
-  return false;
+  return ta.team === TEAMS.BOTH || senco.team === ta.team;
 };
 
 const TIME_SLOTS = [
@@ -264,7 +256,6 @@ function App() {
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
 
-  // Toast handler defined at the top so it is immediately accessible to state, useMemos, and subfunctions
   const addToast = (message, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -365,7 +356,6 @@ function App() {
   }, [currentUser]);
 
   useEffect(() => {
-    // Setup simple listener simulation
     const unsubscribeUsers = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
     }, () => {});
@@ -1045,7 +1035,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       day: selectedDay,
       startDate: new Date().toISOString().split('T')[0],
       endDate: new Date().toISOString().split('T')[0],
-      formattedDate: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }),
+      formattedDate: new Date().toLocaleString('en-NZ', { day: 'numeric', month: 'short' }),
       isAdvance: false,
       reason: reasonText,
       status: 'Pending',
@@ -1190,7 +1180,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
         return;
       }
 
-      const targetDays = Object.keys(copyTargetDays).filter(day => copyTargetDays[day] && day !== selectedDay);
+      const targetDays = Object.keys(copyTargetDays).filter(day => day !== selectedDay);
       if (targetDays.length === 0) {
         addToast('Please select at least one other day to copy to.', 'error');
         return;
@@ -2530,6 +2520,209 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
           <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilter }) {
+  // Set default view mode to "all" (Full Grid overview) to change the default rendering as requested
+  const [viewMode, setViewMode] = useState('all'); 
+  
+  const allTas = users.filter(u => {
+    const roles = u.roles || [u.role];
+    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
+  }).sort((a, b) => a.name.localeCompare(b.name));
+  
+  const tas = allTas.filter(ta => {
+    if (!teamFilter || teamFilter === TEAMS.ALL) return true;
+    if (teamFilter === TEAMS.BOTH) return ta.team === TEAMS.BOTH;
+    if (teamFilter === TEAMS.Y0_4) return ta.team === TEAMS.Y0_4 || ta.team === TEAMS.BOTH;
+    if (teamFilter === TEAMS.Y5_8) return ta.team === TEAMS.Y5_8 || ta.team === TEAMS.BOTH;
+    return true;
+  });
+
+  const [activeTaId, setActiveTaId] = useState('');
+
+  useEffect(() => {
+    if (tas.length > 0) {
+      if (!activeTaId || !tas.some(t => t.id === activeTaId)) {
+        setActiveTaId(tas[0].id);
+      }
+    } else {
+      setActiveTaId('');
+    }
+  }, [tas, activeTaId]);
+
+  return (
+    <div className="space-y-4 font-sans">
+      <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
+        </div>
+        <div className="flex bg-slate-200/60 p-1 rounded-xl">
+          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Individual TA</button>
+          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Full Grid</button>
+        </div>
+      </div>
+
+      {viewMode === 'single' ? (
+        <div className="px-1.5 sm:px-6 py-4 space-y-6 animate-fade-in">
+          <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
+            {tas.map(ta => (
+              <button
+                key={ta.id}
+                onClick={() => setActiveTaId(ta.id)}
+                className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 ${
+                  activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                }`}
+              >
+                {ta.name}
+              </button>
+            ))}
+          </div>
+
+          {activeTaId ? (
+            <div className="space-y-4 max-w-2xl mx-auto animate-fade-in">
+              {TIME_SLOTS.map(slot => {
+                const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === activeTaId);
+                const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
+                const IconComponent = style ? style.icon : null;
+
+                return (
+                  <div 
+                    key={slot.id} 
+                    className={`flex items-stretch group ${isEditable ? 'cursor-pointer' : ''}`}
+                    onClick={() => isEditable && onCellClick(slot.id, activeTaId, session)}
+                  >
+                    <div className="w-14 sm:w-28 flex-shrink-0 flex items-center justify-end pr-2.5 sm:pr-6 border-r border-slate-100">
+                      <span className="font-normal text-slate-500 text-xs sm:text-sm text-right leading-tight">{slot.label}</span>
+                    </div>
+
+                    <div className="flex-1 pl-3 sm:pl-6 relative">
+                      {session ? (
+                        <div className={`border-[1.5px] p-4 rounded-[20px] transition-all flex items-center shadow-sm hover:border-[#6157e8]/40 ${style?.wrapper}`}>
+                          <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center mr-4 shadow-sm ${style?.iconBg} ${style?.iconColor}`}>
+                            {IconComponent && <IconComponent size={18} strokeWidth={2.5} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1 gap-2">
+                              <span className={`text-[9px] tracking-wider uppercase ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-400' : 'font-bold'} ${style?.text}`}>
+                                {session.tier}
+                              </span>
+                              {isEditable && (
+                                <span className="opacity-0 group-hover:opacity-100 text-[10px] font-bold text-[#6157e8] transition-opacity">Edit</span>
+                              )}
+                            </div>
+                            
+                            <h4 className={`text-sm leading-tight truncate ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
+                              {session.subject}
+                            </h4>
+                            
+                            {(session.teacherId || session.teacherIds || session.teamLeaderId) && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {(() => {
+                                  const assignedTeachers = session.teacherIds 
+                                    ? users.filter(u => session.teacherIds.includes(u.id)) 
+                                    : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
+                                  if (assignedTeachers.length === 0) return null;
+                                  return (
+                                    <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
+                                      T: {assignedTeachers.map(t => t.name).join(' & ')}
+                                    </span>
+                                  );
+                                })()}
+                                {session.teamLeaderId && (
+                                  <span className="bg-purple-50 text-purple-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
+                                    L: {users.find(u => u.id === session.teamLeaderId)?.name || 'Leader'}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50/50 rounded-[20px] p-4 border border-dashed border-slate-200/80 hover:border-[#6157e8]/50 hover:bg-[#f0efff]/20 transition-all flex items-center justify-between min-h-[72px]">
+                          <span className="text-slate-400 text-xs font-semibold">Free Session</span>
+                          {isEditable && <span className="text-[10px] font-bold text-[#6157e8] opacity-0 group-hover:opacity-100 transition-opacity">+ Assign Duty</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center p-12 bg-slate-50 rounded-[32px] border border-dashed text-slate-400 font-medium">No matching TAs under this team filter.</div>
+          )}
+        </div>
+      ) : (
+        <div className="relative max-h-[75vh] overflow-auto animate-fade-in">
+          <table className="w-full text-left border-collapse min-w-max table-fixed">
+            <thead>
+              <tr>
+                <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
+                {tas.map(ta => (
+                  <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-semibold text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: '220px' }}>
+                    <div className="truncate">{ta.name}</div>
+                    <div className="text-[10px] text-slate-400 font-normal mt-0.5 truncate">{ta.team}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {TIME_SLOTS.map(slot => (
+                <tr key={slot.id} className="hover:bg-slate-50/30 transition-colors">
+                  <td className="p-4 font-normal text-slate-500 text-xs whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
+                    {slot.label}
+                  </td>
+                  {tas.map(ta => {
+                    const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === ta.id);
+                    const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
+                    
+                    return (
+                      <td 
+                        key={`${slot.id}-${ta.id}`} 
+                        className={`p-2 relative group ${isEditable ? 'cursor-pointer' : ''}`}
+                        onClick={() => isEditable && onCellClick(slot.id, ta.id, session)}
+                        style={{ width: '220px' }}
+                      >
+                        {isEditable && (
+                           <div className="absolute inset-2 bg-[#6157e8]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex justify-center items-center z-10 pointer-events-none">
+                              <Edit3 className="text-[#6157e8] w-5 h-5" />
+                           </div>
+                        )}
+                        {session ? (
+                          <div className={`border ${style?.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
+                            <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style?.text}`}>
+                              {session.tier}
+                            </span>
+                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
+                              {session.subject}
+                            </div>
+                            {(() => {
+                              const assignedTeachers = session.teacherIds 
+                                ? users.filter(u => session.teacherIds.includes(u.id)) 
+                                : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
+                              if (assignedTeachers.length === 0) return null;
+                              return (
+                                <span className="text-[9px] font-bold text-slate-400 mt-1 truncate">
+                                  {assignedTeachers.map(t => t.name.split(' ')[0]).join(' & ')}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        ) : (
+                          <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">Free</div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
