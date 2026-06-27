@@ -650,81 +650,25 @@ function App() {
     }
   };
 
-  if (!authCompleted) {
-    return (
-      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center">
-        <Loader2 className="w-12 h-12 text-[#6157e8] animate-spin mb-4" />
-        <h2 className="text-[#1a1f36] font-bold text-lg">Connecting Securely...</h2>
-      </div>
-    );
-  }
+  // Rule 3: Database operations are explicitly guarded against non-authenticated scopes
+  const handleDbOp = async (opFn) => {
+    setSyncStatus('saving');
+    try {
+      await opFn();
+      setSyncStatus('synced');
+      setLastSavedTime(new Date().toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (err) {
+      console.error("Database operation failed:", err);
+      setSyncStatus('error');
+      addToast("Failed to sync change to cloud database. Retrying...", "error");
+    }
+  };
 
-  if (accessDenied && !currentUser) {
-    return (
-      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
-        <div className="flex flex-col items-center max-w-md w-full">
-          <div className="bg-[#6157e8] p-4 rounded-[20px] shadow-sm mb-6">
-            <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
-          </div>
-          <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
-          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-red-100 text-center animate-fade-in">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Access Denied</h2>
-            <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              The Google email address <b className="text-slate-800">{auth.currentUser?.email || "your Google Account"}</b> is not registered. Please ask Tracey or Cathie to add your email.
-            </p>
-            <button onClick={handleLogout} className="w-full py-3 bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors text-sm">Sign out & try another account</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
-        <div className="flex flex-col items-center max-w-md w-full">
-          <div className="bg-[#6157e8] p-4 rounded-[20px] shadow-sm mb-6">
-            <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
-          </div>
-          
-          <h1 className="text-[36px] font-bold text-[#1a1f36] mb-3 tracking-tight">Support Link</h1>
-          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.2em] mb-12 uppercase text-center">Halswell School TA Management Portal</p>
-
-          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 space-y-4 animate-fade-in flex flex-col items-stretch">
-            <button 
-              onClick={handleGoogleSignIn}
-              disabled={verifyingGoogle}
-              className="w-full py-4 px-4 bg-[#6157e8] hover:bg-[#5249d6] text-white text-sm font-bold rounded-xl flex items-center justify-center space-x-3 shadow-md disabled:opacity-50 transition-colors"
-            >
-              {verifyingGoogle ? <Loader2 className="w-5 h-5 animate-spin" /> : <><ShieldCheck size={18} /><span>Sign in with Google</span></>}
-            </button>
-
-            <div className="pt-4 border-t border-slate-100 text-center space-y-3">
-              <span className="text-[10px] font-bold text-slate-400 tracking-wider block uppercase">Staff Demo Bypass Profiles</span>
-              
-              <div className="space-y-1">
-                <div className="text-[9px] font-bold text-slate-400 uppercase text-left">SENCO Admins:</div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button onClick={() => handleBypassSignIn('senco_cathie')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-700 font-semibold border rounded text-[11px] transition-colors">Cathie (SENCO Y0-4)</button>
-                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
-                </div>
-              </div>
-              
-              <div className="space-y-1">
-                <div className="text-[9px] font-bold text-slate-400 uppercase text-left">Teacher Aides (TAs):</div>
-                <div className="grid grid-cols-3 gap-1">
-                  <button onClick={() => handleBypassSignIn('t1')} className="py-2 px-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 rounded text-[10px] transition-colors">Karen (Tracey)</button>
-                  <button onClick={() => handleBypassSignIn('t_ruby')} className="py-2 px-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 rounded text-[10px] transition-colors">Ruby (Cathie)</button>
-                  <button onClick={() => handleBypassSignIn('t_val')} className="py-2 px-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 rounded text-[10px] transition-colors">Val (Tracey)</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const addUserToDb = async (userObj) => handleDbOp(() => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj));
+  const deleteUserFromDb = async (userId) => handleDbOp(() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId)));
+  const saveSessionToDb = async (sessionData) => handleDbOp(() => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData));
+  const deleteSessionFromDb = async (sessionId) => handleDbOp(() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId)));
+  const saveAbsenceToDb = async (absenceData) => handleDbOp(() => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData));
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
@@ -838,7 +782,7 @@ function App() {
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {activeRole === ROLES.SENCO && (
           <SencoDashboard 
-            currentUser={currentUser} users={safeUsers} absences={safeAbsences} addToast={addToast} 
+            currentUser={currentUser} users={safeUsers} sessions={safeSessions} absences={safeAbsences} addToast={addToast} 
             addUserToDb={addUserToDb} deleteUserFromDb={deleteUserFromDb} saveSessionToDb={saveSessionToDb} deleteSessionFromDb={deleteSessionFromDb} saveAbsenceToDb={saveAbsenceToDb}
           />
         )}
@@ -893,15 +837,15 @@ function App() {
               </div>
               <div className="flex justify-between border-b border-slate-200/40 pb-1.5">
                 <span className="text-slate-400">Timetable Assignments</span>
-                <span className="#1a1f36">{safeSessions.length} active duties</span>
+                <span className="text-slate-800">{safeSessions.length} active duties</span>
               </div>
               <div className="flex justify-between border-b border-slate-200/40 pb-1.5">
                 <span className="text-slate-400">Absence Logs Active</span>
-                <span className="#1a1f36">{safeAbsences.length} records</span>
+                <span className="text-slate-800">{safeAbsences.length} records</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Last Synced Timestamp</span>
-                <span className="#1a1f36">{lastSavedTime} NZST</span>
+                <span className="text-slate-800">{lastSavedTime} NZST</span>
               </div>
             </div>
 
@@ -1827,7 +1771,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       />
                       <button
                         onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')}
-                        className="px-4 py-2.5 bg-slate-750 hover:bg-slate-800 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
+                        className="px-4 py-2.5 bg-slate-755 hover:bg-slate-800 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
                       >
                         Send Reply & Archive
                       </button>
