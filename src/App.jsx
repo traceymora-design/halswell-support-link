@@ -7,8 +7,7 @@ import {
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, signInAnonymously, onAuthStateChanged, 
-  GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut,
+  getAuth, signInAnonymously, onAuthStateChanged, signOut,
   setPersistence, browserLocalPersistence, signInWithCustomToken 
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
@@ -26,7 +25,6 @@ const getFirebaseConfig = () => {
     }
   }
   
-  // High-reliability fallback configuration for independent browser hosting
   return {
     apiKey: "AIzaSyDnWi7OUCjyApvDC0nclGBKWJaaCc-Cr1s",
     authDomain: "support-link-app.firebaseapp.com",
@@ -43,24 +41,11 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Rule 1: Get clean dynamic application namespace and replace slashes to ensure it never splits into multiple invalid segments
 const getCleanAppId = () => {
   const rawId = typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production";
   return rawId.replace(/\//g, '_');
 };
 const appId = getCleanAppId();
-
-const isSandboxEnv = () => {
-  if (typeof window === 'undefined') return false;
-  const host = window.location.hostname;
-  return (
-    host === 'localhost' || 
-    host.includes('web-platform') || 
-    host.includes('sandbox') || 
-    !host.includes('vercel.app')
-  );
-};
-const isSandbox = isSandboxEnv();
 
 const ROLES = {
   SENCO: 'SENCO',
@@ -91,33 +76,27 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 const isStudentMatch = (subjectText, studentText) => {
   if (!subjectText || !studentText) return false;
-  
   const cleanString = (str) => {
     return str.toLowerCase()
       .replace(/^(support|check|check-in|supervise|monitor|check|critical|high needs)\s+/i, '')
       .replace(/[^a-z0-9]/g, '')
       .trim();
   };
-  
   const cleanedSubject = cleanString(subjectText);
   const cleanedStudent = cleanString(studentText);
-  
   return cleanedSubject.includes(cleanedStudent) || cleanedStudent.includes(cleanedSubject);
 };
 
 const isSencoSupervisingTa = (senco, ta) => {
   if (!senco || !ta) return false;
   if (senco.team === TEAMS.ALL) return true;
-  
   if (ta.allocatedSenco) {
     if (ta.allocatedSenco === senco.id) return true;
     if (ta.allocatedSenco === 'senco_tracey' && (senco.id === 'senco_tracey' || senco.name?.toLowerCase().includes('tracey'))) return true;
     if (ta.allocatedSenco === 'senco_cathie' && (senco.id === 'senco_cathie' || senco.name?.toLowerCase().includes('cathie'))) return true;
   }
-  
   if (ta.team === TEAMS.BOTH) return true;
   if (senco.team === ta.team) return true;
-  
   return false;
 };
 
@@ -174,30 +153,25 @@ const INITIAL_ABSENCES = [
 ];
 
 let INITIAL_SESSIONS = [];
-
 DAYS.forEach(day => {
   INITIAL_SESSIONS.push({ id: `es_s1_t1_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't1' });
   INITIAL_SESSIONS.push({ id: `es_s1_t2_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't2' });
   INITIAL_SESSIONS.push({ id: `es_s1_t3_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't3' });
   INITIAL_SESSIONS.push({ id: `es_s1_t4_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't4' });
-
   if (day === 'Friday') {
     INITIAL_SESSIONS.push({ id: `es_s1_t5_${day}`, day, taId: 't_marcela', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't5' });
   } else {
     INITIAL_SESSIONS.push({ id: `es_s1_t5_${day}`, day, taId: 't_helena', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't5' });
   }
-
   if (day === 'Monday') {
     INITIAL_SESSIONS.push({ id: `es_s1_t6_${day}`, day, taId: 't_jenny', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't6' });
     INITIAL_SESSIONS.push({ id: `es_s1_t7_${day}`, day, taId: 't_jenny', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't7' });
   }
-
   if (day === 'Friday') {
     INITIAL_SESSIONS.push({ id: `es_s1_t8_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't8' });
   } else {
     INITIAL_SESSIONS.push({ id: `es_s1_t8_${day}`, day, taId: 't_helena', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't8' });
   }
-
   if (day === 'Wednesday') {
     INITIAL_SESSIONS.push({ id: `es_s1_t9_${day}`, day, taId: 't_marcela', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't9' });
     INITIAL_SESSIONS.push({ id: `es_s1_t10_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't10' });
@@ -205,64 +179,21 @@ DAYS.forEach(day => {
     INITIAL_SESSIONS.push({ id: `es_s1_t9_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't9' });
     INITIAL_SESSIONS.push({ id: `es_s1_t10_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't10' });
   }
-
   if (day === 'Thursday') {
     INITIAL_SESSIONS.push({ id: `es_s1_t11_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't11' });
   } else {
     INITIAL_SESSIONS.push({ id: `es_s1_t11_${day}`, day, taId: 't_marcela', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't11' });
   }
-
   INITIAL_SESSIONS.push({ id: `es_s1_t12_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't12' });
   INITIAL_SESSIONS.push({ id: `es_s1_t13_${day}`, day, taId: 't_praboda', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't13' });
-
   INITIAL_SESSIONS.push({ id: `hw_s1_t2_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W', timeSlotId: 't2' });
   INITIAL_SESSIONS.push({ id: `hw_s1_t6_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W', timeSlotId: 't6' });
-  INITIAL_SESSIONS.push({ 
-    id: `hw_s1_t7_${day}`, 
-    day, 
-    taId: day === 'Friday' ? 't1' : 't_praboda', 
-    teacherId: 'u4', 
-    tier: TIERS.LUNCH, 
-    subject: 'H.W',
-    timeSlotId: 't7'
-  });
-  INITIAL_SESSIONS.push({ 
-    id: `hw_s1_t9_${day}`, 
-    day, 
-    taId: day === 'Friday' ? 't_tara' : 't_tiffany', 
-    teacherId: 'u2', 
-    tier: TIERS.HIGH_NEEDS, 
-    subject: 'H.W',
-    timeSlotId: 't9'
-  });
+  INITIAL_SESSIONS.push({ id: `hw_s1_t7_${day}`, day, taId: day === 'Friday' ? 't1' : 't_praboda', teacherId: 'u4', tier: TIERS.LUNCH, subject: 'H.W', timeSlotId: 't7' });
+  INITIAL_SESSIONS.push({ id: `hw_s1_t9_${day}`, day, taId: day === 'Friday' ? 't_tara' : 't_tiffany', teacherId: 'u2', tier: TIERS.HIGH_NEEDS, subject: 'H.W', timeSlotId: 't9' });
   INITIAL_SESSIONS.push({ id: `hw_s1_t10_${day}`, day, taId: 't_jenny', teacherId: 'u5', tier: TIERS.HIGH_NEEDS, subject: 'H.W', timeSlotId: 't10' });
-  INITIAL_SESSIONS.push({ 
-    id: `hw_s1_t11_${day}`, 
-    day, 
-    taId: day === 'Thursday' ? 't_val' : 't_praboda', 
-    teacherId: 'u3', 
-    tier: TIERS.LUNCH, 
-    subject: 'H.W',
-    timeSlotId: 't11'
-  });
-  INITIAL_SESSIONS.push({ 
-    id: `hw_s1_t12_${day}`, 
-    day, 
-    taId: day === 'Friday' ? 't1' : 't_tiffany', 
-    teacherId: 'u2', 
-    tier: TIERS.CRITICAL, 
-    subject: 'H.W',
-    timeSlotId: 't12'
-  });
-  INITIAL_SESSIONS.push({ 
-    id: `hw_s1_t13_${day}`, 
-    day, 
-    taId: day === 'Friday' ? 't1' : 't_tiffany', 
-    teacherId: 'u2', 
-    tier: TIERS.CRITICAL, 
-    subject: 'H.W',
-    timeSlotId: 't13'
-  });
+  INITIAL_SESSIONS.push({ id: `hw_s1_t11_${day}`, day, taId: day === 'Thursday' ? 't_val' : 't_praboda', teacherId: 'u3', tier: TIERS.LUNCH, subject: 'H.W', timeSlotId: 't11' });
+  INITIAL_SESSIONS.push({ id: `hw_s1_t12_${day}`, day, taId: day === 'Friday' ? 't1' : 't_tiffany', teacherId: 'u2', tier: TIERS.CRITICAL, subject: 'H.W', timeSlotId: 't12' });
+  INITIAL_SESSIONS.push({ id: `hw_s1_t13_${day}`, day, taId: day === 'Friday' ? 't1' : 't_tiffany', teacherId: 'u2', tier: TIERS.CRITICAL, subject: 'H.W', timeSlotId: 't13' });
 });
 
 const TIER_STYLES = {
@@ -324,22 +255,10 @@ export default function SafeApp() {
 }
 
 function App() {
-  const [dbUser, setDbUser] = useState(null); 
   const [currentUser, setCurrentUser] = useState(null); 
   const [activeRole, setActiveRole] = useState(null); 
-  const [accessDenied, setAccessDenied] = useState(false);
-  const [isDbReady, setIsDbReady] = useState(false);
-  const [authCompleted, setAuthCompleted] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
-  const [showMobileSync, setShowMobileSync] = useState(false);
-  const [verifyingGoogle, setVerifyingGoogle] = useState(false);
-  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
-
-  const [syncStatus, setSyncStatus] = useState('synced'); 
-  const [lastSavedTime, setLastSavedTime] = useState(() => new Date().toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-  const [showSaveVerificationModal, setShowSaveVerificationModal] = useState(false);
-  const [isVerifyingConnection, setIsVerifyingConnection] = useState(false);
-
+  const [authCompleted, setAuthCompleted] = useState(true);
+  const [emailInput, setEmailInput] = useState('');
   const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [absences, setAbsences] = useState([]);
@@ -352,14 +271,12 @@ function App() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   };
 
-  // RULE OF HOOKS: Place clean deduplicated state at the very top of the App component before ANY early returns
   const safeUsers = useMemo(() => {
     const merged = [];
     const seenIds = new Set();
     const seenEmails = new Set();
     const seenNames = new Set();
 
-    // 1. Add current Firestore database entries (including newly added staff/TAs)
     users.forEach(u => {
       const emailKey = u.email?.toLowerCase().trim();
       const nameKey = u.name?.toLowerCase().trim();
@@ -372,7 +289,6 @@ function App() {
       }
     });
 
-    // 2. Add local defaults as safety fallbacks
     INITIAL_USERS.forEach(iu => {
       const emailKey = iu.email?.toLowerCase().trim();
       const nameKey = iu.name?.toLowerCase().trim();
@@ -388,60 +304,24 @@ function App() {
     return merged;
   }, [users]);
 
-  // Safely declare safeSessions variable used in dashboard rendering below early return blocks
   const safeSessions = useMemo(() => {
     const activeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
-    // Map sessions to make sure they do not reference deleted/invalid TAs
     return activeSessions.map(s => {
       const taExists = safeUsers.some(u => u.id === s.taId);
       if (!taExists && s.taId) {
-        // Orphan-protect it so it renders cleanly as unassigned 'No cover' on the timetable
         return { ...s, taId: null };
       }
       return s;
     });
   }, [sessions, safeUsers]);
 
-  // Safely declare safeAbsences variable used in dashboard rendering below early return blocks
   const safeAbsences = useMemo(() => {
     return absences || [];
   }, [absences]);
 
-  // Auth / Sign-in handlers must be declared before any conditional returns
   const handleSimpleSignIn = (staffObj) => {
     setCurrentUser(staffObj);
     addToast(`Signed in as ${staffObj.name}`, 'success');
-  };
-
-  const handleGoogleSignIn = async () => {
-    setVerifyingGoogle(true);
-    const provider = new GoogleAuthProvider();
-    try {
-      if (isSandbox) {
-        handleSimpleSignIn({
-          id: 'senco_tracey',
-          name: 'Tracey Mora',
-          role: ROLES.SENCO,
-          roles: [ROLES.SENCO],
-          email: 'tracey@halswell.school.nz',
-          team: TEAMS.Y5_8
-        });
-        return;
-      }
-
-      try {
-        const result = await signInWithPopup(auth, provider);
-        await handlePostSignIn(result.user);
-      } catch (popupErr) {
-        console.warn("Popup blocked, falling back to secure redirect strategy:", popupErr);
-        await signInWithRedirect(auth, provider);
-      }
-    } catch (e) {
-      console.error("Google Sign-In failed completely:", e);
-      addToast("Secure verification blocked or failed.", "error");
-    } finally {
-      setVerifyingGoogle(false);
-    }
   };
 
   const handleBypassSignIn = async (id) => {
@@ -457,16 +337,22 @@ function App() {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    setCurrentUser(null);
-    setAccessDenied(false);
-    addToast("Logged out of session.", "info");
-    try {
-      await signInAnonymously(auth);
-    } catch (err) {
-      console.error("Anonymous fallback failed:", err);
+  const handleEmailLoginSubmit = (e) => {
+    e.preventDefault();
+    if (!emailInput.trim()) return;
+    const searchEmail = emailInput.toLowerCase().trim();
+    const matched = safeUsers.find(u => u.email?.toLowerCase().trim() === searchEmail);
+    if (matched) {
+      setCurrentUser(matched);
+      addToast(`Signed in as ${matched.name}`, 'success');
+    } else {
+      addToast("Email not found. Try one of the test profiles or register first.", "error");
     }
+  };
+
+  const handleLogout = async () => {
+    setCurrentUser(null);
+    addToast("Logged out of session.", "info");
   };
 
   useEffect(() => {
@@ -478,200 +364,127 @@ function App() {
     }
   }, [currentUser]);
 
-  // Rule 3 Guard: Strictly authenticate first before performing querying snapshots or writes
-  const handlePostSignIn = async (firebaseUser) => {
-    if (!firebaseUser) return;
-    const email = firebaseUser.email?.toLowerCase();
-    if (!email) return;
-
-    try {
-      const usersSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users'));
-      const fetchedUsersList = usersSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-      
-      const matchedUser = fetchedUsersList.find(u => u.email?.toLowerCase() === email);
-      if (matchedUser) {
-        setCurrentUser(matchedUser);
-        setAccessDenied(false);
-      } else if (fetchedUsersList.length === 0) {
-        const newSenco = {
-          id: 'u' + Date.now(),
-          name: firebaseUser.displayName || 'School Admin',
-          role: ROLES.SENCO,
-          roles: [ROLES.SENCO],
-          email: email,
-          team: TEAMS.ALL
-        };
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newSenco.id), newSenco);
-        setCurrentUser(newSenco);
-        setAccessDenied(false);
-      } else {
-        setCurrentUser(null);
-        setAccessDenied(true);
-      }
-    } catch (err) {
-      console.error("Post-auth mapping failed:", err);
-    }
-  };
-
-  // Rule 3: Auth Before Queries (Strict connection prioritizing __initial_auth_token)
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const persistenceType = browserLocalPersistence;
-        await setPersistence(auth, persistenceType);
+    // Setup simple listener simulation
+    const unsubscribeUsers = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'users'), (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
+    }, () => {});
 
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) {
-        console.error("Auth init failed:", err);
-        // Fallback to anonymous if security token failed
-        try {
-          await signInAnonymously(auth);
-        } catch (e) {
-          console.error("Critical: Anonymous auth fallback also failed:", e);
-        }
-      } finally {
-        setAuthCompleted(true);
-      }
-    };
-    initAuth();
-    
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setDbUser(firebaseUser);
-    });
-    return () => unsubscribe();
-  }, [rememberMe]);
-
-  // Handle live subscriptions cleanly with user authenticated guard (Rule 3)
-  useEffect(() => {
-    if (!authCompleted || !dbUser) return;
-
-    let usersLoaded = false;
-    let sessionsLoaded = false;
-    let absencesLoaded = false;
-
-    const checkReady = () => {
-      if (usersLoaded && sessionsLoaded && absencesLoaded) setIsDbReady(true);
-    };
-
-    const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
-    const unsubUsers = onSnapshot(usersRef, async (snapshot) => {
-      try {
-        const fetchedUsers = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-        setUsers(fetchedUsers);
-        
-        if (fetchedUsers.length === 0) {
-          await handleRestoreDefaultSeeds();
-        }
-
-        if (auth.currentUser && !auth.currentUser.isAnonymous && auth.currentUser.email) {
-          const email = auth.currentUser.email.toLowerCase();
-          const matchedUser = fetchedUsers.find(u => u.email?.toLowerCase() === email);
-          if (matchedUser) {
-            setCurrentUser(matchedUser);
-            setAccessDenied(false);
-          } else {
-            setAccessDenied(true);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to parse snapshots gracefully:", err);
-      }
-      if(!usersLoaded) { usersLoaded = true; checkReady(); }
-    }, (error) => {
-      console.warn("Database listener warning:", error);
-      if(!usersLoaded) { usersLoaded = true; checkReady(); }
-    });
-
-    const sessionsRef = collection(db, 'artifacts', appId, 'public', 'data', 'sessions');
-    const unsubSessions = onSnapshot(sessionsRef, (snapshot) => {
+    const unsubscribeSessions = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'sessions'), (snapshot) => {
       setSessions(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
-      if(!sessionsLoaded) { sessionsLoaded = true; checkReady(); }
-    }, (error) => {
-      if(!sessionsLoaded) { sessionsLoaded = true; checkReady(); }
-    });
+    }, () => {});
 
-    const absencesRef = collection(db, 'artifacts', appId, 'public', 'data', 'absences');
-    const unsubAbsences = onSnapshot(absencesRef, (snapshot) => {
+    const unsubscribeAbsences = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'absences'), (snapshot) => {
       setAbsences(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
-      if(!absencesLoaded) { absencesLoaded = true; checkReady(); }
-    }, (error) => {
-      if(!absencesLoaded) { absencesLoaded = true; checkReady(); }
-    });
+    }, () => {});
 
-    return () => { unsubUsers(); unsubSessions(); unsubAbsences(); };
-  }, [authCompleted, dbUser]);
+    return () => {
+      unsubscribeUsers();
+      unsubscribeSessions();
+      unsubscribeAbsences();
+    };
+  }, []);
 
-  // Strict guard helper for write sessions
-  const handleRestoreDefaultSeeds = async () => {
-    if (!auth.currentUser) {
-      console.warn("Restore seeds aborted: User authentication state not loaded yet.");
-      return;
-    }
-    setSyncStatus('saving');
+  const addUserToDb = async (userObj) => {
     try {
-      const batch = writeBatch(db);
-      
-      const sessionsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'sessions'));
-      sessionsSnapshot.docs.forEach(d => batch.delete(d.ref));
-
-      const absencesSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'absences'));
-      absencesSnapshot.docs.forEach(d => batch.delete(d.ref));
-
-      const usersSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'users'));
-      usersSnapshot.docs.forEach(d => batch.delete(d.ref));
-
-      INITIAL_USERS.forEach(u => {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', u.id);
-        batch.set(docRef, u);
-      });
-
-      INITIAL_SESSIONS.forEach(s => {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sessions', s.id);
-        batch.set(docRef, s);
-      });
-
-      INITIAL_ABSENCES.forEach(a => {
-        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'absences', a.id);
-        batch.set(docRef, a);
-      });
-
-      await batch.commit();
-      setSyncStatus('synced');
-      setLastSavedTime(new Date().toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      addToast("Prised school roster & E.S timetable restored!", "success");
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
     } catch (e) {
       console.error(e);
-      setSyncStatus('error');
-      addToast("Failed to restore default seeds.", "error");
     }
   };
 
-  // Rule 3: Database operations are explicitly guarded against non-authenticated scopes
-  const handleDbOp = async (opFn) => {
-    setSyncStatus('saving');
+  const deleteUserFromDb = async (userId) => {
     try {
-      await opFn();
-      setSyncStatus('synced');
-      setLastSavedTime(new Date().toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    } catch (err) {
-      console.error("Database operation failed:", err);
-      setSyncStatus('error');
-      addToast("Failed to sync change to cloud database. Retrying...", "error");
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  const addUserToDb = async (userObj) => handleDbOp(() => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj));
-  const deleteUserFromDb = async (userId) => handleDbOp(() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId)));
-  const saveSessionToDb = async (sessionData) => handleDbOp(() => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData));
-  const deleteSessionFromDb = async (sessionId) => handleDbOp(() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId)));
-  const saveAbsenceToDb = async (absenceData) => handleDbOp(() => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData));
+  const saveSessionToDb = async (sessionData) => {
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const deleteSessionFromDb = async (sessionId) => {
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const saveAbsenceToDb = async (absenceData) => {
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans">
+        <div className="flex flex-col items-center max-w-md w-full">
+          <div className="bg-[#6157e8] p-4 rounded-[20px] shadow-sm mb-6">
+            <HeartHandshake className="text-white w-10 h-10" strokeWidth={2} />
+          </div>
+          
+          <h1 className="text-[32px] font-bold text-[#1a1f36] mb-1 tracking-tight">Support Link</h1>
+          <p className="text-[11px] font-bold text-[#6157e8] tracking-[0.1em] mb-8 uppercase text-center">Halswell School TA Management Portal</p>
+
+          <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 space-y-6 animate-fade-in flex flex-col items-stretch">
+            <form onSubmit={handleEmailLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
+                <input 
+                  type="email" 
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="name@halswell.school.nz"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-1 focus:ring-[#6157e8] outline-none text-sm font-medium text-slate-700"
+                  required
+                />
+              </div>
+              <button 
+                type="submit"
+                className="w-full py-4 px-4 bg-[#6157e8] hover:bg-[#5249d6] text-white text-sm font-bold rounded-xl flex items-center justify-center shadow-md transition-colors"
+              >
+                <span>Open Portal</span>
+              </button>
+            </form>
+
+            <div className="pt-4 border-t border-slate-100 text-center space-y-3">
+              <span className="text-[10px] font-bold text-slate-400 tracking-wider block uppercase">Staff Demo Bypass Profiles</span>
+              
+              <div className="space-y-1">
+                <div className="text-[9px] font-bold text-slate-400 uppercase text-left">SENCO Admins:</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button onClick={() => handleBypassSignIn('senco_cathie')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-700 font-semibold border rounded text-[11px] transition-colors">Cathie (SENCO Y0-4)</button>
+                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <div className="text-[9px] font-bold text-slate-400 uppercase text-left">Teacher Aides (TAs):</div>
+                <div className="grid grid-cols-3 gap-1">
+                  <button onClick={() => handleBypassSignIn('t1')} className="py-2 px-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 rounded text-[10px] transition-colors">Karen (Tracey)</button>
+                  <button onClick={() => handleBypassSignIn('t_ruby')} className="py-2 px-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 rounded text-[10px] transition-colors">Ruby (Cathie)</button>
+                  <button onClick={() => handleBypassSignIn('t_val')} className="py-2 px-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-200 rounded text-[10px] transition-colors">Val (Tracey)</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans animate-fade-in">
       {isSandbox && (
         <div className="bg-amber-50 border-b border-amber-200/60 px-6 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-amber-800 select-none shadow-inner">
           <div className="flex items-center gap-1.5 font-bold">
@@ -683,19 +496,19 @@ function App() {
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button onClick={() => handleBypassSignIn('t1')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser?.id === 't1' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
-              Karen Cate (TA)
+              Karen (TA)
             </button>
             <button onClick={() => handleBypassSignIn('t_ruby')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser?.id === 't_ruby' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
-              Ruby Gray (TA)
+              Ruby (TA)
             </button>
             <button onClick={() => handleBypassSignIn('t_jenny')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser?.id === 't_jenny' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
-              Jenny Randall (ORS)
+              Jenny (ORS)
             </button>
             <button onClick={() => handleBypassSignIn('senco_tracey')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser?.id === 'senco_tracey' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
-              Tracey (SENCO Y5-8)
+              Tracey (SENCO)
             </button>
             <button onClick={() => handleBypassSignIn('senco_cathie')} className={`px-2 py-1 rounded font-bold text-[10px] transition-all border ${currentUser?.id === 'senco_cathie' ? 'bg-[#6157e8] text-white border-[#6157e8] shadow-sm' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
-              Cathie (SENCO Y0-4)
+              Cathie (SENCO)
             </button>
           </div>
         </div>
@@ -713,7 +526,7 @@ function App() {
         </div>
 
         {currentUser && (currentUser.roles?.length > 1 || [currentUser.role].filter(Boolean).length > 1) && (
-          <div className="flex items-center space-x-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2 shadow-xs transition-all animate-fade-in">
+          <div className="flex items-center space-x-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2 shadow-xs transition-all">
             <span className="text-[10px] font-bold text-[#6157e8] uppercase tracking-wider">Active View:</span>
             <select 
               value={activeRole || ''} 
@@ -731,44 +544,6 @@ function App() {
         )}
         
         <div className="flex items-center space-x-3">
-          <button
-            onClick={() => setShowSaveVerificationModal(true)}
-            title="Check Cloud Sync Security Status"
-            className={`flex items-center space-x-2 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all shadow-sm ${
-              syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-800 border-emerald-200/85 hover:bg-emerald-100/70' :
-              syncStatus === 'saving' ? 'bg-amber-50 text-amber-800 border-amber-200 animate-pulse' :
-              'bg-rose-50 text-rose-800 border-rose-100 hover:bg-rose-105'
-            }`}
-          >
-            <span className="relative flex h-2 w-2">
-              {syncStatus === 'saving' && (
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              )}
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                syncStatus === 'synced' ? 'bg-emerald-500' :
-                syncStatus === 'saving' ? 'bg-amber-500' :
-                'bg-rose-500'
-              }`}></span>
-            </span>
-            <span className="hidden md:inline">
-              {syncStatus === 'synced' ? `Saved to Cloud (${lastSavedTime})` :
-               syncStatus === 'saving' ? 'Saving changes...' :
-               'Sync Interrupted / Error'}
-            </span>
-            <span className="md:hidden">
-              {syncStatus === 'synced' ? 'Saved' :
-               syncStatus === 'saving' ? 'Saving...' :
-               'Error'}
-            </span>
-          </button>
-
-          <button 
-            onClick={() => setShowMobileSync(true)}
-            className="flex items-center space-x-2 bg-[#f8f9fa] hover:bg-[#f1f3f5] text-slate-600 font-bold text-xs tracking-wider uppercase px-4 py-2.5 rounded-xl transition-colors"
-          >
-            <QrCode size={16} className="text-[#6157e8]" />
-            <span>Sync Mobile</span>
-          </button>
           <button 
             onClick={handleLogout}
             className="flex items-center space-x-2 bg-[#f8f9fa] hover:bg-[#f1f3f5] text-slate-500 font-semibold text-xs tracking-wider uppercase px-4 py-2.5 rounded-xl transition-colors"
@@ -798,90 +573,6 @@ function App() {
           />
         )}
       </main>
-
-      {showMobileSync && (
-        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-sm w-full p-8 text-center animate-fade-in">
-            <Smartphone className="w-8 h-8 text-[#6157e8] mx-auto mb-3" />
-            <h3 className="text-xl font-bold mb-2">Sync with Your Phone</h3>
-            <p className="text-slate-500 text-sm mb-6">Scan QR code to synchronize live schedules on your mobile.</p>
-            <div className="bg-white p-6 rounded-2xl border inline-block mb-6 shadow-md">
-              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : 'https://halswell-support-link.vercel.app')}`} alt="QR" className="w-44 h-44 block mx-auto" />
-            </div>
-            <button onClick={() => setShowMobileSync(false)} className="w-full py-3 bg-[#1a1f36] text-white rounded-xl font-bold text-sm shadow-md">Done</button>
-          </div>
-        </div>
-      )}
-
-      {showSaveVerificationModal && (
-        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 text-center animate-fade-in border border-slate-100">
-            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-inner">
-              <ShieldCheck className="w-7 h-7" />
-            </div>
-            <h3 className="text-2xl font-bold text-[#1a1f36] mb-2">Live Cloud Protection</h3>
-            <p className="text-slate-500 text-xs sm:text-sm mb-6 leading-relaxed">
-              Support Link autosaves every single edit instantly. Your changes are securely synchronized to the cloud and will load automatically on your next login!
-            </p>
-
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-left space-y-2.5 text-xs font-semibold mb-6">
-              <div className="flex justify-between border-b border-slate-200/40 pb-1.5">
-                <span className="text-slate-400">Database Status</span>
-                <span className="text-emerald-600 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live & Connected
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-slate-200/40 pb-1.5">
-                <span className="text-slate-400">Total Registered Staff</span>
-                <span className="text-slate-800">{safeUsers.length} profiles</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-200/40 pb-1.5">
-                <span className="text-slate-400">Timetable Assignments</span>
-                <span className="text-slate-800">{safeSessions.length} active duties</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-200/40 pb-1.5">
-                <span className="text-slate-400">Absence Logs Active</span>
-                <span className="text-slate-800">{safeAbsences.length} records</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Last Synced Timestamp</span>
-                <span className="text-slate-800">{lastSavedTime} NZST</span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <button 
-                onClick={async () => {
-                  setIsVerifyingConnection(true);
-                  await new Promise(r => setTimeout(r, 800)); 
-                  setIsVerifyingConnection(false);
-                  addToast("Cloud validation pass: Timetable integrity confirmed!", "success");
-                }}
-                disabled={isVerifyingConnection}
-                className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white font-bold rounded-xl text-sm shadow-md transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isVerifyingConnection ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Verifying Database logs...</span>
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4" />
-                    <span>Run Integrity Verification</span>
-                  </>
-                )}
-              </button>
-              <button 
-                onClick={() => setShowSaveVerificationModal(false)} 
-                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-sm transition-colors"
-              >
-                Close Panel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {toasts.map((toast, idx) => (
         <div key={toast.id} style={{ bottom: `${1 + idx * 4.5}rem` }} className="fixed right-4 z-50">
@@ -2478,7 +2169,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
               >
                 <span>{student}</span>
                 {activeStudent === student && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-ping"></span>
+                  <span className="animate-ping h-1.5 w-1.5 rounded-full bg-yellow-400"></span>
                 )}
               </button>
             ))}
@@ -2839,209 +2530,6 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
           <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
         </div>
       </div>
-    </div>
-  );
-}
-
-function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilter }) {
-  // Set default view mode to "all" (Full Grid overview) to change the default rendering as requested
-  const [viewMode, setViewMode] = useState('all'); 
-  
-  const allTas = users.filter(u => {
-    const roles = u.roles || [u.role];
-    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
-  }).sort((a, b) => a.name.localeCompare(b.name));
-  
-  const tas = allTas.filter(ta => {
-    if (!teamFilter || teamFilter === TEAMS.ALL) return true;
-    if (teamFilter === TEAMS.BOTH) return ta.team === TEAMS.BOTH;
-    if (teamFilter === TEAMS.Y0_4) return ta.team === TEAMS.Y0_4 || ta.team === TEAMS.BOTH;
-    if (teamFilter === TEAMS.Y5_8) return ta.team === TEAMS.Y5_8 || ta.team === TEAMS.BOTH;
-    return true;
-  });
-
-  const [activeTaId, setActiveTaId] = useState('');
-
-  useEffect(() => {
-    if (tas.length > 0) {
-      if (!activeTaId || !tas.some(t => t.id === activeTaId)) {
-        setActiveTaId(tas[0].id);
-      }
-    } else {
-      setActiveTaId('');
-    }
-  }, [tas, activeTaId]);
-
-  return (
-    <div className="space-y-4 font-sans">
-      <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-          {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
-        </div>
-        <div className="flex bg-slate-200/60 p-1 rounded-xl">
-          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Individual TA</button>
-          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Full Grid</button>
-        </div>
-      </div>
-
-      {viewMode === 'single' ? (
-        <div className="px-1.5 sm:px-6 py-4 space-y-6 animate-fade-in">
-          <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
-            {tas.map(ta => (
-              <button
-                key={ta.id}
-                onClick={() => setActiveTaId(ta.id)}
-                className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 ${
-                  activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-                }`}
-              >
-                {ta.name}
-              </button>
-            ))}
-          </div>
-
-          {activeTaId ? (
-            <div className="space-y-4 max-w-2xl mx-auto animate-fade-in">
-              {TIME_SLOTS.map(slot => {
-                const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === activeTaId);
-                const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
-                const IconComponent = style ? style.icon : null;
-
-                return (
-                  <div 
-                    key={slot.id} 
-                    className={`flex items-stretch group ${isEditable ? 'cursor-pointer' : ''}`}
-                    onClick={() => isEditable && onCellClick(slot.id, activeTaId, session)}
-                  >
-                    <div className="w-14 sm:w-28 flex-shrink-0 flex items-center justify-end pr-2.5 sm:pr-6 border-r border-slate-100">
-                      <span className="font-normal text-slate-500 text-xs sm:text-sm text-right leading-tight">{slot.label}</span>
-                    </div>
-
-                    <div className="flex-1 pl-3 sm:pl-6 relative">
-                      {session ? (
-                        <div className={`border-[1.5px] p-4 rounded-[20px] transition-all flex items-center shadow-sm hover:border-[#6157e8]/40 ${style?.wrapper}`}>
-                          <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center mr-4 shadow-sm ${style?.iconBg} ${style?.iconColor}`}>
-                            {IconComponent && <IconComponent size={18} strokeWidth={2.5} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1 gap-2">
-                              <span className={`text-[9px] tracking-wider uppercase ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-400' : 'font-bold'} ${style?.text}`}>
-                                {session.tier}
-                              </span>
-                              {isEditable && (
-                                <span className="opacity-0 group-hover:opacity-100 text-[10px] font-bold text-[#6157e8] transition-opacity">Edit</span>
-                              )}
-                            </div>
-                            
-                            <h4 className={`text-sm leading-tight truncate ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
-                              {session.subject}
-                            </h4>
-                            
-                            {(session.teacherId || session.teacherIds || session.teamLeaderId) && (
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {(() => {
-                                  const assignedTeachers = session.teacherIds 
-                                    ? users.filter(u => session.teacherIds.includes(u.id)) 
-                                    : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
-                                  if (assignedTeachers.length === 0) return null;
-                                  return (
-                                    <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
-                                      T: {assignedTeachers.map(t => t.name).join(' & ')}
-                                    </span>
-                                  );
-                                })()}
-                                {session.teamLeaderId && (
-                                  <span className="bg-purple-50 text-purple-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
-                                    L: {users.find(u => u.id === session.teamLeaderId)?.name || 'Leader'}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-slate-50/50 rounded-[20px] p-4 border border-dashed border-slate-200/80 hover:border-[#6157e8]/50 hover:bg-[#f0efff]/20 transition-all flex items-center justify-between min-h-[72px]">
-                          <span className="text-slate-400 text-xs font-semibold">Free Session</span>
-                          {isEditable && <span className="text-[10px] font-bold text-[#6157e8] opacity-0 group-hover:opacity-100 transition-opacity">+ Assign Duty</span>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center p-12 bg-slate-50 rounded-[32px] border border-dashed text-slate-400 font-medium">No matching TAs under this team filter.</div>
-          )}
-        </div>
-      ) : (
-        <div className="relative max-h-[75vh] overflow-auto animate-fade-in">
-          <table className="w-full text-left border-collapse min-w-max table-fixed">
-            <thead>
-              <tr>
-                <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
-                {tas.map(ta => (
-                  <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-semibold text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: '220px' }}>
-                    <div className="truncate">{ta.name}</div>
-                    <div className="text-[10px] text-slate-400 font-normal mt-0.5 truncate">{ta.team}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {TIME_SLOTS.map(slot => (
-                <tr key={slot.id} className="hover:bg-slate-50/30 transition-colors">
-                  <td className="p-4 font-normal text-slate-500 text-xs whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
-                    {slot.label}
-                  </td>
-                  {tas.map(ta => {
-                    const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === ta.id);
-                    const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
-                    
-                    return (
-                      <td 
-                        key={`${slot.id}-${ta.id}`} 
-                        className={`p-2 relative group ${isEditable ? 'cursor-pointer' : ''}`}
-                        onClick={() => isEditable && onCellClick(slot.id, ta.id, session)}
-                        style={{ width: '220px' }}
-                      >
-                        {isEditable && (
-                           <div className="absolute inset-2 bg-[#6157e8]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex justify-center items-center z-10 pointer-events-none">
-                              <Edit3 className="text-[#6157e8] w-5 h-5" />
-                           </div>
-                        )}
-                        {session ? (
-                          <div className={`border ${style?.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
-                            <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style?.text}`}>
-                              {session.tier}
-                            </span>
-                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
-                              {session.subject}
-                            </div>
-                            {(() => {
-                              const assignedTeachers = session.teacherIds 
-                                ? users.filter(u => session.teacherIds.includes(u.id)) 
-                                : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
-                              if (assignedTeachers.length === 0) return null;
-                              return (
-                                <span className="text-[9px] font-bold text-slate-400 mt-1 truncate">
-                                  {assignedTeachers.map(t => t.name.split(' ')[0]).join(' & ')}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                        ) : (
-                          <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">Free</div>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
