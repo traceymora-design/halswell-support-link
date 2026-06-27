@@ -685,7 +685,7 @@ function App() {
                 <div className="text-[9px] font-bold text-slate-400 uppercase text-left">SENCO Admins:</div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button onClick={() => handleBypassSignIn('senco_cathie')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-700 font-semibold border rounded text-[11px] transition-colors">Cathie (SENCO Y0-4)</button>
-                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
+                  <button onClick={() => handleBypassSignIn('senco_tracey')} className="py-2 px-1 bg-violet-50 hover:bg-violet-100 text-slate-[#1a1f36] font-semibold border rounded text-[11px] transition-colors">Tracey (SENCO Y5-8)</button>
                 </div>
               </div>
               
@@ -703,6 +703,10 @@ function App() {
       </div>
     );
   }
+
+  // Safely declare variables used in dashboard rendering below early return blocks
+  const safeSessions = sessions.length > 0 ? sessions : INITIAL_SESSIONS;
+  const safeAbsences = absences || [];
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
@@ -948,7 +952,7 @@ function App() {
                 )}
               </button>
               <button 
-                onClick={() => {
+                onClick={async () => {
                   setShowSaveVerificationModal(false);
                   setShowResetConfirmModal(true);
                 }}
@@ -1073,7 +1077,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         </div>
         <button 
           onClick={() => setShowAbsenceForm(true)} 
-          className="w-full md:w-auto px-5 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all shadow-sm"
+          className="w-full md:w-auto px-5 py-3 bg-[#e04f64] hover:bg-[#c93e53] text-white rounded-xl font-bold text-xs uppercase tracking-wider text-center transition-all shadow-sm"
         >
           Report Absence / Leave
         </button>
@@ -1276,7 +1280,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                   </span>
                   <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase border ${
                     a.status === 'Pending' ? 'bg-amber-50 text-amber-600 border-amber-200' : 
-                    a.status.startsWith('Approved') ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+                    a.status.startsWith('Approved') ? 'bg-emerald-50 text-emerald-805 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'
                   }`}>{a.status.startsWith('Approved') ? 'Approved' : a.status}</span>
                 </div>
                 
