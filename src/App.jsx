@@ -41,7 +41,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Rule 1: Get clean dynamic application namespace and replace slashes to ensure it never splits into multiple segments
+// Get clean dynamic application namespace and replace slashes to ensure it never splits into multiple segments
 const getCleanAppId = () => {
   const rawId = typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production";
   return rawId.replace(/\//g, '_');
@@ -921,7 +921,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
 
                 <div className="text-slate-500 text-xs italic bg-white border border-slate-100 p-2 rounded-lg mt-1">Reason: "{a.reason}"</div>
                 {a.reply ? (
-                  <div className="bg-violet-50/70 p-3 rounded-xl border border-violet-100 text-xs text-slate-700 mt-1.5 flex flex-col relative shadow-sm">
+                  <div className="bg-violet-50/70 p-3 rounded-xl border border-violet-100 text-xs text-[#334155] mt-1.5 flex flex-col relative shadow-sm">
                     <div className="font-bold text-[#6157e8] text-[9px] uppercase tracking-wider block mb-1 flex items-center gap-1">
                       <Bell size={10} className="text-[#6157e8]" /> SENCO Response Note:
                     </div>
@@ -1486,7 +1486,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                       />
                       <button
                         onClick={() => handleUpdateAbsenceStatus(a, a.isAdvance ? 'Approved (Leave in Advance)' : 'Approved (Sick Leave)')}
-                        className="px-4 py-2.5 bg-slate-750 hover:bg-slate-800 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
+                        className="px-4 py-2.5 bg-slate-755 hover:bg-slate-800 text-white font-bold text-xs uppercase rounded-xl transition-all shadow-sm"
                       >
                         Send Reply & Archive
                       </button>
@@ -1802,7 +1802,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
             <div className="col-span-12 md:col-span-6 flex flex-col min-h-0 overflow-hidden border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
               <h4 className="font-bold text-[#1a1f36] text-xs uppercase tracking-wider text-slate-400 mb-3">Current Staff Members</h4>
               <div className="flex-1 overflow-y-auto space-y-2 pr-2 max-h-[40vh] md:max-h-[55vh]">
-                {safeUsers.filter(u => u.roles?.includes(ROLES.TA) || u.roles?.includes(ROLES.ORS_TEACHER)).sort((a, b) => a.name.localeCompare(b.name)).map(u => (
+                {users.sort((a, b) => a.name.localeCompare(b.name)).map(u => (
                   <div key={u.id} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-xs hover:border-[#6157e8]/25 transition-all">
                     <div>
                       <div className="font-bold text-[#1a1f36] text-sm">{u.name}</div>
@@ -1819,10 +1819,10 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                         <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider space-y-0.5 mt-2">
                           <div>SENCO: <span className="text-[#6157e8]">{u.allocatedSenco === 'senco_cathie' ? 'Cathie' : u.allocatedSenco === 'senco_tracey' ? 'Tracey' : 'None / Both'}</span></div>
                           {u.allocatedTeacher && (
-                            <div>Teacher: <span className="text-[#6157e8]">{safeUsers.find(x => x.id === u.allocatedTeacher)?.name || 'Assigned'}</span></div>
+                            <div>Teacher: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeacher)?.name || 'Assigned'}</span></div>
                           )}
                           {u.allocatedTeamLeader && (
-                            <div>Team Leader: <span className="text-[#6157e8]">{safeUsers.find(x => x.id === u.allocatedTeamLeader)?.name || 'Assigned'}</span></div>
+                            <div>Team Leader: <span className="text-[#6157e8]">{users.find(x => x.id === u.allocatedTeamLeader)?.name || 'Assigned'}</span></div>
                           )}
                         </div>
                       )}
