@@ -139,13 +139,6 @@ const getTierStyle = (tier) => {
   return matchedKey ? TIER_STYLES[matchedKey] : defaultStyle;
 };
 
-// Secure helper to format any staff name into initials
-const toInitials = (name) => {
-  if (!name) return '';
-  const parts = name.trim().split(/\s+/);
-  return parts.map(p => p[0].toUpperCase()).join('.') + '.';
-};
-
 const isStudentMatch = (subjectText, studentText) => {
   if (!subjectText || !studentText) return false;
   const clean = (str) => str.toLowerCase()
@@ -378,7 +371,7 @@ function AppContent() {
         await addUserToDb(found);
       } catch (err) {}
       setCurrentUser(found);
-      addToast(`Signed in as ${toInitials(found.name)}`, 'success');
+      addToast(`Signed in as ${found.name}`, 'success');
     }
   };
 
@@ -389,7 +382,7 @@ function AppContent() {
     const matched = safeUsers.find(u => u.email?.toLowerCase().trim() === searchEmail);
     if (matched) {
       setCurrentUser(matched);
-      addToast(`Signed in as ${toInitials(matched.name)}`, 'success');
+      addToast(`Signed in as ${matched.name}`, 'success');
     } else {
       addToast("Email not registered. Please use a bypass profile below.", "error");
     }
@@ -590,7 +583,7 @@ function AppContent() {
               const u = safeUsers.find(x => x.id === id);
               return (
                 <button key={id} onClick={() => handleBypassSignIn(id)} className={`px-2 py-1 rounded text-[10px] font-bold transition-all border ${currentUser?.id === id ? 'bg-[#6157e8] text-white border-[#6157e8]' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
-                  {u ? toInitials(u.name) : id}
+                  {u ? u.name : id}
                 </button>
               );
             })}
@@ -709,9 +702,9 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
     <div className="animate-fade-in pb-20 max-w-5xl mx-auto space-y-6">
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">{toInitials(user.name)} Timetable Portal</h2>
+          <h2 className="text-2xl font-bold text-slate-800">{user.name} Timetable Portal</h2>
           <p className="text-xs text-slate-400 mt-1 flex items-center">
-            Allocated SENCO: <strong className="ml-1 text-[#6157e8]">{user.allocatedSenco === 'senco_cathie' ? 'C.Z.' : user.allocatedSenco === 'senco_tracey' ? 'T.M.' : 'Shared (None / Both)'}</strong>
+            Allocated SENCO: <strong className="ml-1 text-[#6157e8]">{user.allocatedSenco === 'senco_cathie' ? 'Cathie Zelas' : user.allocatedSenco === 'senco_tracey' ? 'Tracey Mora' : 'Shared (None / Both)'}</strong>
           </p>
         </div>
         <button onClick={() => setShowAbsenceForm(true)} className="px-5 py-3 bg-[#e04f64] hover:bg-[#c93e53] text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-colors shadow-sm">Report Absence / Leave</button>
@@ -783,7 +776,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                       if (assignedTeachers.length === 0) return null;
                       return (
                         <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded mt-1.5">
-                          Teacher: {assignedTeachers.map(t => toInitials(t.name)).join(' & ')}
+                          Teacher: {assignedTeachers.map(t => t.name).join(' & ')}
                         </span>
                       );
                     })()}
@@ -869,13 +862,13 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
   const taConflictTaName = useMemo(() => {
     if (!editingCell?.taId) return '';
     const found = users.find(u => u.id === editingCell.taId);
-    return found ? toInitials(found.name) : 'Selected TA';
+    return found ? found.name : 'Selected TA';
   }, [editingCell, users]);
 
   const studentConflictTaName = useMemo(() => {
     if (!studentConflictSession) return '';
     const found = users.find(u => u.id === studentConflictSession.taId);
-    return found ? toInitials(found.name) : 'Another TA';
+    return found ? found.name : 'Another TA';
   }, [studentConflictSession, users]);
 
   const isSubmitDisabled = (taConflictSession || studentConflictSession) && !overrideConfirm;
@@ -953,7 +946,7 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-2xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold">Welcome back, {toInitials(currentUser.name)}</h2>
+          <h2 className="text-xl font-bold">Welcome back, {currentUser.name}</h2>
           <div className="flex items-center gap-3 mt-1 text-xs">
             <span className="font-semibold text-slate-400">Team:</span>
             <select value={activeTeamFilter} onChange={e => setActiveTeamFilter(e.target.value)} className="bg-slate-100 p-1 rounded font-bold border outline-none cursor-pointer">
@@ -982,8 +975,8 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>
                   <div className="pl-2">
                     <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase">{ta?.team || 'TA Aide'}</span>
-                    <h4 className="font-bold text-slate-800 mt-1">{toInitials(ta?.name || 'Staff Aide')} reported {a.isAdvance ? 'advance leave' : 'sick'} on {a.formattedDate}</h4>
-                    <p className="text-slate-505 text-xs italic mt-2">"{a.reason}"</p>
+                    <h4 className="font-bold text-slate-800 mt-1">{ta?.name || 'Staff Aide'} reported {a.isAdvance ? 'advance leave' : 'sick'} on {a.formattedDate}</h4>
+                    <p className="text-slate-550 text-xs italic mt-2">"{a.reason}"</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <input type="text" placeholder="Write reply note..." value={sencoReplies[a.id] || ''} onChange={e => setSencoReplies({ ...sencoReplies, [a.id]: e.target.value })} className="border p-2 rounded-lg text-xs" />
@@ -1087,7 +1080,7 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
                 <label className="block text-xs font-bold text-slate-505 uppercase mb-2">Teacher</label>
                 <select name="teacherId" value={modalTeacherId} onChange={(e) => setModalTeacherId(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
                   <option value="">None / Self-Directed</option>
-                  {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{toInitials(t.name)}</option>)}
+                  {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
 
@@ -1136,7 +1129,7 @@ function TeamLeaderDashboard({ user, sessions, users }) {
     <div className="space-y-6 animate-fade-in max-w-5xl mx-auto font-sans">
       <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
         <div>
-          <h2 className="text-2xl font-bold text-[#1a1f36]">{toInitials(user.name)} Dashboard</h2>
+          <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
           <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Team Leader View</p>
         </div>
         <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none cursor-pointer">
@@ -1167,7 +1160,7 @@ function TeacherDashboard({ user, sessions, users }) {
     <div className="space-y-6 animate-fade-in max-w-5xl mx-auto font-sans">
       <div className="flex justify-between items-center bg-[#f8fafc] p-6 rounded-[24px] border border-slate-100">
         <div>
-          <h2 className="text-2xl font-bold text-[#1a1f36]">{toInitials(user.name)} Dashboard</h2>
+          <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
           <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Teacher View</p>
         </div>
         <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 cursor-pointer">
@@ -1256,7 +1249,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
 
     if (!matchingSession || !matchingSession.taId) return null;
     const ta = users.find(u => u.id === matchingSession.taId);
-    return ta ? toInitials(ta.name) : null; 
+    return ta ? ta.name : null; 
   };
 
   const totalWeeklySlots = TIME_SLOTS.length * DAYS.length;
@@ -1475,8 +1468,8 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
           {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
         </div>
         <div className="flex bg-slate-200/60 p-1 rounded-xl">
-          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505'}`}>Individual TA</button>
-          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505'}`}>Full Grid</button>
+          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Individual TA</button>
+          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Full Grid</button>
         </div>
       </div>
 
@@ -1491,7 +1484,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                   activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-550'
                 }`}
               >
-                {toInitials(ta.name)}
+                {ta.name}
               </button>
             ))}
           </div>
@@ -1537,12 +1530,12 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                               <div className="mt-2 flex flex-wrap gap-1.5">
                                 {session.teacherId && (
                                   <span className="bg-slate-100 text-slate-600 text-[9px] font-semibold px-2 py-0.5 rounded">
-                                    T: {toInitials(users.find(u => u.id === session.teacherId)?.name || 'Teacher')}
+                                    T: {users.find(u => u.id === session.teacherId)?.name || 'Teacher'}
                                   </span>
                                 )}
                                 {session.teamLeaderId && (
                                   <span className="bg-purple-100 text-purple-700 text-[9px] font-semibold px-2 py-0.5 rounded">
-                                    L: {toInitials(users.find(u => u.id === session.teamLeaderId)?.name || 'Leader')}
+                                    L: {users.find(u => u.id === session.teamLeaderId)?.name || 'Leader'}
                                   </span>
                                 )}
                               </div>
@@ -1572,7 +1565,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                 <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
                 {tas.map(ta => (
                   <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-semibold text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: '220px' }}>
-                    <div className="truncate">{toInitials(ta.name)}</div>
+                    <div className="truncate">{ta.name}</div>
                     <div className="text-[10px] text-slate-400 font-normal mt-0.5 truncate">{ta.team}</div>
                   </th>
                 ))}
@@ -1710,7 +1703,7 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
                     </div>
                     <h4 className="font-bold text-slate-800 text-base">{session.subject}</h4>
                     <p className="text-xs text-slate-500 mt-1">
-                      Current Caretaker: <strong className="text-[#6157e8]">{assignedTa ? toInitials(assignedTa.name) : 'Unassigned'}</strong>
+                      Current Caretaker: <strong className="text-[#6157e8]">{assignedTa ? assignedTa.name : 'Unassigned'}</strong>
                     </p>
                   </div>
 
@@ -1723,7 +1716,7 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
                         if (newTaId) {
                           saveSessionToDb({ ...session, taId: newTaId });
                           const targetTaName = tas.find(t => t.id === newTaId)?.name || 'TA';
-                          addToast(`Reassigned "${session.subject}" to ${toInitials(targetTaName)}`, 'success');
+                          addToast(`Reassigned "${session.subject}" to ${targetTaName}`, 'success');
                         }
                       }}
                       className="w-full md:w-72 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-1 focus:ring-[#6157e8] outline-none cursor-pointer"
@@ -1733,7 +1726,7 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
                         const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
                         return (
                           <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-50"}>
-                            {toInitials(ta.name)} ({availabilityInfo.label})
+                            {ta.name} ({availabilityInfo.label})
                           </option>
                         );
                       })}
@@ -1807,7 +1800,7 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in font-sans">
-        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {toInitials(absentTa?.name)}</h3>
+        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {absentTa?.name}</h3>
         <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
         
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
@@ -1841,7 +1834,7 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
                     const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
                     return (
                       <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-50"}>
-                        {toInitials(ta.name)} ({availabilityInfo.label})
+                        {ta.name} ({availabilityInfo.label})
                       </option>
                     );
                   })}
