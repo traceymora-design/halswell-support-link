@@ -194,23 +194,7 @@ DAYS.forEach(day => {
   INITIAL_SESSIONS.push({ id: `hw_s1_t7_${day}`, day, taId: 't1', teacherId: 'u4', tier: TIERS.LUNCH, subject: 'H.W', timeSlotId: 't7' });
 });
 
-const TIER_STYLES = {
-  [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-[#fff5f6]', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
-  [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-[#fffaf5]', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
-  [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-[#f5f7ff]', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
-  [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
-};
-
-const Toast = ({ message, type = 'success' }) => (
-  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50 animate-fade-in
-    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
-    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
-    <p className="font-medium text-sm">{message}</p>
-  </div>
-);
-
+// Class declarations are not hoisted in JavaScript, so ErrorBoundary must be declared first
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -244,6 +228,14 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+const Toast = ({ message, type = 'success' }) => (
+  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50 animate-fade-in
+    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
+    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
+    <p className="font-medium text-sm">{message}</p>
+  </div>
+);
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -274,7 +266,6 @@ function AppContent() {
     const merged = [];
     const seenIds = new Set();
     const seenEmails = new Set();
-    const seenNames = new Set();
 
     const hasFirstAndLastName = (name) => {
       if (!name) return false;
@@ -284,26 +275,22 @@ function AppContent() {
     users.forEach(u => {
       if (!hasFirstAndLastName(u.name)) return;
       const emailKey = u.email?.toLowerCase().trim();
-      const nameKey = u.name?.toLowerCase().trim();
       const idKey = u.id;
-      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey)) && (!nameKey || !seenNames.has(nameKey))) {
+      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey))) {
         merged.push(u);
         seenIds.add(idKey);
         if (emailKey) seenEmails.add(emailKey);
-        if (nameKey) seenNames.add(nameKey);
       }
     });
 
     INITIAL_USERS.forEach(iu => {
       if (!hasFirstAndLastName(iu.name)) return;
       const emailKey = iu.email?.toLowerCase().trim();
-      const nameKey = iu.name?.toLowerCase().trim();
       const idKey = iu.id;
-      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey)) && (!nameKey || !seenNames.has(nameKey))) {
+      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey))) {
         merged.push(iu);
         seenIds.add(idKey);
         if (emailKey) seenEmails.add(emailKey);
-        if (nameKey) seenNames.add(nameKey);
       }
     });
 
@@ -1235,7 +1222,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       'bg-purple-50 text-purple-800 border-purple-200/50',
       'bg-pink-50 text-pink-800 border-pink-200/50',
       'bg-amber-50 text-amber-800 border-amber-200/50',
-      'bg-indigo-50 text-indigo-800 border-indigo-200/50',
+      'bg-[#f5f3ff] text-violet-800 border-violet-200/50',
       'bg-teal-50 text-teal-800 border-teal-200/50'
     ];
     return colors[hash % colors.length];
@@ -1428,8 +1415,8 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
           {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
         </div>
         <div className="flex bg-slate-200/60 p-1 rounded-xl">
-          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Individual TA</button>
-          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Full Grid</button>
+          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Individual TA</button>
+          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Full Grid</button>
         </div>
       </div>
 
@@ -1441,7 +1428,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                 key={ta.id}
                 onClick={() => setActiveTaId(ta.id)}
                 className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 ${
-                  activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-505 hover:bg-slate-100 hover:text-slate-800'
+                  activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                 }`}
               >
                 {toInitials(ta.name)}
@@ -1574,6 +1561,241 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose, addToast }) {
+  const criticalSessions = sessions.filter(s => 
+    s.day === day && 
+    (s.tier === TIERS.CRITICAL || s.tier === TIERS.HIGH_NEEDS)
+  );
+
+  const tas = users.filter(u => {
+    const roles = u.roles || [u.role];
+    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
+  });
+
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
+  return (
+    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4 font-sans">
+      <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col overflow-hidden border border-amber-200">
+        <div className="border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="text-amber-500 w-6 h-6" />
+              <h3 className="text-2xl font-bold text-[#1a1f36]">Critical Student Coverage Manager</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Directly reallocate available Teacher Aides from other duties to ensure high-priority students on {day} are covered.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          {criticalSessions.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 font-semibold">
+              No Critical or High Needs students require duties on {day}.
+            </div>
+          ) : (
+            criticalSessions.map(session => {
+              const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+              const assignedTa = tas.find(t => t.id === session.taId);
+              
+              const sortedTasForSlot = [...tas].sort((a, b) => {
+                const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+                const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+                if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+                return a.name.localeCompare(b.name);
+              });
+
+              return (
+                <div key={session.id} className="border border-slate-100 bg-slate-50/40 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-amber-300 transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {session.tier}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {slot?.start} - {slot?.end}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-base">{session.subject}</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Current Caretaker: <strong className="text-[#6157e8]">{assignedTa ? toInitials(assignedTa.name) : 'Unassigned'}</strong>
+                    </p>
+                  </div>
+
+                  <div className="w-full md:w-auto">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Reassign Cover (Best Matches First):</label>
+                    <select
+                      value={session.taId || ''}
+                      onChange={(e) => {
+                        const newTaId = e.target.value;
+                        if (newTaId) {
+                          saveSessionToDb({ ...session, taId: newTaId });
+                          const targetTaName = tas.find(t => t.id === newTaId)?.name || 'TA';
+                          addToast(`Reassigned "${session.subject}" to ${toInitials(targetTaName)}`, 'success');
+                        }
+                      }}
+                      className="w-full md:w-72 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-1 focus:ring-[#6157e8] outline-none cursor-pointer"
+                    >
+                      <option value="">-- Select cover TA --</option>
+                      {sortedTasForSlot.map(ta => {
+                        const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
+                        return (
+                          <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-50"}>
+                            {toInitials(ta.name)} ({availabilityInfo.label})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 mt-4 flex justify-end">
+          <button onClick={onClose} className="px-6 py-3 bg-[#1a1f36] hover:bg-black text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-sm transition-all">
+            Close Board
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
+  const absentTa = users.find(u => u.id === absence.taId) || INITIAL_USERS.find(u => u.id === absence.taId);
+  const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
+  
+  const otherTas = users
+    .filter(u => {
+      const roles = u.roles || [u.role];
+      return (roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER)) && u.id !== absence.taId;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  
+  const [assignments, setAssignments] = useState({});
+
+  useEffect(() => {
+    const initial = {};
+    absentSessions.forEach(s => {
+      initial[s.id] = '';
+    });
+    setAssignments(initial);
+  }, [sessions, absence]);
+
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === absence.day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in font-sans">
+        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {toInitials(absentTa?.name)}</h3>
+        <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
+        
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
+          {absentSessions.map(session => {
+            const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+
+            const sortedOtherTas = [...otherTas].sort((a, b) => {
+              const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+              const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+              if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+              return a.name.localeCompare(b.name);
+            });
+
+            return (
+              <div key={session.id} className="border border-slate-100 bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    <span>{slot?.start} - {slot?.end}</span>
+                    <span className="mx-2">•</span>
+                    <span>{session?.tier}</span>
+                  </div>
+                  <div className="font-bold text-[#1a1f36] text-sm">{session?.subject}</div>
+                </div>
+                <select
+                  value={assignments[session.id] || ''}
+                  onChange={(e) => setAssignments(prev => ({ ...prev, [session.id]: e.target.value }))}
+                  className="w-full sm:w-56 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-[#6157e8] outline-none cursor-pointer"
+                >
+                  <option value="">Leave Uncovered</option>
+                  {sortedOtherTas.map(ta => {
+                    const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
+                    return (
+                      <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-50"}>
+                        {toInitials(ta.name)} ({availabilityInfo.label})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-end space-x-3 border-t border-slate-100 pt-4">
+          <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
+          <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
+        </div>
+      </div>
     </div>
   );
 }
