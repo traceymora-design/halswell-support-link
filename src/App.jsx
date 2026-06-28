@@ -117,6 +117,28 @@ const TIERS = {
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
+const TIER_STYLES = {
+  [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-[#fff5f6]', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
+  [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-[#fffaf5]', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
+  [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-[#f5f7ff]', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
+  [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
+  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
+  [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
+};
+
+// Safe case-insensitive fallback style retrieval helper
+const getTierStyle = (tier) => {
+  const defaultStyle = TIER_STYLES[TIERS.ENRICHMENT];
+  if (!tier) return defaultStyle;
+  
+  // Find key matching case-insensitively
+  const matchedKey = Object.keys(TIER_STYLES).find(
+    key => key.toLowerCase() === tier.toLowerCase().trim()
+  );
+  
+  return matchedKey ? TIER_STYLES[matchedKey] : defaultStyle;
+};
+
 // Secure helper to format any staff name into initials
 const toInitials = (name) => {
   if (!name) return '';
@@ -742,7 +764,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
           <div className="text-center p-12 text-slate-400 font-medium">No active support duties allocated for {selectedDay}.</div>
         ) : (
           sortedSessions.map(({ slot, session }) => {
-            const style = TIER_STYLES[session?.tier] || TIER_STYLES[TIERS.ENRICHMENT];
+            const style = getTierStyle(session?.tier);
             const IconComponent = style?.icon || Star;
             return (
               <div key={slot.id} className="flex items-stretch group border-b border-slate-50 pb-4 last:border-0 last:pb-0">
@@ -1478,7 +1500,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
             <div className="space-y-4 max-w-2xl mx-auto animate-fade-in">
               {TIME_SLOTS.map(slot => {
                 const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === activeTaId);
-                const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
+                const style = session ? getTierStyle(session.tier) : null;
                 const IconComponent = style ? style.icon : null;
 
                 return (
@@ -1564,7 +1586,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                   </td>
                   {tas.map(ta => {
                     const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === ta.id);
-                    const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
+                    const style = session ? getTierStyle(session.tier) : null;
                     
                     return (
                       <td 
