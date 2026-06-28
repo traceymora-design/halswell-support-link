@@ -272,17 +272,33 @@ function AppContent() {
       return name.trim().split(/\s+/).length >= 2;
     };
 
+    // Parse users loaded from Google Cloud Firestore
     users.forEach(u => {
       if (!hasFirstAndLastName(u.name)) return;
       const emailKey = u.email?.toLowerCase().trim();
       const idKey = u.id;
       if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey))) {
-        merged.push(u);
+        const defaultUser = INITIAL_USERS.find(iu => iu.id === idKey || (emailKey && iu.email?.toLowerCase().trim() === emailKey));
+        const mergedUser = {
+          ...defaultUser, 
+          ...u            
+        };
+
+        // Self-Healing Logic: Prevent database 'None' or empty overrides from breaking layout guards
+        if (!mergedUser.role || mergedUser.role === 'None' || mergedUser.role === 'none') {
+          mergedUser.role = defaultUser?.role || ROLES.TA;
+        }
+        if (!mergedUser.roles || mergedUser.roles.length === 0 || mergedUser.roles[0] === 'None') {
+          mergedUser.roles = defaultUser?.roles || [mergedUser.role];
+        }
+
+        merged.push(mergedUser);
         seenIds.add(idKey);
         if (emailKey) seenEmails.add(emailKey);
       }
     });
 
+    // Fall back to missing initial user templates safely
     INITIAL_USERS.forEach(iu => {
       if (!hasFirstAndLastName(iu.name)) return;
       const emailKey = iu.email?.toLowerCase().trim();
@@ -309,6 +325,16 @@ function AppContent() {
   }, [sessions, safeUsers]);
 
   const safeAbsences = useMemo(() => absences || [], [absences]);
+
+  // Keep currentUser state in complete sync with safeUsers when database loads updated profiles
+  useEffect(() => {
+    if (currentUser) {
+      const liveUser = safeUsers.find(u => u.id === currentUser.id);
+      if (liveUser && (liveUser.role !== currentUser.role || JSON.stringify(liveUser.roles) !== JSON.stringify(currentUser.roles))) {
+        setCurrentUser(liveUser);
+      }
+    }
+  }, [safeUsers, currentUser]);
 
   // Robust case-insensitive normalizer to prevent blank dashboards from lowercase role mappings
   const normalizedActiveRole = useMemo(() => {
@@ -453,6 +479,15 @@ function AppContent() {
     }
   };
 
+  useEffect(() => {
+    if (currentUser) {
+      const availableRoles = currentUser.roles || [currentUser.role];
+      setActiveRole(availableRoles[0]);
+    } else {
+      setActiveRole(null);
+    }
+  }, [currentUser]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans animate-pulse">
@@ -562,7 +597,7 @@ function AppContent() {
         <button onClick={handleLogout} className="flex items-center space-x-2 bg-[#f8f9fa] hover:bg-[#f1f3f5] text-slate-500 font-semibold text-xs tracking-wider uppercase px-4 py-2.5 rounded-xl transition-colors"><LogOut size={16} /><span>Exit</span></button>
       </header>
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
+      <div className="flex-1 w-full max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {normalizedActiveRole === ROLES.SENCO && (
           <SencoDashboard currentUser={currentUser} users={safeUsers} absences={safeAbsences} sessions={safeSessions} addToast={addToast} addUserToDb={addUserToDb} deleteUserFromDb={deleteUserFromDb} saveSessionToDb={saveSessionToDb} deleteSessionFromDb={deleteSessionFromDb} saveAbsenceToDb={saveAbsenceToDb} />
         )}
@@ -589,7 +624,7 @@ function AppContent() {
             <p className="text-xs text-slate-400 mt-2">Please contact your system administrator or SENCO to configure an authorized dashboard role on your staff profile.</p>
           </div>
         )}
-      </main>
+      </div>
 
       {toasts.map((toast, idx) => (
         <div key={toast.id} style={{ bottom: `${1 + idx * 4.5}rem` }} className="fixed right-4 z-50">
@@ -824,7 +859,6 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
   const isSubmitDisabled = (taConflictSession || studentConflictSession) && !overrideConfirm;
 
   const directAbsences = absences.filter(a => a.status === 'Pending' && isSencoSupervisingTa(currentUser, users.find(u => u.id === a.taId)));
-  const resolvedAbsences = absences.filter(a => a.status !== 'Pending').sort((a,b) => b.id.localeCompare(a.id));
 
   const handleUpdateAbsenceStatus = async (absence, newStatus) => {
     const replyText = sencoReplies[absence.id] || "Approved cover.";
@@ -927,7 +961,7 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
                   <div className="pl-2">
                     <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase">{ta?.team || 'TA Aide'}</span>
                     <h4 className="font-bold text-slate-800 mt-1">{toInitials(ta?.name || 'Staff Aide')} reported {a.isAdvance ? 'advance leave' : 'sick'} on {a.formattedDate}</h4>
-                    <p className="text-slate-500 text-xs italic mt-2">"{a.reason}"</p>
+                    <p className="text-slate-505 text-xs italic mt-2">"{a.reason}"</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <input type="text" placeholder="Write reply note..." value={sencoReplies[a.id] || ''} onChange={e => setSencoReplies({ ...sencoReplies, [a.id]: e.target.value })} className="border p-2 rounded-lg text-xs" />
@@ -1020,15 +1054,15 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
             <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">{editingCell.session ? 'Edit Duty' : 'Assign Duty'}</h3>
             <form onSubmit={(e) => { e.preventDefault(); handleSaveSession({ subject: modalSubject, tier: modalTier, teacherId: modalTeacherId || null, teamLeaderId: modalTeamLeaderId || null }); }} className="space-y-4">
-              <div><label className="block text-xs font-bold text-slate-500 uppercase mb-2">Subject / Student Name</label><input type="text" name="subject" required value={modalSubject} onChange={(e) => setModalSubject(e.target.value)} className="w-full border rounded-xl px-4 py-3 text-slate-700" placeholder="e.g. ESOL / Reading Support..." /></div>
+              <div><label className="block text-xs font-bold text-slate-505 uppercase mb-2">Subject / Student Name</label><input type="text" name="subject" required value={modalSubject} onChange={(e) => setModalSubject(e.target.value)} className="w-full border rounded-xl px-4 py-3 text-slate-700" placeholder="e.g. ESOL / Reading Support..." /></div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Priority Tier</label>
+                <label className="block text-xs font-bold text-slate-505 uppercase mb-2">Priority Tier</label>
                 <select name="tier" value={modalTier} onChange={(e) => setModalTier(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
                   {Object.values(TIERS).map(tier => <option key={tier} value={tier}>{tier}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Teacher</label>
+                <label className="block text-xs font-bold text-slate-505 uppercase mb-2">Teacher</label>
                 <select name="teacherId" value={modalTeacherId} onChange={(e) => setModalTeacherId(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
                   <option value="">None / Self-Directed</option>
                   {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{toInitials(t.name)}</option>)}
@@ -1226,7 +1260,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       'bg-purple-50 text-purple-800 border-purple-200/50',
       'bg-pink-50 text-pink-800 border-pink-200/50',
       'bg-amber-50 text-amber-800 border-amber-200/50',
-      'bg-indigo-50 text-indigo-800 border-indigo-200/50',
+      'bg-[#f5f3ff] text-violet-800 border-violet-200/50',
       'bg-teal-50 text-teal-800 border-teal-200/50'
     ];
     return colors[hash % colors.length];
@@ -1454,7 +1488,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                     onClick={() => isEditable && onCellClick(slot.id, activeTaId, session)}
                   >
                     <div className="w-14 sm:w-28 flex-shrink-0 flex items-center justify-end pr-2.5 sm:pr-6 border-r border-slate-100">
-                      <span className="font-normal text-slate-505 text-xs sm:text-sm text-right leading-tight">{slot.label}</span>
+                      <span className="font-normal text-slate-555 text-xs sm:text-sm text-right leading-tight">{slot.label}</span>
                     </div>
 
                     <div className="flex-1 pl-3 sm:pl-6 relative">
@@ -1473,7 +1507,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                               )}
                             </div>
                             
-                            <h4 className={`text-sm leading-tight truncate ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-505' : 'font-medium text-slate-800'}`}>
+                            <h4 className={`text-sm leading-tight truncate ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-555' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </h4>
                             
@@ -1549,7 +1583,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                             <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style?.text}`}>
                               {session.tier}
                             </span>
-                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-550' : 'font-medium text-slate-800'}`}>
+                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-555' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </div>
                           </div>
