@@ -279,6 +279,11 @@ function App() {
 
   const safeAbsences = useMemo(() => absences || [], [absences]);
 
+  const handleSimpleSignIn = (staffObj) => {
+    setCurrentUser(staffObj);
+    addToast(`Signed in as ${staffObj.name}`, 'success');
+  };
+
   const handleBypassSignIn = async (id) => {
     const found = safeUsers.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id);
     if (found) {
@@ -597,9 +602,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
         {DAYS.map(d => (
           <button key={d} onClick={() => setSelectedDay(d)} className={`flex-1 min-w-[90px] py-2.5 text-center text-xs font-bold tracking-wider rounded-lg uppercase transition-all ${
             selectedDay === d ? 'bg-[#1a1f36] text-white shadow-sm' : 'text-slate-400 hover:text-slate-700'
-          }`}>
-            {d}
-          </button>
+          }`}>{d}</button>
         ))}
       </div>
 
@@ -995,6 +998,706 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
 
       {showCriticalCoverBoard && (
         <CriticalCoverageBoard day={selectedDay} users={users} sessions={sessions} saveSessionToDb={saveSessionToDb} onClose={() => setShowCriticalCoverBoard(false)} addToast={addToast} />
+      )}
+    </div>
+  );
+}
+
+function StudentTimetablesView({ sessions, users, addToast }) {
+  const autoTrackedStudents = useMemo(() => {
+    const ignoredKeywords = [
+      'lunch', 'morning tea', 'tea', 'no cover', 'break', 'not working', 
+      'interval', 'meeting', 'duty', 'admin', 'planning', 'free session', 
+      'Ōtawhito', 'otawhito', 'esol', 'office', 'classroom', 'check-in',
+      'monitor', 'support', 'supervise', 'check', 'supervision'
+    ];
+    const found = new Set(['H.W', 'E.S']);
+    
+    sessions.forEach(s => {
+      if (s.tier !== TIERS.CRITICAL && s.tier !== TIERS.HIGH_NEEDS) return;
+      if (!s.subject) return;
+      const parts = s.subject.split(/[-\/&+]|\band\b/i);
+      parts.forEach(part => {
+        let cleaned = part.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+        if (!cleaned) return;
+        cleaned = cleaned.replace(/^(support|check|check-in|supervise|monitor|check)\s+/i, '').trim();
+        const lower = cleaned.toLowerCase();
+        const isTimeFormat = /\b\d{1,2}(:\d{2})?\s*(am|pm)?\b/i.test(lower);
+        const isIgnored = isTimeFormat || ignoredKeywords.some(keyword => lower === keyword || lower.includes(keyword) || lower.startsWith(keyword) || lower.endsWith(keyword));
+        if (!isIgnored && cleaned.length > 0 && cleaned.length <= 15) {
+          found.add(cleaned);
+        }
+      });
+    });
+    return Array.from(found).sort();
+  }, [sessions]);
+
+  const [manualStudents, setManualStudents] = useState([]);
+  const allTrackedStudents = useMemo(() => {
+    return Array.from(new Set([...autoTrackedStudents, ...manualStudents])).sort();
+  }, [autoTrackedStudents, manualStudents]);
+
+  const [activeStudent, setActiveStudent] = useState('E.S');
+  const [newStudentName, setNewStudentName] = useState('');
+  const [showAddStudentForm, setShowAddStudentForm] = useState(false);
+
+  const handleCreateStudent = (e) => {
+    e.preventDefault();
+    if (newStudentName.trim()) {
+      setManualStudents(prev => [...prev, newStudentName.trim()]);
+      setActiveStudent(newStudentName.trim());
+      setNewStudentName('');
+      setShowAddStudentForm(false);
+      addToast(`Added student track for ${newStudentName.trim()}`, 'success');
+    }
+  };
+
+  const getCoveringStaff = (day, slotId) => {
+    const matchingSession = sessions.find(s => {
+      if (s.day !== day || s.timeSlotId !== slotId) return false;
+      const cleanSubject = s.subject?.toLowerCase() || '';
+      const cleanStudent = activeStudent.toLowerCase();
+      const strippedSubject = cleanSubject.replace(/^(support|check|check-in|supervise|monitor|check)\s+/i, '').trim();
+
+      return (
+        strippedSubject === cleanStudent ||
+        cleanSubject === cleanStudent || 
+        cleanSubject.startsWith(cleanStudent + ' ') || 
+        cleanSubject.endsWith(' ' + cleanStudent) ||
+        cleanSubject.includes('(' + cleanStudent + ')') || 
+        cleanSubject.includes(' - ' + cleanStudent) ||
+        cleanSubject.split(/[-\/&\s]/).some(part => part.trim() === cleanStudent)
+      );
+    });
+
+    if (!matchingSession || !matchingSession.taId) return null;
+    
+    // Combine live Firestore users with INITIAL_USERS to ensure any unsynced TA names can still be resolved
+    const resolverList = [...users];
+    INITIAL_USERS.forEach(iu => {
+      if (!resolverList.some(u => u.id === iu.id)) {
+        resolverList.push(iu);
+      }
+    });
+
+    const ta = resolverList.find(u => u.id === matchingSession.taId);
+    return ta ? ta.name.split(' ')[0] : null; 
+  };
+
+  const totalWeeklySlots = TIME_SLOTS.length * DAYS.length;
+  let coveredWeeklyCount = 0;
+  
+  DAYS.forEach(day => {
+    TIME_SLOTS.forEach(slot => {
+      if (getCoveringStaff(day, slot.id)) {
+        coveredWeeklyCount++;
+      }
+    });
+  });
+
+  const uncoveredWeeklyCount = totalWeeklySlots - coveredWeeklyCount;
+  const coveragePercentage = Math.round((coveredWeeklyCount / totalWeeklySlots) * 100);
+
+  const nameToColorClass = (name) => {
+    if (!name) return '';
+    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const colors = [
+      'bg-blue-50 text-blue-800 border-blue-200/50',
+      'bg-emerald-50 text-emerald-800 border-emerald-200/50',
+      'bg-purple-50 text-purple-800 border-purple-200/50',
+      'bg-pink-50 text-pink-800 border-pink-200/50',
+      'bg-amber-50 text-amber-800 border-amber-200/50',
+      'bg-indigo-50 text-indigo-800 border-indigo-200/50',
+      'bg-teal-50 text-teal-800 border-teal-200/50'
+    ];
+    return colors[hash % colors.length];
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fade-in font-sans">
+      <div className="lg:col-span-3 space-y-6">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-2">Tracked Students</h3>
+            <p className="text-xs text-slate-400">Select a student profile to render their week-at-a-glance coverage.</p>
+          </div>
+
+          <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+            {allTrackedStudents.map(student => (
+              <button
+                key={student}
+                onClick={() => setActiveStudent(student)}
+                className={`w-full text-left px-4 py-3 rounded-xl text-xs transition-all flex items-center justify-between ${
+                  activeStudent === student 
+                    ? 'bg-[#1a1f36] text-white shadow-xs font-medium' 
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/50'
+                }`}
+              >
+                <span>{student}</span>
+                {activeStudent === student && (
+                  <span className="animate-ping h-1.5 w-1.5 rounded-full bg-yellow-400"></span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {showAddStudentForm ? (
+            <form onSubmit={handleCreateStudent} className="space-y-2 pt-2 border-t border-slate-100 animate-fade-in">
+              <input
+                type="text"
+                placeholder="Student Name / Initials"
+                value={newStudentName}
+                onChange={e => setNewStudentName(e.target.value)}
+                className="w-full text-xs font-medium border rounded-lg px-3 py-2.5 outline-none focus:ring-1 focus:ring-[#6157e8]"
+                maxLength={10}
+                required
+                autoFocus
+              />
+              <div className="flex gap-1.5">
+                <button type="submit" className="flex-1 py-1.5 bg-[#6157e8] hover:bg-[#5249d6] text-white font-bold text-[10px] rounded uppercase tracking-wider">Save</button>
+                <button type="button" onClick={() => setShowAddStudentForm(false)} className="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-[10px] rounded uppercase">Cancel</button>
+              </div>
+            </form>
+          ) : (
+            <button
+              onClick={() => setShowAddStudentForm(true)}
+              className="w-full py-3 border border-dashed border-[#6157e8]/50 text-[#6157e8] hover:bg-violet-50/50 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5"
+            >
+              <Plus size={14} />
+              <span>Track New Student</span>
+            </button>
+          )}
+        </div>
+
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-1">Funding Coverage</h3>
+            <span className="text-[10px] font-bold text-[#6157e8] uppercase tracking-widest block">Operational Audit</span>
+          </div>
+
+          <div className="space-y-3.5 pt-2">
+            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+              <span className="text-xs text-slate-400 font-medium">Assigned TA Hours:</span>
+              <span className="text-xs font-medium text-slate-800">{coveredWeeklyCount * 0.5} hours / wk</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+              <span className="text-xs text-slate-400 font-medium">Unscheduled Gaps:</span>
+              <span className={`text-xs font-medium ${uncoveredWeeklyCount > 0 ? 'text-red-500' : 'text-slate-800'}`}>
+                {uncoveredWeeklyCount * 0.5} hours / wk
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+              <span className="text-xs text-slate-400 font-medium">Coverage Rate:</span>
+              <span className="text-xs font-semibold text-slate-800">{coveragePercentage}%</span>
+            </div>
+            
+            <div className="space-y-1.5 pt-1">
+              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-500 ${
+                    coveragePercentage >= 90 ? 'bg-[#10b981]' :
+                    coveragePercentage >= 70 ? 'bg-amber-400' : 'bg-red-400'
+                  }`}
+                  style={{ width: `${coveragePercentage}%` }}
+                ></div>
+              </div>
+              <span className="text-[10px] text-slate-400 block italic leading-relaxed">
+                {uncoveredWeeklyCount > 0 
+                  ? `💡 Needs attention! You have ${uncoveredWeeklyCount} uncovered slots this week.` 
+                  : "🎉 Perfect coverage! No empty slots found."}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="lg:col-span-9 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="p-6 sm:p-8 border-b border-slate-100 bg-white">
+          <h2 className="text-xl font-bold text-[#1a1f36]">Week-at-a-Glance Timetable</h2>
+          <p className="text-xs text-slate-400 mt-1">Review coverage allocations and identify scheduling gaps immediately.</p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-center border-collapse min-w-max table-fixed">
+            <thead>
+              <tr className="bg-slate-50">
+                <th className="p-4 bg-amber-400 text-[#1a1f36] font-normal text-xs border-r border-slate-200 w-44 uppercase tracking-wider select-none">
+                  {activeStudent}
+                </th>
+                {DAYS.map(day => (
+                  <th key={day} className="p-4 bg-slate-100 text-slate-500 font-normal text-xs uppercase tracking-wider border-b border-slate-200">
+                    {day}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {TIME_SLOTS.map(slot => (
+                <tr key={slot.id} className="hover:bg-slate-50/30 transition-all">
+                  <td className="p-4 font-normal text-slate-500 text-xs border-r border-slate-200 bg-slate-50/50 whitespace-nowrap">
+                    {slot.label}
+                  </td>
+                  
+                  {DAYS.map(day => {
+                    const coveringName = getCoveringStaff(day, slot.id);
+                    
+                    return (
+                      <td key={`${slot.id}-${day}`} className="p-2 border-r border-slate-100 last:border-r-0" style={{ width: '160px' }}>
+                        {coveringName ? (
+                          <div className={`py-3 px-2 rounded-xl text-xs font-normal border shadow-xs transition-transform hover:scale-[1.01] ${nameToColorClass(coveringName)}`}>
+                            {coveringName}
+                          </div>
+                        ) : (
+                          <div className="py-3 px-2 bg-rose-50/60 border border-dashed border-rose-200 rounded-xl text-rose-400 text-xs font-normal leading-none italic select-none">
+                            No cover
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose, addToast }) {
+  const criticalSessions = sessions.filter(s => 
+    s.day === day && 
+    (s.tier === TIERS.CRITICAL || s.tier === TIERS.HIGH_NEEDS)
+  );
+
+  const tas = users.filter(u => {
+    const roles = u.roles || [u.role];
+    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
+  });
+
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
+  return (
+    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4 font-sans">
+      <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col overflow-hidden border border-amber-200">
+        <div className="border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="text-amber-500 w-6 h-6" />
+              <h3 className="text-2xl font-bold text-[#1a1f36]">Critical Student Coverage Manager</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Directly reallocate available Teacher Aides from other duties to ensure high-priority students on {day} are covered.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          {criticalSessions.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 font-semibold">
+              No Critical or High Needs students require duties on {day}.
+            </div>
+          ) : (
+            criticalSessions.map(session => {
+              const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+              const assignedTa = tas.find(t => t.id === session.taId);
+              
+              const sortedTasForSlot = [...tas].sort((a, b) => {
+                const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+                const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+                if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+                return a.name.localeCompare(b.name);
+              });
+
+              return (
+                <div key={session.id} className="border border-slate-100 bg-slate-50/40 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-amber-300 transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {session.tier}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {slot?.start} - {slot?.end}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-base">{session.subject}</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Current Caretaker: <strong className="text-[#6157e8]">{assignedTa ? assignedTa.name : 'Unassigned'}</strong>
+                    </p>
+                  </div>
+
+                  <div className="w-full md:w-auto">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Reassign Cover (Best Matches First):</label>
+                    <select
+                      value={session.taId || ''}
+                      onChange={(e) => {
+                        const newTaId = e.target.value;
+                        if (newTaId) {
+                          saveSessionToDb({ ...session, taId: newTaId });
+                          const targetTaName = tas.find(t => t.id === newTaId)?.name || 'TA';
+                          addToast(`Reassigned "${session.subject}" to ${targetTaName}`, 'success');
+                        }
+                      }}
+                      className="w-full md:w-72 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-1 focus:ring-[#6157e8] outline-none cursor-pointer"
+                    >
+                      <option value="">-- Select cover TA --</option>
+                      {sortedTasForSlot.map(ta => {
+                        const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
+                        return (
+                          <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-500"}>
+                            {ta.name} ({availabilityInfo.label})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 mt-4 flex justify-end">
+          <button onClick={onClose} className="px-6 py-3 bg-[#1a1f36] hover:bg-black text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-sm transition-all">
+            Close Board
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
+  const absentTa = users.find(u => u.id === absence.taId) || INITIAL_USERS.find(u => u.id === absence.taId);
+  const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
+  
+  const otherTas = users
+    .filter(u => {
+      const roles = u.roles || [u.role];
+      return (roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER)) && u.id !== absence.taId;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  
+  const [assignments, setAssignments] = useState({});
+
+  useEffect(() => {
+    const initial = {};
+    absentSessions.forEach(s => {
+      initial[s.id] = '';
+    });
+    setAssignments(initial);
+  }, [sessions, absence]);
+
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === absence.day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in font-sans">
+        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {absentTa?.name}</h3>
+        <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
+        
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
+          {absentSessions.map(session => {
+            const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+
+            const sortedOtherTas = [...otherTas].sort((a, b) => {
+              const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+              const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+              if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+              return a.name.localeCompare(b.name);
+            });
+
+            return (
+              <div key={session.id} className="border border-slate-100 bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    <span>{slot?.start} - {slot?.end}</span>
+                    <span className="mx-2">•</span>
+                    <span>{session?.tier}</span>
+                  </div>
+                  <div className="font-bold text-[#1a1f36] text-sm">{session?.subject}</div>
+                </div>
+                <select
+                  value={assignments[session.id] || ''}
+                  onChange={(e) => setAssignments(prev => ({ ...prev, [session.id]: e.target.value }))}
+                  className="w-full sm:w-56 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-[#6157e8] outline-none cursor-pointer"
+                >
+                  <option value="">Leave Uncovered</option>
+                  {sortedOtherTas.map(ta => {
+                    const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
+                    return (
+                      <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-500"}>
+                        {ta.name} ({availabilityInfo.label})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-end space-x-3 border-t border-slate-100 pt-4">
+          <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
+          <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilter }) {
+  // Set default view mode to "all" (Full Grid overview) to change the default rendering as requested
+  const [viewMode, setViewMode] = useState('all'); 
+  
+  const allTas = users.filter(u => {
+    const roles = u.roles || [u.role];
+    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
+  }).sort((a, b) => a.name.localeCompare(b.name));
+  
+  const tas = allTas.filter(ta => {
+    if (!teamFilter || teamFilter === TEAMS.ALL) return true;
+    if (teamFilter === TEAMS.BOTH) return ta.team === TEAMS.BOTH;
+    if (teamFilter === TEAMS.Y0_4) return ta.team === TEAMS.Y0_4 || ta.team === TEAMS.BOTH;
+    if (teamFilter === TEAMS.Y5_8) return ta.team === TEAMS.Y5_8 || ta.team === TEAMS.BOTH;
+    return true;
+  });
+
+  const [activeTaId, setActiveTaId] = useState('');
+
+  useEffect(() => {
+    if (tas.length > 0) {
+      if (!activeTaId || !tas.some(t => t.id === activeTaId)) {
+        setActiveTaId(tas[0].id);
+      }
+    } else {
+      setActiveTaId('');
+    }
+  }, [tas, activeTaId]);
+
+  return (
+    <div className="space-y-4 font-sans">
+      <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
+        </div>
+        <div className="flex bg-slate-200/60 p-1 rounded-xl">
+          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Individual TA</button>
+          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Full Grid</button>
+        </div>
+      </div>
+
+      {viewMode === 'single' ? (
+        <div className="px-1.5 sm:px-6 py-4 space-y-6 animate-fade-in">
+          <div className="flex space-x-2 overflow-x-auto pb-3 border-b border-slate-100 scrollbar-hide">
+            {tas.map(ta => (
+              <button
+                key={ta.id}
+                onClick={() => setActiveTaId(ta.id)}
+                className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 ${
+                  activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                }`}
+              >
+                {ta.name}
+              </button>
+            ))}
+          </div>
+
+          {activeTaId ? (
+            <div className="space-y-4 max-w-2xl mx-auto animate-fade-in">
+              {TIME_SLOTS.map(slot => {
+                const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === activeTaId);
+                const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
+                const IconComponent = style ? style.icon : null;
+
+                return (
+                  <div 
+                    key={slot.id} 
+                    className={`flex items-stretch group ${isEditable ? 'cursor-pointer' : ''}`}
+                    onClick={() => isEditable && onCellClick(slot.id, activeTaId, session)}
+                  >
+                    <div className="w-14 sm:w-28 flex-shrink-0 flex items-center justify-end pr-2.5 sm:pr-6 border-r border-slate-100">
+                      <span className="font-normal text-slate-500 text-xs sm:text-sm text-right leading-tight">{slot.label}</span>
+                    </div>
+
+                    <div className="flex-1 pl-3 sm:pl-6 relative">
+                      {session ? (
+                        <div className={`border-[1.5px] p-4 rounded-[20px] transition-all flex items-center shadow-sm hover:border-[#6157e8]/40 ${style?.wrapper}`}>
+                          <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center mr-4 shadow-sm ${style?.iconBg} ${style?.iconColor}`}>
+                            {IconComponent && <IconComponent size={18} strokeWidth={2.5} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1 gap-2">
+                              <span className={`text-[9px] tracking-wider uppercase ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-400' : 'font-bold'} ${style?.text}`}>
+                                {session.tier}
+                              </span>
+                              {isEditable && (
+                                <span className="opacity-0 group-hover:opacity-100 text-[10px] font-bold text-[#6157e8] transition-opacity">Edit</span>
+                              )}
+                            </div>
+                            
+                            <h4 className={`text-sm leading-tight truncate ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
+                              {session.subject}
+                            </h4>
+                            
+                            {(session.teacherId || session.teacherIds || session.teamLeaderId) && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {(() => {
+                                  const assignedTeachers = session.teacherIds 
+                                    ? users.filter(u => session.teacherIds.includes(u.id)) 
+                                    : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
+                                  if (assignedTeachers.length === 0) return null;
+                                  return (
+                                    <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
+                                      T: {assignedTeachers.map(t => t.name).join(' & ')}
+                                    </span>
+                                  );
+                                })()}
+                                {session.teamLeaderId && (
+                                  <span className="bg-purple-50 text-purple-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
+                                    L: {users.find(u => u.id === session.teamLeaderId)?.name || 'Leader'}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50/50 rounded-[20px] p-4 border border-dashed border-slate-200/80 hover:border-[#6157e8]/50 hover:bg-[#f0efff]/20 transition-all flex items-center justify-between min-h-[72px]">
+                          <span className="text-slate-400 text-xs font-semibold">Free Session</span>
+                          {isEditable && <span className="text-[10px] font-bold text-[#6157e8] opacity-0 group-hover:opacity-100 transition-opacity">+ Assign Duty</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center p-12 bg-slate-50 rounded-[32px] border border-dashed text-slate-400 font-medium">No matching TAs under this team filter.</div>
+          )}
+        </div>
+      ) : (
+        <div className="relative max-h-[75vh] overflow-auto animate-fade-in">
+          <table className="w-full text-left border-collapse min-w-max table-fixed">
+            <thead>
+              <tr>
+                <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
+                {tas.map(ta => (
+                  <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-semibold text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: '220px' }}>
+                    <div className="truncate">{ta.name}</div>
+                    <div className="text-[10px] text-slate-400 font-normal mt-0.5 truncate">{ta.team}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {TIME_SLOTS.map(slot => (
+                <tr key={slot.id} className="hover:bg-slate-50/30 transition-colors">
+                  <td className="p-4 font-normal text-slate-500 text-xs whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
+                    {slot.label}
+                  </td>
+                  {tas.map(ta => {
+                    const session = sessions.find(s => s.day === day && s.timeSlotId === slot.id && s.taId === ta.id);
+                    const style = session ? (TIER_STYLES[session.tier] || TIER_STYLES[TIERS.ENRICHMENT]) : null;
+                    
+                    return (
+                      <td 
+                        key={`${slot.id}-${ta.id}`} 
+                        className={`p-2 relative group ${isEditable ? 'cursor-pointer' : ''}`}
+                        onClick={() => isEditable && onCellClick(slot.id, ta.id, session)}
+                        style={{ width: '220px' }}
+                      >
+                        {isEditable && (
+                           <div className="absolute inset-2 bg-[#6157e8]/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex justify-center items-center z-10 pointer-events-none">
+                              <Edit3 className="text-[#6157e8] w-5 h-5" />
+                           </div>
+                        )}
+                        {session ? (
+                          <div className={`border ${style?.wrapper} rounded-xl p-3 h-full flex flex-col justify-center min-h-[80px] group-hover:border-[#6157e8]/30 transition-colors`}>
+                            <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style?.text}`}>
+                              {session.tier}
+                            </span>
+                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
+                              {session.subject}
+                            </div>
+                            {(() => {
+                              const assignedTeachers = session.teacherIds 
+                                ? users.filter(u => session.teacherIds.includes(u.id)) 
+                                : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
+                              if (assignedTeachers.length === 0) return null;
+                              return (
+                                <span className="text-[9px] font-bold text-slate-400 mt-1 truncate">
+                                  {assignedTeachers.map(t => t.name.split(' ')[0]).join(' & ')}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        ) : (
+                          <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">Free</div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
