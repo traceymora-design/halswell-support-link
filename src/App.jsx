@@ -38,6 +38,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Use sanitized appId to replace all slashes with underscores so it doesn't break Firestore segment paths
 const appId = (typeof __app_id !== 'undefined' ? __app_id : "halswell-school-production").replace(/\//g, '_');
 
 const isSandbox = typeof window !== 'undefined' && (
@@ -193,23 +194,6 @@ DAYS.forEach(day => {
   INITIAL_SESSIONS.push({ id: `hw_s1_t7_${day}`, day, taId: 't1', teacherId: 'u4', tier: TIERS.LUNCH, subject: 'H.W', timeSlotId: 't7' });
 });
 
-const TIER_STYLES = {
-  [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-[#fff5f6]', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
-  [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-[#fffaf5]', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
-  [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-[#f5f7ff]', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
-  [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
-};
-
-const Toast = ({ message, type = 'success' }) => (
-  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50 animate-fade-in
-    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
-    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
-    <p className="font-medium text-sm">{message}</p>
-  </div>
-);
-
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -243,15 +227,15 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-export default function SafeApp() {
+export default function App() {
   return (
     <ErrorBoundary>
-      <App />
+      <AppContent />
     </ErrorBoundary>
   );
 }
 
-function App() {
+function AppContent() {
   const [currentUser, setCurrentUser] = useState(null); 
   const [activeRole, setActiveRole] = useState(null); 
   const [authCompleted, setAuthCompleted] = useState(false);
@@ -261,6 +245,7 @@ function App() {
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const addToast = (message, type = 'success') => {
     const id = Date.now();
@@ -345,12 +330,12 @@ function App() {
     addToast("Logged out of session.", "info");
   };
 
-  // Rule 3: Auth Handshake setup first
+  // Rule 3: Securely await authentication completion before triggering any database listener setup
   useEffect(() => {
     const initAuth = async () => {
       try {
         await setPersistence(auth, browserLocalPersistence);
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token && __initial_auth_token !== 'null' && __initial_auth_token !== 'undefined') {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else {
           await signInAnonymously(auth);
@@ -363,6 +348,7 @@ function App() {
           console.error("Critical: Anonymous auth failed:", e);
         }
       } finally {
+        setAuthLoading(false);
         setAuthCompleted(true);
       }
     };
@@ -371,9 +357,9 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // Listeners guarded by auth verification
+  // Listeners strictly guarded by auth verification to avoid Missing Permission errors
   useEffect(() => {
-    if (!user) return;
+    if (authLoading || !user) return;
 
     const unsubscribeUsers = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
@@ -398,37 +384,61 @@ function App() {
       unsubscribeSessions();
       unsubscribeAbsences();
     };
-  }, [user]);
+  }, [user, authLoading]);
 
   const addUserToDb = async (userObj) => {
+    if (!user) return;
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Error writing user:", e);
+    }
   };
 
   const deleteUserFromDb = async (userId) => {
+    if (!user) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
-    } catch (e) {}
+    } catch (e) {
+      console.error("Error deleting user:", e);
+    }
   };
 
   const saveSessionToDb = async (sessionData) => {
+    if (!user) return;
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Error saving session:", e);
+    }
   };
 
   const deleteSessionFromDb = async (sessionId) => {
+    if (!user) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
-    } catch (e) {}
+    } catch (e) {
+      console.error("Error deleting session:", e);
+    }
   };
 
   const saveAbsenceToDb = async (absenceData) => {
+    if (!user) return;
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
-    } catch (e) {}
+    } catch (e) {
+      console.error("Error saving absence:", e);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex flex-col justify-center items-center p-4 font-sans animate-pulse">
+        <Loader2 className="animate-spin text-[#6157e8] w-8 h-8" />
+        <p className="text-xs text-slate-400 mt-2.5 font-bold uppercase tracking-widest">Connecting securely...</p>
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return (
@@ -519,7 +529,7 @@ function App() {
         </div>
 
         {currentUser && (currentUser.roles?.length > 1 || [currentUser.role].filter(Boolean).length > 1) && (
-          <div className="flex items-center space-x-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2 shadow-xs transition-all">
+          <div className="flex items-center space-x-2.5 bg-violet-50 border border-violet-100 rounded-xl px-3.5 py-2 shadow-xs">
             <span className="text-[10px] font-bold text-[#6157e8] uppercase tracking-wider">Active View:</span>
             <select value={activeRole || ''} onChange={(e) => { setActiveRole(e.target.value); addToast(`Switched view to ${e.target.value}`); }} className="bg-white text-slate-800 text-xs font-bold border border-slate-200 rounded-lg px-2.5 py-1 outline-none cursor-pointer focus:ring-1 focus:ring-[#6157e8]">
               {(currentUser.roles || [currentUser.role]).map(r => <option key={r} value={r}>{r}</option>)}
@@ -883,8 +893,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button onClick={() => setActiveDashboardTab('timetable')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'timetable' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-50'}`}>Master Timetable</button>
-          <button onClick={() => setActiveDashboardTab('students')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'students' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-50'}`}>Student Views</button>
+          <button onClick={() => setActiveDashboardTab('timetable')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'timetable' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505'}`}>Master Timetable</button>
+          <button onClick={() => setActiveDashboardTab('students')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'students' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505'}`}>Student Views</button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setShowCriticalCoverBoard(true)} className="px-4 py-2 bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-colors"><AlertTriangle size={14} /> Critical Coverage Board</button>
@@ -1008,7 +1018,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Teacher</label>
                 <select name="teacherId" value={modalTeacherId} onChange={(e) => setModalTeacherId(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
                   <option value="">None / Self-Directed</option>
-                  {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{toInitials(t.name)}</option>)}
                 </select>
               </div>
 
@@ -1542,6 +1552,241 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose, addToast }) {
+  const criticalSessions = sessions.filter(s => 
+    s.day === day && 
+    (s.tier === TIERS.CRITICAL || s.tier === TIERS.HIGH_NEEDS)
+  );
+
+  const tas = users.filter(u => {
+    const roles = u.roles || [u.role];
+    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
+  });
+
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
+  return (
+    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4 font-sans">
+      <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col overflow-hidden border border-amber-200">
+        <div className="border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="text-amber-500 w-6 h-6" />
+              <h3 className="text-2xl font-bold text-[#1a1f36]">Critical Student Coverage Manager</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Directly reallocate available Teacher Aides from other duties to ensure high-priority students on {day} are covered.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          {criticalSessions.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 font-semibold">
+              No Critical or High Needs students require duties on {day}.
+            </div>
+          ) : (
+            criticalSessions.map(session => {
+              const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+              const assignedTa = tas.find(t => t.id === session.taId);
+              
+              const sortedTasForSlot = [...tas].sort((a, b) => {
+                const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+                const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+                if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+                return a.name.localeCompare(b.name);
+              });
+
+              return (
+                <div key={session.id} className="border border-slate-100 bg-slate-50/40 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-amber-300 transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {session.tier}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {slot?.start} - {slot?.end}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-base">{session.subject}</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Current Caretaker: <strong className="text-[#6157e8]">{assignedTa ? assignedTa.name : 'Unassigned'}</strong>
+                    </p>
+                  </div>
+
+                  <div className="w-full md:w-auto">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Reassign Cover (Best Matches First):</label>
+                    <select
+                      value={session.taId || ''}
+                      onChange={(e) => {
+                        const newTaId = e.target.value;
+                        if (newTaId) {
+                          saveSessionToDb({ ...session, taId: newTaId });
+                          const targetTaName = tas.find(t => t.id === newTaId)?.name || 'TA';
+                          addToast(`Reassigned "${session.subject}" to ${targetTaName}`, 'success');
+                        }
+                      }}
+                      className="w-full md:w-72 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-1 focus:ring-[#6157e8] outline-none cursor-pointer"
+                    >
+                      <option value="">-- Select cover TA --</option>
+                      {sortedTasForSlot.map(ta => {
+                        const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
+                        return (
+                          <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-50"}>
+                            {ta.name} ({availabilityInfo.label})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 mt-4 flex justify-end">
+          <button onClick={onClose} className="px-6 py-3 bg-[#1a1f36] hover:bg-black text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-sm transition-all">
+            Close Board
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
+  const absentTa = users.find(u => u.id === absence.taId) || INITIAL_USERS.find(u => u.id === absence.taId);
+  const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
+  
+  const otherTas = users
+    .filter(u => {
+      const roles = u.roles || [u.role];
+      return (roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER)) && u.id !== absence.taId;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  
+  const [assignments, setAssignments] = useState({});
+
+  useEffect(() => {
+    const initial = {};
+    absentSessions.forEach(s => {
+      initial[s.id] = '';
+    });
+    setAssignments(initial);
+  }, [sessions, absence]);
+
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === absence.day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in font-sans">
+        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {absentTa?.name}</h3>
+        <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
+        
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
+          {absentSessions.map(session => {
+            const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+
+            const sortedOtherTas = [...otherTas].sort((a, b) => {
+              const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+              const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+              if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+              return a.name.localeCompare(b.name);
+            });
+
+            return (
+              <div key={session.id} className="border border-slate-100 bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    <span>{slot?.start} - {slot?.end}</span>
+                    <span className="mx-2">•</span>
+                    <span>{session?.tier}</span>
+                  </div>
+                  <div className="font-bold text-[#1a1f36] text-sm">{session?.subject}</div>
+                </div>
+                <select
+                  value={assignments[session.id] || ''}
+                  onChange={(e) => setAssignments(prev => ({ ...prev, [session.id]: e.target.value }))}
+                  className="w-full sm:w-56 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-[#6157e8] outline-none cursor-pointer"
+                >
+                  <option value="">Leave Uncovered</option>
+                  {sortedOtherTas.map(ta => {
+                    const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
+                    return (
+                      <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-50"}>
+                        {ta.name} ({availabilityInfo.label})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-end space-x-3 border-t border-slate-100 pt-4">
+          <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
+          <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
+        </div>
+      </div>
     </div>
   );
 }
