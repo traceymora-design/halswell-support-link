@@ -147,7 +147,6 @@ const INITIAL_ABSENCES = [
   }
 ];
 
-// Reassigned all default slots from first-name-only accounts to our active staff roster
 let INITIAL_SESSIONS = [];
 DAYS.forEach(day => {
   INITIAL_SESSIONS.push({ id: `es_s1_t1_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't1' });
@@ -194,6 +193,56 @@ DAYS.forEach(day => {
   INITIAL_SESSIONS.push({ id: `hw_s1_t7_${day}`, day, taId: 't1', teacherId: 'u4', tier: TIERS.LUNCH, subject: 'H.W', timeSlotId: 't7' });
 });
 
+const TIER_STYLES = {
+  [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-[#fff5f6]', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
+  [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-[#fffaf5]', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
+  [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-[#f5f7ff]', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
+  [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
+  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
+  [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
+};
+
+const Toast = ({ message, type = 'success' }) => (
+  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50 animate-fade-in
+    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
+    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
+    <p className="font-medium text-sm">{message}</p>
+  </div>
+);
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, errorInfo: "" };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorInfo: error.message };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Support Link Crash caught:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-6 font-sans">
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-red-100 max-w-md w-full text-center">
+            <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Something went wrong</h2>
+            <p className="text-xs text-slate-500 mb-6">{this.state.errorInfo}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm transition-colors"
+            >
+              Reload Support Link
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function SafeApp() {
   return (
     <ErrorBoundary>
@@ -205,12 +254,13 @@ export default function SafeApp() {
 function App() {
   const [currentUser, setCurrentUser] = useState(null); 
   const [activeRole, setActiveRole] = useState(null); 
-  const [authCompleted, setAuthCompleted] = useState(true);
+  const [authCompleted, setAuthCompleted] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [users, setUsers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [absences, setAbsences] = useState([]);
   const [toasts, setToasts] = useState([]);
+  const [user, setUser] = useState(null);
 
   const addToast = (message, type = 'success') => {
     const id = Date.now();
@@ -295,34 +345,60 @@ function App() {
     addToast("Logged out of session.", "info");
   };
 
+  // Rule 3: Auth Handshake setup first
   useEffect(() => {
-    if (currentUser) {
-      const availableRoles = currentUser.roles || [currentUser.role];
-      setActiveRole(availableRoles[0]);
-    } else {
-      setActiveRole(null);
-    }
-  }, [currentUser]);
+    const initAuth = async () => {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth init failed, fallback triggered:", err);
+        try {
+          await signInAnonymously(auth);
+        } catch (e) {
+          console.error("Critical: Anonymous auth failed:", e);
+        }
+      } finally {
+        setAuthCompleted(true);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, setUser);
+    return () => unsubscribe();
+  }, []);
 
+  // Listeners guarded by auth verification
   useEffect(() => {
+    if (!user) return;
+
     const unsubscribeUsers = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'users'), (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
-    }, () => {});
+    }, (error) => {
+      console.error("Database listener user error:", error);
+    });
 
     const unsubscribeSessions = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'sessions'), (snapshot) => {
       setSessions(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
-    }, () => {});
+    }, (error) => {
+      console.error("Database listener session error:", error);
+    });
 
     const unsubscribeAbsences = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'absences'), (snapshot) => {
       setAbsences(snapshot.docs.map(doc => ({id: doc.id, ...doc.data()})));
-    }, () => {});
+    }, (error) => {
+      console.error("Database listener absence error:", error);
+    });
 
     return () => {
       unsubscribeUsers();
       unsubscribeSessions();
       unsubscribeAbsences();
     };
-  }, []);
+  }, [user]);
 
   const addUserToDb = async (userObj) => {
     try {
@@ -807,8 +883,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button onClick={() => setActiveDashboardTab('timetable')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'timetable' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Master Timetable</button>
-          <button onClick={() => setActiveDashboardTab('students')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'students' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Student Views</button>
+          <button onClick={() => setActiveDashboardTab('timetable')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'timetable' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-50'}`}>Master Timetable</button>
+          <button onClick={() => setActiveDashboardTab('students')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'students' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-50'}`}>Student Views</button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setShowCriticalCoverBoard(true)} className="px-4 py-2 bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-colors"><AlertTriangle size={14} /> Critical Coverage Board</button>
@@ -932,7 +1008,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Teacher</label>
                 <select name="teacherId" value={modalTeacherId} onChange={(e) => setModalTeacherId(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
                   <option value="">None / Self-Directed</option>
-                  {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{toInitials(t.name)}</option>)}
+                  {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
 
