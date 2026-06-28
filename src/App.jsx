@@ -12,7 +12,7 @@ import {
 } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 
-// Safely parse Firebase configurations for sandbox or local use
+// Parse environmental or sandbox configurations safely
 const getFirebaseConfig = () => {
   if (typeof __firebase_config !== 'undefined' && __firebase_config) {
     try {
@@ -73,6 +73,13 @@ const TIERS = {
 };
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+// Secure helper to format any staff name into initials
+const toInitials = (name) => {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  return parts.map(p => p[0].toUpperCase()).join('.') + '.';
+};
 
 const isStudentMatch = (subjectText, studentText) => {
   if (!subjectText || !studentText) return false;
@@ -140,72 +147,52 @@ const INITIAL_ABSENCES = [
   }
 ];
 
+// Reassigned all default slots from first-name-only accounts to our active staff roster
 let INITIAL_SESSIONS = [];
 DAYS.forEach(day => {
-  INITIAL_SESSIONS.push({ id: `es_s1_t1_${day}`, day, taId: 't_ruby', teacherId: 't_jenny', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't1' });
-  INITIAL_SESSIONS.push({ id: `es_s1_t2_${day}`, day, taId: 't_ruby', teacherId: 't_jenny', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't2' });
-  INITIAL_SESSIONS.push({ id: `es_s1_t3_${day}`, day, taId: 't_ruby', teacherId: 't_jenny', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't3' });
-  INITIAL_SESSIONS.push({ id: `es_s1_t4_${day}`, day, taId: 't_ruby', teacherId: 't_jenny', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't4' });
+  INITIAL_SESSIONS.push({ id: `es_s1_t1_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't1' });
+  INITIAL_SESSIONS.push({ id: `es_s1_t2_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't2' });
+  INITIAL_SESSIONS.push({ id: `es_s1_t3_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't3' });
+  INITIAL_SESSIONS.push({ id: `es_s1_t4_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't4' });
+  
+  if (day === 'Friday') {
+    INITIAL_SESSIONS.push({ id: `es_s1_t5_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't5' });
+  } else {
+    INITIAL_SESSIONS.push({ id: `es_s1_t5_${day}`, day, taId: 't1', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't5' });
+  }
   
   if (day === 'Monday') {
     INITIAL_SESSIONS.push({ id: `es_s1_t6_${day}`, day, taId: 't_jenny', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't6' });
     INITIAL_SESSIONS.push({ id: `es_s1_t7_${day}`, day, taId: 't_jenny', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't7' });
   }
+  
+  if (day === 'Friday') {
+    INITIAL_SESSIONS.push({ id: `es_s1_t8_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't8' });
+  } else {
+    INITIAL_SESSIONS.push({ id: `es_s1_t8_${day}`, day, taId: 't1', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't8' });
+  }
+  
+  if (day === 'Wednesday') {
+    INITIAL_SESSIONS.push({ id: `es_s1_t9_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't9' });
+    INITIAL_SESSIONS.push({ id: `es_s1_t10_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't10' });
+  } else {
+    INITIAL_SESSIONS.push({ id: `es_s1_t9_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't9' });
+    INITIAL_SESSIONS.push({ id: `es_s1_t10_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't10' });
+  }
+  
+  if (day === 'Thursday') {
+    INITIAL_SESSIONS.push({ id: `es_s1_t11_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't11' });
+  } else {
+    INITIAL_SESSIONS.push({ id: `es_s1_t11_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't11' });
+  }
+  
+  INITIAL_SESSIONS.push({ id: `es_s1_t12_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't12' });
+  INITIAL_SESSIONS.push({ id: `es_s1_t13_${day}`, day, taId: 't_ruby', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'E.S', timeSlotId: 't13' });
 
   INITIAL_SESSIONS.push({ id: `hw_s1_t2_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W', timeSlotId: 't2' });
   INITIAL_SESSIONS.push({ id: `hw_s1_t6_${day}`, day, taId: 't_val', teacherId: 'u3', tier: TIERS.CRITICAL, subject: 'H.W', timeSlotId: 't6' });
   INITIAL_SESSIONS.push({ id: `hw_s1_t7_${day}`, day, taId: 't1', teacherId: 'u4', tier: TIERS.LUNCH, subject: 'H.W', timeSlotId: 't7' });
 });
-
-const TIER_STYLES = {
-  [TIERS.CRITICAL]: { wrapper: 'border-[#ffcfd6] bg-[#fff5f6]', iconBg: 'bg-[#e04f64]', iconColor: 'text-white', icon: AlertTriangle, text: 'text-[#e04f64]', subText: 'text-[#e04f64]' },
-  [TIERS.HIGH_NEEDS]: { wrapper: 'border-[#ffebd5] bg-[#fffaf5]', iconBg: 'bg-[#f4a261]', iconColor: 'text-white', icon: User, text: 'text-[#d97706]', subText: 'text-[#f4a261]' },
-  [TIERS.ENRICHMENT]: { wrapper: 'border-[#e0e7ff] bg-[#f5f7ff]', iconBg: 'bg-[#6157e8]', iconColor: 'text-white', icon: Star, text: 'text-[#4338ca]', subText: 'text-[#818cf8]' },
-  [TIERS.MORNING_TEA]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Coffee, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.LUNCH]: { wrapper: 'border-[#fef08a] bg-[#fefdf0]', iconBg: 'bg-[#eab308]', iconColor: 'text-white', icon: Utensils, text: 'text-[#ca8a04]', subText: 'text-[#eab308]' },
-  [TIERS.NOT_WORKING]: { wrapper: 'border-slate-200 bg-slate-50 opacity-60', iconBg: 'bg-slate-200', iconColor: 'text-slate-500', icon: Calendar, text: 'text-slate-500 font-normal', subText: 'text-slate-400' }
-};
-
-const Toast = ({ message, type = 'success' }) => (
-  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50 animate-fade-in
-    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
-    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
-    <p className="font-medium text-sm">{message}</p>
-  </div>
-);
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, errorInfo: "" };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, errorInfo: error.message };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error("Support Link Crash caught:", error, errorInfo);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-slate-50/50 flex flex-col justify-center items-center p-6 font-sans">
-          <div className="bg-white p-8 rounded-3xl shadow-xl border border-red-100 max-w-md w-full text-center">
-            <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Something went wrong</h2>
-            <p className="text-xs text-slate-500 mb-6">{this.state.errorInfo}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm transition-colors"
-            >
-              Reload Support Link
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 export default function SafeApp() {
   return (
@@ -279,21 +266,14 @@ function App() {
 
   const safeAbsences = useMemo(() => absences || [], [absences]);
 
-  const handleSimpleSignIn = (staffObj) => {
-    setCurrentUser(staffObj);
-    addToast(`Signed in as ${staffObj.name}`, 'success');
-  };
-
   const handleBypassSignIn = async (id) => {
     const found = safeUsers.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id);
     if (found) {
       try {
         await addUserToDb(found);
-      } catch (err) {
-        console.error("Bypass profile save skipped:", err);
-      }
+      } catch (err) {}
       setCurrentUser(found);
-      addToast(`Entered view for ${found.name}`, 'success');
+      addToast(`Signed in as ${toInitials(found.name)}`, 'success');
     }
   };
 
@@ -304,9 +284,9 @@ function App() {
     const matched = safeUsers.find(u => u.email?.toLowerCase().trim() === searchEmail);
     if (matched) {
       setCurrentUser(matched);
-      addToast(`Signed in as ${matched.name}`, 'success');
+      addToast(`Signed in as ${toInitials(matched.name)}`, 'success');
     } else {
-      addToast("Email not found. Try one of the test profiles or register first.", "error");
+      addToast("Email not registered. Please use a bypass profile below.", "error");
     }
   };
 
@@ -347,41 +327,31 @@ function App() {
   const addUserToDb = async (userObj) => {
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userObj.id), userObj);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   };
 
   const deleteUserFromDb = async (userId) => {
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', userId));
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   };
 
   const saveSessionToDb = async (sessionData) => {
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionData.id), sessionData);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   };
 
   const deleteSessionFromDb = async (sessionId) => {
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'sessions', sessionId));
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   };
 
   const saveAbsenceToDb = async (absenceData) => {
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'absences', absenceData.id), absenceData);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   };
 
   if (!currentUser) {
@@ -455,7 +425,7 @@ function App() {
               const u = safeUsers.find(x => x.id === id);
               return (
                 <button key={id} onClick={() => handleBypassSignIn(id)} className={`px-2 py-1 rounded text-[10px] font-bold transition-all border ${currentUser?.id === id ? 'bg-[#6157e8] text-white border-[#6157e8]' : 'bg-white hover:bg-amber-100/60 border-amber-200 text-slate-700'}`}>
-                  {u ? u.name : id}
+                  {u ? toInitials(u.name) : id}
                 </button>
               );
             })}
@@ -467,7 +437,7 @@ function App() {
         <div className="flex items-center space-x-4">
           <div className="bg-[#f0efff] p-2 rounded-xl text-[#6157e8]"><HeartHandshake size={24} strokeWidth={2.5} /></div>
           <div>
-            <h1 className="font-bold text-xl text-[#1a1f36] leading-tight">Support Link</h1>
+            <h1 className="font-bold text-xl text-[#1a1f36] leading-tight font-sans">Support Link</h1>
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Halswell Hub</div>
           </div>
         </div>
@@ -556,9 +526,9 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
     <div className="animate-fade-in pb-20 max-w-5xl mx-auto space-y-6">
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">{user.name} Timetable Portal</h2>
+          <h2 className="text-2xl font-bold text-slate-800">{toInitials(user.name)} Timetable Portal</h2>
           <p className="text-xs text-slate-400 mt-1 flex items-center">
-            Allocated SENCO: <strong className="ml-1 text-[#6157e8]">{user.allocatedSenco === 'senco_cathie' ? 'Cathie Zelas' : user.allocatedSenco === 'senco_tracey' ? 'Tracey Mora' : 'Shared (None / Both)'}</strong>
+            Allocated SENCO: <strong className="ml-1 text-[#6157e8]">{user.allocatedSenco === 'senco_cathie' ? 'C.Z.' : user.allocatedSenco === 'senco_tracey' ? 'T.M.' : 'Shared (None / Both)'}</strong>
           </p>
         </div>
         <button onClick={() => setShowAbsenceForm(true)} className="px-5 py-3 bg-[#e04f64] hover:bg-[#c93e53] text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-colors shadow-sm">Report Absence / Leave</button>
@@ -630,7 +600,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                       if (assignedTeachers.length === 0) return null;
                       return (
                         <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-semibold px-2 py-0.5 rounded mt-1.5">
-                          Teacher: {assignedTeachers.map(t => t.name).join(' & ')}
+                          Teacher: {assignedTeachers.map(t => toInitials(t.name)).join(' & ')}
                         </span>
                       );
                     })()}
@@ -722,13 +692,13 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   const taConflictTaName = useMemo(() => {
     if (!editingCell?.taId) return '';
     const found = users.find(u => u.id === editingCell.taId);
-    return found ? found.name : 'Selected TA';
+    return found ? toInitials(found.name) : 'Selected TA';
   }, [editingCell, users]);
 
   const studentConflictTaName = useMemo(() => {
     if (!studentConflictSession) return '';
     const found = users.find(u => u.id === studentConflictSession.taId);
-    return found ? found.name : 'Another TA';
+    return found ? toInitials(found.name) : 'Another TA';
   }, [studentConflictSession, users]);
 
   const isSubmitDisabled = (taConflictSession || studentConflictSession) && !overrideConfirm;
@@ -760,7 +730,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
       reply: "",
       approvedByStuart: "N/A"
     });
-    addToast(`Simulated absence alert created for ${target.name}!`, "info");
+    addToast(`Simulated absence alert created for ${toInitials(target.name)}!`, "info");
   };
 
   const handleStartEditStaff = (staff) => {
@@ -828,7 +798,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-2xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold">Welcome back, {currentUser.name}</h2>
+          <h2 className="text-xl font-bold">Welcome back, {toInitials(currentUser.name)}</h2>
           <div className="flex items-center gap-3 mt-1 text-xs">
             <span className="font-semibold text-slate-400">Team:</span>
             <select value={activeTeamFilter} onChange={e => setActiveTeamFilter(e.target.value)} className="bg-slate-100 p-1 rounded font-bold border outline-none cursor-pointer">
@@ -837,8 +807,8 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
           </div>
         </div>
         <div className="flex bg-slate-100 p-1 rounded-xl">
-          <button onClick={() => setActiveDashboardTab('timetable')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'timetable' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-50'}`}>Master Timetable</button>
-          <button onClick={() => setActiveDashboardTab('students')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'students' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-50'}`}>Student Views</button>
+          <button onClick={() => setActiveDashboardTab('timetable')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'timetable' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Master Timetable</button>
+          <button onClick={() => setActiveDashboardTab('students')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'students' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>Student Views</button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => setShowCriticalCoverBoard(true)} className="px-4 py-2 bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-colors"><AlertTriangle size={14} /> Critical Coverage Board</button>
@@ -857,7 +827,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500"></div>
                   <div className="pl-2">
                     <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase">{ta?.team || 'TA Aide'}</span>
-                    <h4 className="font-bold text-slate-800 mt-1">{ta?.name || 'Staff Aide'} reported {a.isAdvance ? 'advance leave' : 'sick'} on {a.formattedDate}</h4>
+                    <h4 className="font-bold text-slate-800 mt-1">{toInitials(ta?.name || 'Staff Aide')} reported {a.isAdvance ? 'advance leave' : 'sick'} on {a.formattedDate}</h4>
                     <p className="text-slate-500 text-xs italic mt-2">"{a.reason}"</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -962,7 +932,7 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Teacher</label>
                 <select name="teacherId" value={modalTeacherId} onChange={(e) => setModalTeacherId(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
                   <option value="">None / Self-Directed</option>
-                  {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{toInitials(t.name)}</option>)}
                 </select>
               </div>
 
@@ -1003,32 +973,91 @@ function SencoDashboard({ currentUser, users, sessions, absences, addToast, addU
   );
 }
 
+function TeamLeaderDashboard({ user, sessions, users }) {
+  const [selectedDay, setSelectedDay] = useState('Monday');
+  const teamSessions = sessions.filter(s => s.day === selectedDay && s.teamLeaderId === user.id);
+
+  return (
+    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto font-sans">
+      <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
+        <div>
+          <h2 className="text-2xl font-bold text-[#1a1f36]">{toInitials(user.name)} Dashboard</h2>
+          <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Team Leader View</p>
+        </div>
+        <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none cursor-pointer">
+          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </div>
+
+      <div className="bg-white rounded-[28px] border border-slate-200 overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+          <h3 className="font-bold text-slate-800 text-md">Your Assigned Team Schedules</h3>
+        </div>
+        <div className="p-0">
+          <TimetableGrid sessions={teamSessions} day={selectedDay} users={users} isEditable={false} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeacherDashboard({ user, sessions, users }) {
+  const [selectedDay, setSelectedDay] = useState('Monday');
+  const teacherSessions = sessions.filter(s => 
+    s.day === selectedDay && 
+    (s.teacherId === user.id || (s.teacherIds && s.teacherIds.includes(user.id)))
+  );
+
+  return (
+    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto font-sans">
+      <div className="flex justify-between items-center bg-[#f8fafc] p-6 rounded-[24px] border border-slate-100">
+        <div>
+          <h2 className="text-2xl font-bold text-[#1a1f36]">{toInitials(user.name)} Dashboard</h2>
+          <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Teacher View</p>
+        </div>
+        <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 cursor-pointer">
+          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </div>
+
+      <div className="bg-white rounded-[28px] border border-slate-100 overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+          <h3 className="font-bold text-slate-800 text-md">Your Supporting TAs</h3>
+        </div>
+        <div className="p-0">
+          <TimetableGrid sessions={teacherSessions} day={selectedDay} users={users} isEditable={false} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StudentTimetablesView({ sessions, users, addToast }) {
   const autoTrackedStudents = useMemo(() => {
     const ignoredKeywords = [
       'lunch', 'morning tea', 'tea', 'no cover', 'break', 'not working', 
       'interval', 'meeting', 'duty', 'admin', 'planning', 'free session', 
       'Ōtawhito', 'otawhito', 'esol', 'office', 'classroom', 'check-in',
-      'monitor', 'support', 'supervise', 'check', 'supervision'
+      'monitor', 'support', 'supervise', 'check', 'supervision', 'planning time'
     ];
-    const found = new Set(['H.W', 'E.S']);
+    const found = new Set();
     
     sessions.forEach(s => {
-      if (s.tier !== TIERS.CRITICAL && s.tier !== TIERS.HIGH_NEEDS) return;
       if (!s.subject) return;
-      const parts = s.subject.split(/[-\/&+]|\band\b/i);
-      parts.forEach(part => {
-        let cleaned = part.replace(/\s*\(.*?\)\s*/g, ' ').trim();
-        if (!cleaned) return;
-        cleaned = cleaned.replace(/^(support|check|check-in|supervise|monitor|check)\s+/i, '').trim();
-        const lower = cleaned.toLowerCase();
-        const isTimeFormat = /\b\d{1,2}(:\d{2})?\s*(am|pm)?\b/i.test(lower);
-        const isIgnored = isTimeFormat || ignoredKeywords.some(keyword => lower === keyword || lower.includes(keyword) || lower.startsWith(keyword) || lower.endsWith(keyword));
-        if (!isIgnored && cleaned.length > 0 && cleaned.length <= 15) {
-          found.add(cleaned);
-        }
-      });
+      const lowerSubject = s.subject.toLowerCase().trim();
+      const isIgnored = ignoredKeywords.some(kw => lowerSubject === kw || lowerSubject.includes(kw));
+      if (isIgnored) return;
+
+      let cleaned = s.subject.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+      if (cleaned) {
+        found.add(cleaned);
+      }
     });
+    
+    if (found.size === 0) {
+      found.add('E.S');
+      found.add('H.W');
+    }
     return Array.from(found).sort();
   }, [sessions]);
 
@@ -1071,17 +1100,8 @@ function StudentTimetablesView({ sessions, users, addToast }) {
     });
 
     if (!matchingSession || !matchingSession.taId) return null;
-    
-    // Combine live Firestore users with INITIAL_USERS to ensure any unsynced TA names can still be resolved
-    const resolverList = [...users];
-    INITIAL_USERS.forEach(iu => {
-      if (!resolverList.some(u => u.id === iu.id)) {
-        resolverList.push(iu);
-      }
-    });
-
-    const ta = resolverList.find(u => u.id === matchingSession.taId);
-    return ta ? ta.name.split(' ')[0] : null; 
+    const ta = users.find(u => u.id === matchingSession.taId);
+    return ta ? toInitials(ta.name) : null; 
   };
 
   const totalWeeklySlots = TIME_SLOTS.length * DAYS.length;
@@ -1265,243 +1285,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
   );
 }
 
-function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose, addToast }) {
-  const criticalSessions = sessions.filter(s => 
-    s.day === day && 
-    (s.tier === TIERS.CRITICAL || s.tier === TIERS.HIGH_NEEDS)
-  );
-
-  const tas = users.filter(u => {
-    const roles = u.roles || [u.role];
-    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
-  });
-
-  const getTaAvailabilityInfo = (ta, targetSlotId) => {
-    const otherSession = sessions.find(s => 
-      s.day === day && 
-      s.timeSlotId === targetSlotId && 
-      s.taId === ta.id
-    );
-
-    if (!otherSession) {
-      return { label: '⭐ Available (No assigned duty)', score: 0 };
-    }
-    if (otherSession.tier === TIERS.NOT_WORKING) {
-      return { label: '⛔ Not Working', score: 100 };
-    }
-    if (otherSession.tier === TIERS.ENRICHMENT) {
-      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
-    }
-    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
-      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
-    }
-    if (otherSession.tier === TIERS.HIGH_NEEDS) {
-      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
-    }
-    if (otherSession.tier === TIERS.CRITICAL) {
-      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
-    }
-    return { label: `Busy: ${otherSession.subject}`, score: 5 };
-  };
-
-  return (
-    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4 font-sans">
-      <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col overflow-hidden border border-amber-200">
-        <div className="border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
-          <div>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="text-amber-500 w-6 h-6" />
-              <h3 className="text-2xl font-bold text-[#1a1f36]">Critical Student Coverage Manager</h3>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Directly reallocate available Teacher Aides from other duties to ensure high-priority students on {day} are covered.
-            </p>
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-          {criticalSessions.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 font-semibold">
-              No Critical or High Needs students require duties on {day}.
-            </div>
-          ) : (
-            criticalSessions.map(session => {
-              const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
-              const assignedTa = tas.find(t => t.id === session.taId);
-              
-              const sortedTasForSlot = [...tas].sort((a, b) => {
-                const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
-                const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
-                if (infoA.score !== infoB.score) return infoA.score - infoB.score;
-                return a.name.localeCompare(b.name);
-              });
-
-              return (
-                <div key={session.id} className="border border-slate-100 bg-slate-50/40 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-amber-300 transition-colors">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                        {session.tier}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-500">
-                        {slot?.start} - {slot?.end}
-                      </span>
-                    </div>
-                    <h4 className="font-bold text-slate-800 text-base">{session.subject}</h4>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Current Caretaker: <strong className="text-[#6157e8]">{assignedTa ? assignedTa.name : 'Unassigned'}</strong>
-                    </p>
-                  </div>
-
-                  <div className="w-full md:w-auto">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Reassign Cover (Best Matches First):</label>
-                    <select
-                      value={session.taId || ''}
-                      onChange={(e) => {
-                        const newTaId = e.target.value;
-                        if (newTaId) {
-                          saveSessionToDb({ ...session, taId: newTaId });
-                          const targetTaName = tas.find(t => t.id === newTaId)?.name || 'TA';
-                          addToast(`Reassigned "${session.subject}" to ${targetTaName}`, 'success');
-                        }
-                      }}
-                      className="w-full md:w-72 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-1 focus:ring-[#6157e8] outline-none cursor-pointer"
-                    >
-                      <option value="">-- Select cover TA --</option>
-                      {sortedTasForSlot.map(ta => {
-                        const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
-                        return (
-                          <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-500"}>
-                            {ta.name} ({availabilityInfo.label})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <div className="border-t border-slate-100 pt-4 mt-4 flex justify-end">
-          <button onClick={onClose} className="px-6 py-3 bg-[#1a1f36] hover:bg-black text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-sm transition-all">
-            Close Board
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
-  const absentTa = users.find(u => u.id === absence.taId) || INITIAL_USERS.find(u => u.id === absence.taId);
-  const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
-  
-  const otherTas = users
-    .filter(u => {
-      const roles = u.roles || [u.role];
-      return (roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER)) && u.id !== absence.taId;
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
-  
-  const [assignments, setAssignments] = useState({});
-
-  useEffect(() => {
-    const initial = {};
-    absentSessions.forEach(s => {
-      initial[s.id] = '';
-    });
-    setAssignments(initial);
-  }, [sessions, absence]);
-
-  const getTaAvailabilityInfo = (ta, targetSlotId) => {
-    const otherSession = sessions.find(s => 
-      s.day === absence.day && 
-      s.timeSlotId === targetSlotId && 
-      s.taId === ta.id
-    );
-
-    if (!otherSession) {
-      return { label: '⭐ Available (No assigned duty)', score: 0 };
-    }
-    if (otherSession.tier === TIERS.NOT_WORKING) {
-      return { label: '⛔ Not Working', score: 100 };
-    }
-    if (otherSession.tier === TIERS.ENRICHMENT) {
-      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
-    }
-    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
-      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
-    }
-    if (otherSession.tier === TIERS.HIGH_NEEDS) {
-      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
-    }
-    if (otherSession.tier === TIERS.CRITICAL) {
-      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
-    }
-    return { label: `Busy: ${otherSession.subject}`, score: 5 };
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in font-sans">
-        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {absentTa?.name}</h3>
-        <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
-        
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
-          {absentSessions.map(session => {
-            const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
-
-            const sortedOtherTas = [...otherTas].sort((a, b) => {
-              const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
-              const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
-              if (infoA.score !== infoB.score) return infoA.score - infoB.score;
-              return a.name.localeCompare(b.name);
-            });
-
-            return (
-              <div key={session.id} className="border border-slate-100 bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    <span>{slot?.start} - {slot?.end}</span>
-                    <span className="mx-2">•</span>
-                    <span>{session?.tier}</span>
-                  </div>
-                  <div className="font-bold text-[#1a1f36] text-sm">{session?.subject}</div>
-                </div>
-                <select
-                  value={assignments[session.id] || ''}
-                  onChange={(e) => setAssignments(prev => ({ ...prev, [session.id]: e.target.value }))}
-                  className="w-full sm:w-56 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-[#6157e8] outline-none cursor-pointer"
-                >
-                  <option value="">Leave Uncovered</option>
-                  {sortedOtherTas.map(ta => {
-                    const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
-                    return (
-                      <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-500"}>
-                        {ta.name} ({availabilityInfo.label})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="flex justify-end space-x-3 border-t border-slate-100 pt-4">
-          <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
-          <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilter }) {
-  // Set default view mode to "all" (Full Grid overview) to change the default rendering as requested
   const [viewMode, setViewMode] = useState('all'); 
   
   const allTas = users.filter(u => {
@@ -1536,8 +1320,8 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
           {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
         </div>
         <div className="flex bg-slate-200/60 p-1 rounded-xl">
-          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Individual TA</button>
-          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-[#1a1f36] shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Full Grid</button>
+          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Individual TA</button>
+          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>Full Grid</button>
         </div>
       </div>
 
@@ -1552,7 +1336,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                   activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                 }`}
               >
-                {ta.name}
+                {toInitials(ta.name)}
               </button>
             ))}
           </div>
@@ -1594,22 +1378,16 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                               {session.subject}
                             </h4>
                             
-                            {(session.teacherId || session.teacherIds || session.teamLeaderId) && (
+                            {(session.teacherId || session.teamLeaderId) && (
                               <div className="mt-2 flex flex-wrap gap-1.5">
-                                {(() => {
-                                  const assignedTeachers = session.teacherIds 
-                                    ? users.filter(u => session.teacherIds.includes(u.id)) 
-                                    : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
-                                  if (assignedTeachers.length === 0) return null;
-                                  return (
-                                    <span className="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
-                                      T: {assignedTeachers.map(t => t.name).join(' & ')}
-                                    </span>
-                                  );
-                                })()}
+                                {session.teacherId && (
+                                  <span className="bg-slate-100 text-slate-600 text-[9px] font-semibold px-2 py-0.5 rounded">
+                                    T: {toInitials(users.find(u => u.id === session.teacherId)?.name || 'Teacher')}
+                                  </span>
+                                )}
                                 {session.teamLeaderId && (
-                                  <span className="bg-purple-50 text-purple-600 text-[9px] font-bold px-2 py-0.5 rounded-md">
-                                    L: {users.find(u => u.id === session.teamLeaderId)?.name || 'Leader'}
+                                  <span className="bg-purple-100 text-purple-700 text-[9px] font-semibold px-2 py-0.5 rounded">
+                                    L: {toInitials(users.find(u => u.id === session.teamLeaderId)?.name || 'Leader')}
                                   </span>
                                 )}
                               </div>
@@ -1639,7 +1417,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                 <th className="p-4 bg-white text-slate-400 font-medium text-xs uppercase tracking-wider w-32 sticky top-0 left-0 z-30 shadow-[inset_0_-2px_0_#f1f5f9,inset_-2px_0_0_#f1f5f9]">Time</th>
                 {tas.map(ta => (
                   <th key={ta.id} className="p-4 bg-white text-[#1a1f36] font-semibold text-sm sticky top-0 z-20 shadow-[inset_0_-2px_0_#f1f5f9]" style={{ width: '220px' }}>
-                    <div className="truncate">{ta.name}</div>
+                    <div className="truncate">{toInitials(ta.name)}</div>
                     <div className="text-[10px] text-slate-400 font-normal mt-0.5 truncate">{ta.team}</div>
                   </th>
                 ))}
@@ -1675,17 +1453,6 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                             <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-500' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </div>
-                            {(() => {
-                              const assignedTeachers = session.teacherIds 
-                                ? users.filter(u => session.teacherIds.includes(u.id)) 
-                                : (session.teacherId ? [users.find(u => u.id === session.teacherId)].filter(Boolean) : []);
-                              if (assignedTeachers.length === 0) return null;
-                              return (
-                                <span className="text-[9px] font-bold text-slate-400 mt-1 truncate">
-                                  {assignedTeachers.map(t => t.name.split(' ')[0]).join(' & ')}
-                                </span>
-                              );
-                            })()}
                           </div>
                         ) : (
                           <div className="bg-slate-50/50 rounded-xl p-3 h-full border border-dashed border-slate-200 flex items-center justify-center text-slate-400 text-xs font-medium min-h-[80px] group-hover:border-[#6157e8]/50 group-hover:bg-[#f0efff]/50 transition-colors">Free</div>
@@ -1699,65 +1466,6 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
           </table>
         </div>
       )}
-    </div>
-  );
-}
-
-function TeamLeaderDashboard({ user, sessions, users }) {
-  const [selectedDay, setSelectedDay] = useState('Monday');
-  const teamSessions = sessions.filter(s => s.day === selectedDay && s.teamLeaderId === user.id);
-
-  return (
-    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto font-sans">
-      <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[24px] border border-slate-200">
-        <div>
-          <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
-          <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Team Leader View</p>
-        </div>
-        <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 outline-none cursor-pointer">
-          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-      </div>
-
-      <div className="bg-white rounded-[28px] border border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="font-bold text-slate-800 text-md">Your Assigned Team Schedules</h3>
-        </div>
-        <div className="p-0">
-          <TimetableGrid sessions={teamSessions} day={selectedDay} users={users} isEditable={false} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TeacherDashboard({ user, sessions, users }) {
-  const [selectedDay, setSelectedDay] = useState('Monday');
-  const teacherSessions = sessions.filter(s => 
-    s.day === selectedDay && 
-    (s.teacherId === user.id || (s.teacherIds && s.teacherIds.includes(user.id)))
-  );
-
-  return (
-    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto font-sans">
-      <div className="flex justify-between items-center bg-[#f8fafc] p-6 rounded-[24px] border border-slate-100">
-        <div>
-          <h2 className="text-2xl font-bold text-[#1a1f36]">{user.name} Dashboard</h2>
-          <p className="text-xs font-semibold text-[#6157e8] uppercase mt-1 tracking-wider">Teacher View</p>
-        </div>
-        <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)} className="bg-white border border-slate-200 text-[#1a1f36] font-semibold rounded-xl px-4 py-2.5 cursor-pointer">
-          {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-      </div>
-
-      <div className="bg-white rounded-[28px] border border-slate-100 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="font-bold text-slate-800 text-md">Your Supporting TAs</h3>
-        </div>
-        <div className="p-0">
-          <TimetableGrid sessions={teacherSessions} day={selectedDay} users={users} isEditable={false} />
-        </div>
-      </div>
     </div>
   );
 }
