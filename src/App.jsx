@@ -783,12 +783,6 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
   const [activeTeamFilter, setActiveTeamFilter] = useState(TEAMS.ALL);
   const [sencoReplies, setSencoReplies] = useState({});
 
-  const [showCopyDayModal, setShowCopyDayModal] = useState(false);
-  const [copyScope, setCopyScope] = useState('whole-day'); 
-  const [copySelectedTaId, setCopySelectedTaId] = useState('');
-  const [copyTargetDays, setCopyTargetDays] = useState({ Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false });
-  const [copyOverwrite, setCopyOverwrite] = useState(true);
-
   const [modalSubject, setModalSubject] = useState('');
   const [modalTier, setModalTier] = useState(TIERS.ENRICHMENT);
   const [modalTeacherId, setModalTeacherId] = useState('');
@@ -830,33 +824,12 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
   const isSubmitDisabled = (taConflictSession || studentConflictSession) && !overrideConfirm;
 
   const directAbsences = absences.filter(a => a.status === 'Pending' && isSencoSupervisingTa(currentUser, users.find(u => u.id === a.taId)));
-  const coSencoAbsences = absences.filter(a => a.status === 'Pending' && !isSencoSupervisingTa(currentUser, users.find(u => u.id === a.taId)));
   const resolvedAbsences = absences.filter(a => a.status !== 'Pending').sort((a,b) => b.id.localeCompare(a.id));
 
   const handleUpdateAbsenceStatus = async (absence, newStatus) => {
     const replyText = sencoReplies[absence.id] || "Approved cover.";
     await saveAbsenceToDb({ ...absence, status: newStatus, reply: replyText });
     addToast("Absence status logged securely to Cloud database.", 'success');
-  };
-
-  const handleTriggerTestAlert = async () => {
-    const list = users.filter(u => u.roles?.includes(ROLES.TA) || u.role === ROLES.TA);
-    const target = list[Math.floor(Math.random() * list.length)] || users[0];
-    if (!target) return;
-    await saveAbsenceToDb({
-      id: 'abs_' + Date.now(),
-      taId: target.id,
-      day: selectedDay,
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0],
-      formattedDate: "Today",
-      isAdvance: false,
-      reason: "Feeling unwell, unable to make morning shift.",
-      status: "Pending",
-      reply: "",
-      approvedByStuart: "N/A"
-    });
-    addToast(`Simulated absence alert created for ${toInitials(target.name)}!`, "info");
   };
 
   const handleStartEditStaff = (staff) => {
@@ -1253,7 +1226,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
       'bg-purple-50 text-purple-800 border-purple-200/50',
       'bg-pink-50 text-pink-800 border-pink-200/50',
       'bg-amber-50 text-amber-800 border-amber-200/50',
-      'bg-[#f5f3ff] text-violet-800 border-violet-200/50',
+      'bg-indigo-50 text-indigo-800 border-indigo-200/50',
       'bg-teal-50 text-teal-800 border-teal-200/50'
     ];
     return colors[hash % colors.length];
@@ -1459,7 +1432,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                 key={ta.id}
                 onClick={() => setActiveTaId(ta.id)}
                 className={`px-5 py-2.5 rounded-full text-xs font-bold tracking-wider whitespace-nowrap transition-all duration-150 ${
-                  activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-505'
+                  activeTaId === ta.id ? 'bg-[#6157e8] text-white shadow-md' : 'bg-slate-50 border border-slate-200/60 text-slate-550'
                 }`}
               >
                 {toInitials(ta.name)}
@@ -1576,7 +1549,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
                             <span className={`text-[9px] tracking-wider uppercase mb-1 ${session.tier === TIERS.NOT_WORKING ? 'font-normal' : 'font-semibold'} ${style?.text}`}>
                               {session.tier}
                             </span>
-                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-505' : 'font-medium text-slate-800'}`}>
+                            <div className={`text-sm leading-tight font-normal ${session.tier === TIERS.NOT_WORKING ? 'font-normal text-slate-550' : 'font-medium text-slate-800'}`}>
                               {session.subject}
                             </div>
                           </div>
@@ -1592,6 +1565,241 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose, addToast }) {
+  const criticalSessions = sessions.filter(s => 
+    s.day === day && 
+    (s.tier === TIERS.CRITICAL || s.tier === TIERS.HIGH_NEEDS)
+  );
+
+  const tas = users.filter(u => {
+    const roles = u.roles || [u.role];
+    return roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER);
+  });
+
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
+  return (
+    <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4 font-sans">
+      <div className="bg-white rounded-[32px] shadow-2xl max-w-4xl w-full p-8 animate-fade-in max-h-[90vh] flex flex-col overflow-hidden border border-amber-200">
+        <div className="border-b border-slate-100 pb-4 mb-4 flex justify-between items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="text-amber-500 w-6 h-6" />
+              <h3 className="text-2xl font-bold text-[#1a1f36]">Critical Student Coverage Manager</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Directly reallocate available Teacher Aides from other duties to ensure high-priority students on {day} are covered.
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          {criticalSessions.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 font-semibold">
+              No Critical or High Needs students require duties on {day}.
+            </div>
+          ) : (
+            criticalSessions.map(session => {
+              const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+              const assignedTa = tas.find(t => t.id === session.taId);
+              
+              const sortedTasForSlot = [...tas].sort((a, b) => {
+                const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+                const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+                if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+                return a.name.localeCompare(b.name);
+              });
+
+              return (
+                <div key={session.id} className="border border-slate-100 bg-slate-50/40 p-4 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-amber-300 transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        {session.tier}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-500">
+                        {slot?.start} - {slot?.end}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-base">{session.subject}</h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Current Caretaker: <strong className="text-[#6157e8]">{assignedTa ? toInitials(assignedTa.name) : 'Unassigned'}</strong>
+                    </p>
+                  </div>
+
+                  <div className="w-full md:w-auto">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Reassign Cover (Best Matches First):</label>
+                    <select
+                      value={session.taId || ''}
+                      onChange={(e) => {
+                        const newTaId = e.target.value;
+                        if (newTaId) {
+                          saveSessionToDb({ ...session, taId: newTaId });
+                          const targetTaName = tas.find(t => t.id === newTaId)?.name || 'TA';
+                          addToast(`Reassigned "${session.subject}" to ${toInitials(targetTaName)}`, 'success');
+                        }
+                      }}
+                      className="w-full md:w-72 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-1 focus:ring-[#6157e8] outline-none cursor-pointer"
+                    >
+                      <option value="">-- Select cover TA --</option>
+                      {sortedTasForSlot.map(ta => {
+                        const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
+                        return (
+                          <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-50"}>
+                            {toInitials(ta.name)} ({availabilityInfo.label})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 mt-4 flex justify-end">
+          <button onClick={onClose} className="px-6 py-3 bg-[#1a1f36] hover:bg-black text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-sm transition-all">
+            Close Board
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
+  const absentTa = users.find(u => u.id === absence.taId) || INITIAL_USERS.find(u => u.id === absence.taId);
+  const absentSessions = sessions.filter(s => s.day === absence.day && s.taId === absence.taId);
+  
+  const otherTas = users
+    .filter(u => {
+      const roles = u.roles || [u.role];
+      return (roles.includes(ROLES.TA) || roles.includes(ROLES.ORS_TEACHER)) && u.id !== absence.taId;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  
+  const [assignments, setAssignments] = useState({});
+
+  useEffect(() => {
+    const initial = {};
+    absentSessions.forEach(s => {
+      initial[s.id] = '';
+    });
+    setAssignments(initial);
+  }, [sessions, absence]);
+
+  const getTaAvailabilityInfo = (ta, targetSlotId) => {
+    const otherSession = sessions.find(s => 
+      s.day === absence.day && 
+      s.timeSlotId === targetSlotId && 
+      s.taId === ta.id
+    );
+
+    if (!otherSession) {
+      return { label: '⭐ Available (No assigned duty)', score: 0 };
+    }
+    if (otherSession.tier === TIERS.NOT_WORKING) {
+      return { label: '⛔ Not Working', score: 100 };
+    }
+    if (otherSession.tier === TIERS.ENRICHMENT) {
+      return { label: `⚡ Enrichment: ${otherSession.subject} (Safe to reassign)`, score: 1 };
+    }
+    if (otherSession.tier === TIERS.MORNING_TEA || otherSession.tier === TIERS.LUNCH) {
+      return { label: `☕ Break: ${otherSession.subject}`, score: 2 };
+    }
+    if (otherSession.tier === TIERS.HIGH_NEEDS) {
+      return { label: `⚠️ High Needs: ${otherSession.subject}`, score: 3 };
+    }
+    if (otherSession.tier === TIERS.CRITICAL) {
+      return { label: `🚨 Critical: ${otherSession.subject}`, score: 4 };
+    }
+    return { label: `Busy: ${otherSession.subject}`, score: 5 };
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl animate-fade-in font-sans">
+        <h3 className="text-2xl font-bold text-slate-800 mb-2">Coverage: {toInitials(absentTa?.name)}</h3>
+        <p className="text-slate-500 text-sm mb-6">Assign replacement staff for {absence.day}'s schedule.</p>
+        
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-6">
+          {absentSessions.map(session => {
+            const slot = TIME_SLOTS.find(t => t.id === session.timeSlotId);
+
+            const sortedOtherTas = [...otherTas].sort((a, b) => {
+              const infoA = getTaAvailabilityInfo(a, session.timeSlotId);
+              const infoB = getTaAvailabilityInfo(b, session.timeSlotId);
+              if (infoA.score !== infoB.score) return infoA.score - infoB.score;
+              return a.name.localeCompare(b.name);
+            });
+
+            return (
+              <div key={session.id} className="border border-slate-100 bg-slate-50 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    <span>{slot?.start} - {slot?.end}</span>
+                    <span className="mx-2">•</span>
+                    <span>{session?.tier}</span>
+                  </div>
+                  <div className="font-bold text-[#1a1f36] text-sm">{session?.subject}</div>
+                </div>
+                <select
+                  value={assignments[session.id] || ''}
+                  onChange={(e) => setAssignments(prev => ({ ...prev, [session.id]: e.target.value }))}
+                  className="w-full sm:w-56 border border-slate-200 bg-white rounded-xl px-3 py-2 text-xs font-semibold focus:ring-[#6157e8] outline-none cursor-pointer"
+                >
+                  <option value="">Leave Uncovered</option>
+                  {sortedOtherTas.map(ta => {
+                    const availabilityInfo = getTaAvailabilityInfo(ta, session.timeSlotId);
+                    return (
+                      <option key={ta.id} value={ta.id} className={availabilityInfo.score === 0 ? "font-bold text-emerald-600" : availabilityInfo.score === 1 ? "text-indigo-600" : "text-slate-50"}>
+                        {toInitials(ta.name)} ({availabilityInfo.label})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-end space-x-3 border-t border-slate-100 pt-4">
+          <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
+          <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
+        </div>
+      </div>
     </div>
   );
 }
