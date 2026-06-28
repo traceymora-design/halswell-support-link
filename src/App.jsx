@@ -194,6 +194,14 @@ DAYS.forEach(day => {
   INITIAL_SESSIONS.push({ id: `hw_s1_t7_${day}`, day, taId: 't1', teacherId: 'u4', tier: TIERS.LUNCH, subject: 'H.W', timeSlotId: 't7' });
 });
 
+const Toast = ({ message, type = 'success' }) => (
+  <div className={`fixed bottom-4 right-4 flex items-center p-4 rounded-xl shadow-lg text-white transition-all z-50 animate-fade-in
+    ${type === 'success' ? 'bg-[#10b981]' : 'bg-[#6157e8]'}`}>
+    {type === 'success' ? <CheckCircle className="w-5 h-5 mr-3" /> : <Bell className="w-5 h-5 mr-3" />}
+    <p className="font-medium text-sm">{message}</p>
+  </div>
+);
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -257,6 +265,7 @@ function AppContent() {
     const merged = [];
     const seenIds = new Set();
     const seenEmails = new Set();
+    const seenNames = new Set();
 
     const hasFirstAndLastName = (name) => {
       if (!name) return false;
@@ -266,22 +275,26 @@ function AppContent() {
     users.forEach(u => {
       if (!hasFirstAndLastName(u.name)) return;
       const emailKey = u.email?.toLowerCase().trim();
+      const nameKey = u.name?.toLowerCase().trim();
       const idKey = u.id;
-      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey))) {
+      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey)) && (!nameKey || !seenNames.has(nameKey))) {
         merged.push(u);
         seenIds.add(idKey);
         if (emailKey) seenEmails.add(emailKey);
+        if (nameKey) seenNames.add(nameKey);
       }
     });
 
     INITIAL_USERS.forEach(iu => {
       if (!hasFirstAndLastName(iu.name)) return;
       const emailKey = iu.email?.toLowerCase().trim();
+      const nameKey = iu.name?.toLowerCase().trim();
       const idKey = iu.id;
-      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey))) {
+      if (!seenIds.has(idKey) && (!emailKey || !seenEmails.has(emailKey)) && (!nameKey || !seenNames.has(nameKey))) {
         merged.push(iu);
         seenIds.add(idKey);
         if (emailKey) seenEmails.add(emailKey);
+        if (nameKey) seenNames.add(nameKey);
       }
     });
 
@@ -664,7 +677,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-8 space-y-4">
         {sortedSessions.length === 0 ? (
-          <div className="text-center p-12 text-slate-400 font-medium">No active support duties allocated for {selectedDay}.</div>
+          <div className="text-center p-12 text-slate-400 font-medium">No duties allocated for {selectedDay}.</div>
         ) : (
           sortedSessions.map(({ slot, session }) => {
             const style = TIER_STYLES[session?.tier] || TIER_STYLES[TIERS.ENRICHMENT];
@@ -677,7 +690,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                 <div className={`flex-1 ml-4 md:ml-6 p-4 rounded-xl border flex items-center ${style?.wrapper}`}>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${style?.iconBg} ${style?.iconColor}`}><IconComponent size={18} /></div>
                   <div>
-                    <span className={`text-[9px] font-bold tracking-wider uppercase block ${style?.text}`}>{session?.tier}</span>
+                    <span className={`text-[9px] font-bold block uppercase ${style?.text}`}>{session?.tier}</span>
                     <h4 className="font-medium text-slate-800 text-sm md:text-base mt-0.5">{session?.subject}</h4>
                     {(() => {
                       const assignedTeachers = session?.teacherIds 
@@ -723,7 +736,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
   );
 }
 
-function SencoDashboard({ currentUser, users, sessions, absences, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb }) {
+function SencoDashboard({ currentUser, users, absences, sessions, addToast, addUserToDb, deleteUserFromDb, saveSessionToDb, deleteSessionFromDb, saveAbsenceToDb }) {
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [resolvingAbsence, setResolvingAbsence] = useState(null);
   const [editingCell, setEditingCell] = useState(null); 
