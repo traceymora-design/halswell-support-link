@@ -139,6 +139,12 @@ const getTierStyle = (tier) => {
   return matchedKey ? TIER_STYLES[matchedKey] : defaultStyle;
 };
 
+const toInitials = (name) => {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  return parts.map(p => p[0].toUpperCase()).join('.') + '.';
+};
+
 const isStudentMatch = (subjectText, studentText) => {
   if (!subjectText || !studentText) return false;
   const clean = (str) => str.toLowerCase()
@@ -833,6 +839,12 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
   const [activeTeamFilter, setActiveTeamFilter] = useState(TEAMS.ALL);
   const [sencoReplies, setSencoReplies] = useState({});
 
+  const [showCopyDayModal, setShowCopyDayModal] = useState(false);
+  const [copyScope, setCopyScope] = useState('whole-day'); 
+  const [copySelectedTaId, setCopySelectedTaId] = useState('');
+  const [copyTargetDays, setCopyTargetDays] = useState({ Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false });
+  const [copyOverwrite, setCopyOverwrite] = useState(true);
+
   const [modalSubject, setModalSubject] = useState('');
   const [modalTier, setModalTier] = useState(TIERS.ENRICHMENT);
   const [modalTeacherId, setModalTeacherId] = useState('');
@@ -942,6 +954,59 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
     setEditingCell(null);
   };
 
+  const handleCopySchedule = async () => {
+    const sourceSessions = sessions.filter(s => {
+      if (s.day !== selectedDay) return false;
+      if (copyScope === 'single-staff' && s.taId !== copySelectedTaId) return false;
+      return true;
+    });
+
+    if (sourceSessions.length === 0) {
+      addToast(`No ${copyScope === 'single-staff' ? 'staff ' : ''}sessions found on ${selectedDay} to copy.`, "error");
+      return;
+    }
+
+    const selectedTargetDays = Object.entries(copyTargetDays)
+      .filter(([_, isSelected]) => isSelected)
+      .map(([day, _]) => day);
+
+    if (selectedTargetDays.length === 0) {
+      addToast("Please select at least one target day to copy to.", "error");
+      return;
+    }
+
+    try {
+      for (const targetDay of selectedTargetDays) {
+        if (copyOverwrite) {
+          const sessionsToDelete = sessions.filter(s => {
+            if (s.day !== targetDay) return false;
+            if (copyScope === 'single-staff' && s.taId !== copySelectedTaId) return false;
+            return true;
+          });
+          for (const s of sessionsToDelete) {
+            await deleteSessionFromDb(s.id);
+          }
+        }
+
+        for (const sourceSess of sourceSessions) {
+          const newId = `sess_${targetDay}_${sourceSess.timeSlotId}_${sourceSess.taId || 'unassigned'}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+          await saveSessionToDb({
+            ...sourceSess,
+            id: newId,
+            day: targetDay
+          });
+        }
+      }
+      
+      addToast("Schedule copied successfully!", "success");
+      setShowCopyDayModal(false);
+      setCopyTargetDays({ Monday: false, Tuesday: false, Wednesday: false, Thursday: false, Friday: false });
+    } catch (error) {
+      console.error("Error copying schedule:", error);
+      addToast("Failed to copy schedule.", "error");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-2xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -959,6 +1024,7 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
           <button onClick={() => setActiveDashboardTab('students')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'students' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505'}`}>Student Views</button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => setShowCopyDayModal(true)} className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-colors"><Copy size={14} /> Copy Schedule</button>
           <button onClick={() => setShowCriticalCoverBoard(true)} className="px-4 py-2 bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-colors"><AlertTriangle size={14} /> Critical Coverage Board</button>
           <button onClick={() => setShowManageStaff(true)} className="px-4 py-2 bg-[#6157e8] text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-colors"><Users size={14} /> Manage Staff & Teams</button>
         </div>
@@ -1069,15 +1135,15 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
           <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
             <h3 className="text-2xl font-bold text-[#1a1f36] mb-6">{editingCell.session ? 'Edit Duty' : 'Assign Duty'}</h3>
             <form onSubmit={(e) => { e.preventDefault(); handleSaveSession({ subject: modalSubject, tier: modalTier, teacherId: modalTeacherId || null, teamLeaderId: modalTeamLeaderId || null }); }} className="space-y-4">
-              <div><label className="block text-xs font-bold text-slate-505 uppercase mb-2">Subject / Student Name</label><input type="text" name="subject" required value={modalSubject} onChange={(e) => setModalSubject(e.target.value)} className="w-full border rounded-xl px-4 py-3 text-slate-700" placeholder="e.g. ESOL / Reading Support..." /></div>
+              <div><label className="block text-xs font-bold text-slate-550 uppercase mb-2">Subject / Student Name</label><input type="text" name="subject" required value={modalSubject} onChange={(e) => setModalSubject(e.target.value)} className="w-full border rounded-xl px-4 py-3 text-slate-700" placeholder="e.g. ESOL / Reading Support..." /></div>
               <div>
-                <label className="block text-xs font-bold text-slate-505 uppercase mb-2">Priority Tier</label>
+                <label className="block text-xs font-bold text-slate-550 uppercase mb-2">Priority Tier</label>
                 <select name="tier" value={modalTier} onChange={(e) => setModalTier(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
                   {Object.values(TIERS).map(tier => <option key={tier} value={tier}>{tier}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-505 uppercase mb-2">Teacher</label>
+                <label className="block text-xs font-bold text-slate-550 uppercase mb-2">Teacher</label>
                 <select name="teacherId" value={modalTeacherId} onChange={(e) => setModalTeacherId(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
                   <option value="">None / Self-Directed</option>
                   {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -1116,6 +1182,114 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
 
       {showCriticalCoverBoard && (
         <CriticalCoverageBoard day={selectedDay} users={users} sessions={sessions} saveSessionToDb={saveSessionToDb} onClose={() => setShowCriticalCoverBoard(false)} addToast={addToast} />
+      )}
+
+      {showCopyDayModal && (
+        <div className="fixed inset-0 bg-[#1a1f36]/40 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 animate-fade-in border border-slate-100">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
+              <h3 className="text-xl font-bold text-[#1a1f36] flex items-center gap-2">
+                <Copy className="text-[#6157e8] w-5 h-5" /> Copy Schedule
+              </h3>
+              <button onClick={() => setShowCopyDayModal(false)} className="text-slate-400 hover:text-slate-600 font-bold text-xl">×</button>
+            </div>
+            
+            <div className="space-y-5 text-sm">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 font-sans">Source Day</label>
+                <div className="px-4 py-3 bg-slate-50 border rounded-xl font-bold text-[#1a1f36]">
+                  {selectedDay}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 font-sans">Scope</label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+                  <button 
+                    onClick={() => setCopyScope('whole-day')} 
+                    className={`py-2 rounded-lg transition-all ${copyScope === 'whole-day' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505'}`}
+                  >
+                    Whole Day
+                  </button>
+                  <button 
+                    onClick={() => setCopyScope('single-staff')} 
+                    className={`py-2 rounded-lg transition-all ${copyScope === 'single-staff' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505'}`}
+                  >
+                    Specific Staff
+                  </button>
+                </div>
+              </div>
+
+              {copyScope === 'single-staff' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 font-sans">Select Staff Member</label>
+                  <select 
+                    value={copySelectedTaId} 
+                    onChange={e => setCopySelectedTaId(e.target.value)}
+                    className="w-full border rounded-xl px-4 py-3 cursor-pointer text-xs font-semibold"
+                  >
+                    <option value="">-- Choose Teacher Aide --</option>
+                    {users.filter(u => u.roles?.includes(ROLES.TA) || u.role === ROLES.TA).map(ta => (
+                      <option key={ta.id} value={ta.id}>{ta.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 font-sans">Target Day(s)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {DAYS.map(day => (
+                    <label 
+                      key={day} 
+                      className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer select-none transition-all ${
+                        day === selectedDay ? 'opacity-40 cursor-not-allowed bg-slate-50' : 
+                        copyTargetDays[day] ? 'border-[#6157e8] bg-violet-50/30 text-[#6157e8] font-bold' : 'border-slate-200'
+                      }`}
+                    >
+                      <input 
+                        type="checkbox" 
+                        disabled={day === selectedDay}
+                        checked={copyTargetDays[day]}
+                        onChange={e => setCopyTargetDays({ ...copyTargetDays, [day]: e.target.checked })}
+                        className="rounded border-slate-300 text-[#6157e8] focus:ring-[#6157e8]"
+                      />
+                      <span className="text-xs">{day}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 bg-slate-50 border rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-700 block font-sans">Overwrite Existing Schedule</span>
+                  <span className="text-[10px] text-slate-400">Clear targets before pasting</span>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={copyOverwrite} 
+                  onChange={e => setCopyOverwrite(e.target.checked)}
+                  className="rounded border-slate-300 text-[#6157e8] focus:ring-[#6157e8] w-4 h-4 cursor-pointer"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <button 
+                  onClick={() => setShowCopyDayModal(false)} 
+                  className="px-5 py-3 text-slate-500 font-semibold text-xs uppercase"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleCopySchedule}
+                  className="px-6 py-3 bg-[#1a1f36] hover:bg-black text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-md transition-colors"
+                >
+                  Copy Schedule
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
