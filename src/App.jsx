@@ -1024,7 +1024,6 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
           <button onClick={() => setActiveDashboardTab('students')} className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeDashboardTab === 'students' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505'}`}>Student Views</button>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => setShowCopyDayModal(true)} className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-colors"><Copy size={14} /> Copy Schedule</button>
           <button onClick={() => setShowCriticalCoverBoard(true)} className="px-4 py-2 bg-amber-500 text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-colors"><AlertTriangle size={14} /> Critical Coverage Board</button>
           <button onClick={() => setShowManageStaff(true)} className="px-4 py-2 bg-[#6157e8] text-white font-bold rounded-xl text-xs flex items-center gap-1 transition-colors"><Users size={14} /> Manage Staff & Teams</button>
         </div>
@@ -1042,7 +1041,7 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
                   <div className="pl-2">
                     <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded uppercase">{ta?.team || 'TA Aide'}</span>
                     <h4 className="font-bold text-slate-800 mt-1">{ta?.name || 'Staff Aide'} reported {a.isAdvance ? 'advance leave' : 'sick'} on {a.formattedDate}</h4>
-                    <p className="text-slate-550 text-xs italic mt-2">"{a.reason}"</p>
+                    <p className="text-slate-555 text-xs italic mt-2">"{a.reason}"</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <input type="text" placeholder="Write reply note..." value={sencoReplies[a.id] || ''} onChange={e => setSencoReplies({ ...sencoReplies, [a.id]: e.target.value })} className="border p-2 rounded-lg text-xs" />
@@ -1064,7 +1063,15 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
               {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
-          <TimetableGrid sessions={sessions} day={selectedDay} users={users} isEditable={true} teamFilter={activeTeamFilter} onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} />
+          <TimetableGrid 
+            sessions={sessions} 
+            day={selectedDay} 
+            users={users} 
+            isEditable={true} 
+            teamFilter={activeTeamFilter} 
+            onCellClick={(timeSlotId, taId, session) => setEditingCell({timeSlotId, taId, session})} 
+            onCopyClick={() => setShowCopyDayModal(true)}
+          />
         </div>
       ) : (
         <StudentTimetablesView sessions={sessions} users={users} addToast={addToast} />
@@ -1607,7 +1614,7 @@ function StudentTimetablesView({ sessions, users, addToast }) {
   );
 }
 
-function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilter }) {
+function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilter, onCopyClick }) {
   const [viewMode, setViewMode] = useState('all'); 
   
   const allTas = users.filter(u => {
@@ -1637,13 +1644,23 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
 
   return (
     <div className="space-y-4 font-sans">
-      <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100">
+      <div className="flex items-center justify-between p-4 bg-slate-50 border-b border-slate-100 flex-wrap gap-2">
         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
           {viewMode === 'single' ? "Individual TA Mode" : "Birds-Eye Grid Overview"}
         </div>
-        <div className="flex bg-slate-200/60 p-1 rounded-xl">
-          <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Individual TA</button>
-          <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Full Grid</button>
+        <div className="flex items-center gap-3">
+          {isEditable && onCopyClick && (
+            <button 
+              onClick={onCopyClick}
+              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+            >
+              <Copy size={13} /> Copy Schedule
+            </button>
+          )}
+          <div className="flex bg-slate-200/60 p-1 rounded-xl">
+            <button onClick={() => setViewMode('single')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Individual TA</button>
+            <button onClick={() => setViewMode('all')} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-505 hover:text-slate-800'}`}>Full Grid</button>
+          </div>
         </div>
       </div>
 
