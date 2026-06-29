@@ -31,7 +31,7 @@ class ErrorBoundary extends React.Component {
           <div className="bg-white p-8 rounded-3xl shadow-xl border border-red-100 max-w-md w-full text-center">
             <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[#1a1f36] mb-2">Something went wrong</h2>
-            <p className="text-xs text-slate-500 mb-6">{this.state.errorInfo}</p>
+            <p className="text-xs text-slate-505 mb-6">{this.state.errorInfo}</p>
             <button 
               onClick={() => window.location.reload()} 
               className="w-full py-3 bg-[#6157e8] hover:bg-[#5249d6] text-white rounded-xl font-bold text-sm transition-colors"
@@ -532,7 +532,7 @@ function AppContent() {
           <div className="w-full max-w-sm bg-white p-8 rounded-[24px] shadow-sm border border-slate-100 space-y-6 animate-fade-in flex flex-col items-stretch">
             <form onSubmit={handleEmailLoginSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
+                <label className="block text-xs font-bold text-slate-505 uppercase tracking-wider mb-2">Email Address</label>
                 <input 
                   type="email" 
                   value={emailInput}
@@ -639,7 +639,7 @@ function AppContent() {
           <div className="bg-white p-8 rounded-3xl border text-center max-w-md mx-auto my-12 shadow-sm animate-fade-in">
             <AlertCircle className="w-12 h-12 text-[#6157e8] mx-auto mb-3" />
             <h3 className="font-bold text-slate-800 text-lg">No Dashboard Layout Assigned</h3>
-            <p className="text-xs text-slate-500 mt-2">
+            <p className="text-xs text-slate-550 mt-2">
               Your profile is registered with the role <strong className="text-[#6157e8]">"{activeRole || 'None'}"</strong>.
             </p>
             <p className="text-xs text-slate-400 mt-2">Please contact your system administrator or SENCO to configure an authorized dashboard role on your staff profile.</p>
@@ -741,7 +741,7 @@ function TADashboard({ user, sessions, absences, addToast, saveAbsenceToDb, user
                 </div>
               </div>
             )}
-            <div><label className="text-xs font-semibold block mb-1 text-slate-500">Reason / Details</label><textarea value={absenceReason} onChange={e => setAbsenceReason(e.target.value)} className="w-full border p-3 rounded-xl text-sm focus:ring-1 focus:ring-[#6157e8] outline-none" rows={3} placeholder="Please specify details..." /></div>
+            <div><label className="text-xs font-semibold block mb-1 text-slate-505">Reason / Details</label><textarea value={absenceReason} onChange={e => setAbsenceReason(e.target.value)} className="w-full border p-3 rounded-xl text-sm focus:ring-1 focus:ring-[#6157e8] outline-none" rows={3} placeholder="Please specify details..." /></div>
             <div className="flex justify-end space-x-2 pt-3 border-t">
               <button onClick={() => setShowAbsenceForm(false)} className="px-4 py-2.5 text-xs text-slate-500">Cancel</button>
               <button onClick={handleReportAbsence} className="px-5 py-2.5 bg-red-500 text-white rounded-xl text-xs font-bold uppercase">Submit to SENCO</button>
@@ -1154,6 +1154,15 @@ function SencoDashboard({ currentUser, users, absences, sessions, addToast, addU
                 <select name="teacherId" value={modalTeacherId} onChange={(e) => setModalTeacherId(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
                   <option value="">None / Self-Directed</option>
                   {users.filter(u => u.roles?.includes(ROLES.TEACHER) || u.role === ROLES.TEACHER).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+
+              {/* modular fix: adding the team leader selection field here */}
+              <div>
+                <label className="block text-xs font-bold text-slate-550 uppercase mb-2">Team Leader</label>
+                <select name="teamLeaderId" value={modalTeamLeaderId} onChange={(e) => setModalTeamLeaderId(e.target.value)} className="w-full border rounded-xl px-4 py-3 cursor-pointer">
+                  <option value="">None / Unassigned</option>
+                  {users.filter(u => u.roles?.includes(ROLES.TEAM_LEADER) || u.role === ROLES.TEAM_LEADER).map(tl => <option key={tl.id} value={tl.id}>{tl.name}</option>)}
                 </select>
               </div>
 
@@ -1765,7 +1774,7 @@ function TimetableGrid({ sessions, day, users, isEditable, onCellClick, teamFilt
             <tbody className="divide-y divide-slate-100">
               {TIME_SLOTS.map(slot => (
                 <tr key={slot.id} className="hover:bg-slate-50/30 transition-colors">
-                  <td className="p-4 font-normal text-slate-500 text-xs whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
+                  <td className="p-4 font-normal text-slate-505 text-xs whitespace-nowrap sticky left-0 z-10 bg-white shadow-[inset_-2px_0_0_#f1f5f9]">
                     {slot.label}
                   </td>
                   {tas.map(ta => {
@@ -1857,7 +1866,7 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
               <AlertTriangle className="text-amber-500 w-6 h-6" />
               <h3 className="text-2xl font-bold text-[#1a1f36]">Critical Student Coverage Manager</h3>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-slate-505 mt-1">
               Directly reallocate available Teacher Aides from other duties to ensure high-priority students on {day} are covered.
             </p>
           </div>
@@ -1893,7 +1902,7 @@ function CriticalCoverageBoard({ day, users, sessions, saveSessionToDb, onClose,
                       </span>
                     </div>
                     <h4 className="font-bold text-slate-800 text-base">{session.subject}</h4>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-505 mt-1">
                       Current Caretaker: <strong className="text-[#6157e8]">{assignedTa ? assignedTa.name : 'Unassigned'}</strong>
                     </p>
                   </div>
@@ -2036,7 +2045,7 @@ function CoverageResolver({ absence, users, sessions, onClose, onResolve }) {
         </div>
 
         <div className="flex justify-end space-x-3 border-t border-slate-100 pt-4">
-          <button onClick={onClose} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
+          <button onClick={onClose} className="px-5 py-3 text-slate-505 font-bold hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
           <button onClick={() => onResolve(assignments)} className="px-6 py-3 bg-[#1a1f36] text-white font-bold hover:bg-black rounded-xl text-sm transition-colors shadow-md">Approve Coverage</button>
         </div>
       </div>
